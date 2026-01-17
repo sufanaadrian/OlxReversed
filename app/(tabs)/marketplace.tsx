@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
 import type { Request } from "../../src/context/AppContext";
+import { supabase } from "../../src/lib/supabase";
+
 import { useApp } from "../../src/context/useApp";
 
 const categories = [
@@ -57,9 +59,21 @@ export default function Marketplace() {
     );
   };
 
-  const handleSwipe = (direction: "left" | "right") => {
+  const handleSwipe = async (direction: "left" | "right") => {
     if (!currentRequest) return;
-    if (direction === "right") addInterestedRequest(currentRequest);
+
+    if (direction === "right") {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+
+      if (!session) {
+        router.push("/sign-in");
+        return;
+      }
+
+      addInterestedRequest(currentRequest);
+    }
+
     goNext();
   };
 
