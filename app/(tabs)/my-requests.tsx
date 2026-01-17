@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "../../src/components/Screen";
 import type { Request } from "../../src/context/AppContext";
 import { useApp } from "../../src/context/useApp";
 
@@ -10,51 +9,49 @@ export default function MyRequestsScreen() {
   const { myRequests } = useApp();
 
   return (
-    <Screen>
-      <View style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.h1}>My Requests</Text>
+    <View style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.h1}>My Requests</Text>
+
+        <Pressable
+          onPress={() => router.push("/create-request")}
+          style={({ pressed }) => [
+            styles.createBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <Feather name="plus" size={20} color={theme.primaryText} />
+        </Pressable>
+      </View>
+
+      {/* Content */}
+      {myRequests.length === 0 ? (
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <Feather name="plus" size={22} color={theme.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>No requests yet</Text>
+          <Text style={styles.emptyText}>
+            Create your first request to get started
+          </Text>
 
           <Pressable
             onPress={() => router.push("/create-request")}
-            style={({ pressed }) => [
-              styles.createBtn,
-              pressed && { opacity: 0.9 },
-            ]}
+            style={styles.primaryBtn}
           >
-            <Feather name="plus" size={20} color={theme.primaryText} />
+            <Text style={styles.primaryBtnText}>Create Request</Text>
           </Pressable>
         </View>
-
-        {/* Content */}
-        {myRequests.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Feather name="plus" size={22} color={theme.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>No requests yet</Text>
-            <Text style={styles.emptyText}>
-              Create your first request to get started
-            </Text>
-
-            <Pressable
-              onPress={() => router.push("/create-request")}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Create Request</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <FlatList
-            contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-            data={myRequests}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <RequestRow request={item} />}
-          />
-        )}
-      </View>
-    </Screen>
+      ) : (
+        <FlatList
+          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          data={myRequests}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <RequestRow request={item} />}
+        />
+      )}
+    </View>
   );
 }
 

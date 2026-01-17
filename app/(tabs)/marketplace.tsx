@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -12,11 +13,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Screen } from "../../src/components/Screen";
-import type { Request } from "../../src/context/AppContext";
-import { supabase } from "../../src/lib/supabase";
-
 import { useApp } from "../../src/context/useApp";
+import { supabase } from "../../src/lib/supabase";
 
 const categories = [
   "All",
@@ -26,17 +24,82 @@ const categories = [
   "Electronics & Tech",
   "Fashion & Personal",
   "Other",
-];
+] as const;
+
+type Category = (typeof categories)[number];
+
+type RequestRow = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  budget_min: number;
+  budget_max: number;
+  type: "product" | "service";
+  status: "active" | "closed";
+  created_at: string;
+  location: string | null;
+};
 
 const { width } = Dimensions.get("window");
 const SWIPE_THRESHOLD = Math.min(120, width * 0.28);
 
-export default function Marketplace() {
-  const { requests, addInterestedRequest } = useApp();
+export default function MarketplaceScreen() {
+  // keep your app-context action for now
+  const { addInterestedRequest } = useApp();
+
+  const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+
+    const { data: sess } = await supabase.auth.getSession();
+    const userId = sess.session?.user.id ?? null;
+
+    // If logged in, fetch their swipes first, so we can exclude them
+    let excludedIds: string[] = [];
+    if (userId) {
+      const { data: swipes } = await supabase
+        .from("request_swipes")
+        .select("request_id")
+        .eq("user_id", userId);
+
+      excludedIds = (swipes ?? []).map((s: any) => s.request_id);
+    }
+
+    let query = supabase
+      .from("requests")
+      .select(
+        "id,title,description,category,budget_min,budget_max,type,status,created_at,location",
+      )
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (excludedIds.length > 0) {
+      query = query.not("id", "in", `(${excludedIds.join(",")})`);
+    }
+
+    const { data, error } = await query;
+
+    if (!error) {
+      setRequests((data ?? []) as any);
+      setCurrentIndex(0);
+    }
+
+    setLoading(false);
+  }, []);
+
+  // Refresh when you come back from the modal (or any time this tab focuses)
+  useFocusEffect(
+    useCallback(() => {
+      loadRequests();
+    }, [loadRequests]),
+  );
 
   const filteredRequests = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -54,148 +117,155 @@ export default function Marketplace() {
   const currentRequest = filteredRequests[currentIndex];
 
   const goNext = () => {
-    setCurrentIndex((prev) =>
-      Math.min(prev + 1, Math.max(filteredRequests.length - 1, 0)),
-    );
+    setCurrentIndex((prev) => prev + 1);
   };
 
   const handleSwipe = async (direction: "left" | "right") => {
     if (!currentRequest) return;
 
-    if (direction === "right") {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
+    // Always move UI forward immediately so the card disappears
+    goNext();
 
-      if (!session) {
-        router.push("/sign-in");
-        return;
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+
+    // If not logged in:
+    // - allow browsing
+    // - BUT we cannot save the swipe to DB, so it may reappear after refetch
+    if (!session) {
+      if (direction === "right") {
+        router.push({
+          pathname: "/sign-in",
+          params: { redirect: "/(tabs)/marketplace" },
+        } as any);
       }
-
-      addInterestedRequest(currentRequest);
+      return;
     }
 
-    goNext();
+    // Save swipe to DB (prevents it from reappearing)
+    await supabase.from("request_swipes").upsert({
+      user_id: session.user.id,
+      request_id: currentRequest.id,
+      direction,
+    });
+
+    // If RIGHT swipe, send user to My Offers (your desired UX)
+    if (direction === "right") {
+      router.push("/(tabs)/my-offers" as any);
+    }
   };
 
   return (
-    <Screen>
-      <View style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.h1}>Marketplace</Text>
-
-          <View style={styles.searchRow}>
-            <View style={styles.searchBox}>
-              <Feather name="search" size={18} color={theme.secondaryText} />
-              <TextInput
-                value={searchQuery}
-                onChangeText={(t) => {
-                  setSearchQuery(t);
-                  setCurrentIndex(0);
-                }}
-                placeholder="Search requests"
-                placeholderTextColor={theme.secondaryText}
-                style={styles.searchInput}
-              />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.iconBtn,
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={() => router.push("/filters")}
-            >
-              <Feather name="sliders" size={18} color={theme.primaryText} />
-            </Pressable>
+    <View style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Feather name="search" size={18} color={theme.secondaryText} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={(t) => {
+                setSearchQuery(t);
+                setCurrentIndex(0);
+              }}
+              placeholder="Search requests"
+              placeholderTextColor={theme.secondaryText}
+              style={styles.searchInput}
+            />
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
+          <Pressable
+            style={({ pressed }) => [
+              styles.iconBtn,
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={() => router.push("/filters")}
           >
-            {categories.map((c) => {
-              const selected = c === selectedCategory;
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => {
-                    setSelectedCategory(c);
-                    setCurrentIndex(0);
-                  }}
-                  style={[styles.chip, selected && styles.chipSelected]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      selected && styles.chipTextSelected,
-                    ]}
-                  >
-                    {c}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            <Feather name="sliders" size={18} color={theme.primaryText} />
+          </Pressable>
         </View>
 
-        {/* Swipe Area */}
-        <View style={styles.swipeArea}>
-          {currentIndex >= filteredRequests.length || !currentRequest ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>
-                {requests.length === 0
-                  ? "No requests loaded"
-                  : "No more requests"}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {requests.length === 0
-                  ? "Add mock requests to AppContext to see cards here."
-                  : "You've viewed all available requests in this category."}
-              </Text>
-
+        {/* Category chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {categories.map((c) => {
+            const selected = c === selectedCategory;
+            return (
               <Pressable
-                style={styles.secondaryBtn}
-                onPress={() => setCurrentIndex(0)}
+                key={c}
+                onPress={() => {
+                  setSelectedCategory(c);
+                  setCurrentIndex(0);
+                }}
+                style={[styles.chip, selected && styles.chipSelected]}
               >
-                <Text style={styles.secondaryBtnText}>Reset</Text>
+                <Text
+                  style={[styles.chipText, selected && styles.chipTextSelected]}
+                >
+                  {c}
+                </Text>
               </Pressable>
-            </View>
-          ) : (
-            <RequestCard
-              request={currentRequest}
-              remaining={filteredRequests.length - currentIndex}
-              total={filteredRequests.length}
-              onSwipe={handleSwipe}
-            />
-          )}
-        </View>
-
-        {/* Bottom actions */}
-        <View style={styles.actions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && { opacity: 0.9 },
-            ]}
-            onPress={() => handleSwipe("left")}
-          >
-            <Feather name="x" size={22} color={theme.primaryText} />
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && { opacity: 0.9 },
-            ]}
-            onPress={() => handleSwipe("right")}
-          >
-            <Feather name="check" size={22} color={theme.primaryText} />
-          </Pressable>
-        </View>
+            );
+          })}
+        </ScrollView>
       </View>
-    </Screen>
+
+      {/* Swipe Area */}
+      <View style={styles.swipeArea}>
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Loading…</Text>
+            <Text style={styles.emptySubtitle}>Fetching requests</Text>
+          </View>
+        ) : currentIndex >= filteredRequests.length || !currentRequest ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No more requests</Text>
+            <Text style={styles.emptySubtitle}>
+              Try another category or search.
+            </Text>
+
+            <Pressable style={styles.refreshBtn} onPress={loadRequests}>
+              <Text style={styles.refreshBtnText}>Refresh</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <RequestCard
+            request={currentRequest}
+            remaining={filteredRequests.length - currentIndex}
+            total={filteredRequests.length}
+            onSwipe={handleSwipe}
+          />
+        )}
+      </View>
+
+      {/* Bottom action buttons */}
+      <View style={styles.actions}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+          onPress={() => handleSwipe("left")}
+          disabled={loading || !currentRequest}
+        >
+          <Feather name="x" size={22} color={theme.primaryText} />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+          onPress={() => handleSwipe("right")}
+          disabled={loading || !currentRequest}
+        >
+          <Feather name="check" size={22} color={theme.primaryText} />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -205,7 +275,7 @@ function RequestCard({
   total,
   onSwipe,
 }: {
-  request: Request;
+  request: RequestRow;
   remaining: number;
   total: number;
   onSwipe: (direction: "left" | "right") => void;
@@ -234,9 +304,7 @@ function RequestCard({
       onMoveShouldSetPanResponder: (_evt, g) => Math.abs(g.dx) > 6,
       onPanResponderMove: Animated.event(
         [null, { dx: translate.x, dy: translate.y }],
-        {
-          useNativeDriver: false,
-        },
+        { useNativeDriver: false },
       ),
       onPanResponderRelease: (_evt, g) => {
         const dx = g.dx;
@@ -286,21 +354,9 @@ function RequestCard({
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
-
-        <Pressable
-          style={styles.detailsBtn}
-          onPress={() =>
-            router.push({
-              pathname: "/request/[id]",
-              params: { id: request.id },
-            } as any)
-          }
-        >
-          <Feather name="chevron-right" size={18} color={theme.primaryText} />
-        </Pressable>
       </View>
 
-      {/* Stack */}
+      {/* Stack background */}
       <View style={styles.stack}>
         <View style={styles.stackBg1} />
         <View style={styles.stackBg2} />
@@ -334,8 +390,8 @@ function RequestCard({
                   color={theme.secondaryText}
                 />
                 <Text style={styles.detailText}>
-                  ${request.budgetMin.toLocaleString()} - $
-                  {request.budgetMax.toLocaleString()}
+                  ${request.budget_min.toLocaleString()} - $
+                  {request.budget_max.toLocaleString()}
                 </Text>
               </View>
 
@@ -351,12 +407,12 @@ function RequestCard({
               )}
 
               <Text style={styles.posted}>
-                Posted {new Date(request.datePosted).toLocaleDateString()}
+                Posted {new Date(request.created_at).toLocaleDateString()}
               </Text>
             </View>
           </View>
 
-          {/* Indicators */}
+          {/* Swipe indicators */}
           <Animated.View
             style={[styles.indicatorLeft, { opacity: leftOpacity }]}
           >
@@ -376,6 +432,7 @@ function RequestCard({
 
 const theme = {
   primary: "#1E40AF",
+  success: "#16A34A",
   bg: "#F9FAFB",
   surface: "#FFFFFF",
   primaryText: "#020617",
@@ -388,13 +445,6 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.bg },
 
   header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-  h1: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: theme.primaryText,
-    marginBottom: 10,
-  },
-
   searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   searchBox: {
     flex: 1,
@@ -446,30 +496,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
+    gap: 10,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: theme.primaryText,
-    marginBottom: 6,
-  },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: theme.primaryText },
   emptySubtitle: {
     fontSize: 14,
     color: theme.secondaryText,
     textAlign: "center",
   },
-  secondaryBtn: {
-    marginTop: 14,
-    height: 44,
-    paddingHorizontal: 16,
+  refreshBtn: {
+    marginTop: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 14,
-    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: theme.bg,
   },
-  secondaryBtnText: { fontWeight: "900", color: theme.primaryText },
+  refreshBtnText: { fontWeight: "900", color: theme.primaryText },
 
   cardWrap: { flex: 1 },
   progressRow: {
@@ -499,16 +543,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressFill: { height: "100%", backgroundColor: theme.primary },
-  detailsBtn: {
-    height: 32,
-    width: 32,
-    borderRadius: 12,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
   stack: { flex: 1, alignItems: "center", justifyContent: "center" },
   stackBg1: {

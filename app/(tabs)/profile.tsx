@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
 
 export default function ProfileScreen() {
@@ -47,49 +46,47 @@ export default function ProfileScreen() {
   const isLoggedIn = !!email;
 
   return (
-    <Screen>
-      <View style={styles.container}>
-        <Text style={styles.h1}>Profile</Text>
+    <View style={styles.container}>
+      <Text style={styles.h1}>Profile</Text>
 
-        <View style={styles.card}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(email?.[0] ?? "U").toUpperCase()}
-            </Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{isLoggedIn ? "User" : "Guest"}</Text>
-            <Text style={styles.email}>{email ?? "Not signed in"}</Text>
-          </View>
-        </View>
-
-        {/* Mock stats for now */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Requests</Text>
-            <Text style={styles.statValue}>0</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Deals</Text>
-            <Text style={styles.statValue}>0</Text>
-          </View>
-        </View>
-
-        <Pressable style={styles.authBtn} onPress={onAuthButtonPress}>
-          <Feather
-            name={isLoggedIn ? "log-out" : "log-in"}
-            size={18}
-            color={theme.primaryText}
-          />
-          <Text style={styles.authText}>
-            {isLoggedIn ? "Log out" : "Sign in"}
+      <View style={styles.card}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {(email?.[0] ?? "U").toUpperCase()}
           </Text>
-        </Pressable>
+        </View>
 
-        <Text style={styles.version}>Version 1.0.0</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name}>{isLoggedIn ? "User" : "Guest"}</Text>
+          <Text style={styles.email}>{email ?? "Not signed in"}</Text>
+        </View>
       </View>
-    </Screen>
+
+      {/* Mock stats for now */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Requests</Text>
+          <Text style={styles.statValue}>0</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Deals</Text>
+          <Text style={styles.statValue}>0</Text>
+        </View>
+      </View>
+
+      <Pressable style={styles.authBtn} onPress={onAuthButtonPress}>
+        <Feather
+          name={isLoggedIn ? "log-out" : "log-in"}
+          size={18}
+          color={theme.primaryText}
+        />
+        <Text style={styles.authText}>
+          {isLoggedIn ? "Log out" : "Sign in"}
+        </Text>
+      </Pressable>
+
+      <Text style={styles.version}>Version 1.0.0</Text>
+    </View>
   );
 }
 
