@@ -1,6 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
+import { Alert } from "react-native"; // add at top if missing
+
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -39,6 +41,7 @@ type RequestRow = {
   status: "active" | "closed";
   created_at: string;
   location: string | null;
+  profiles?: { email: string | null } | null; // ✅ joined from profiles
 };
 
 const { width } = Dimensions.get("window");
@@ -64,33 +67,69 @@ export default function MarketplaceScreen() {
     // If logged in, fetch their swipes first, so we can exclude them
     let excludedIds: string[] = [];
     if (userId) {
-      const { data: swipes } = await supabase
+      const { data: swipes, error: swipeErr } = await supabase
         .from("request_swipes")
         .select("request_id")
         .eq("user_id", userId);
 
+      if (swipeErr) {
+        console.log("Swipe fetch error:", swipeErr);
+      }
+
       excludedIds = (swipes ?? []).map((s: any) => s.request_id);
     }
+
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr) console.log("getUser error:", userErr);
+    const user = userRes?.user ?? null;
 
     let query = supabase
       .from("requests")
       .select(
-        "id,title,description,category,budget_min,budget_max,type,status,created_at,location",
+        `
+    id,
+    title,
+    description,
+    category,
+    budget_min,
+    budget_max,
+    type,
+    status,
+    created_at,
+    location,
+    user_id,
+    profiles!requests_user_id_fkey (
+      email
+    )
+  `,
       )
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
+    // ✅ hide my own requests in marketplace
+    if (user) {
+      query = query.neq("user_id", user.id);
+    }
+
+    // ✅ exclude swiped request ids (quote UUIDs correctly)
     if (excludedIds.length > 0) {
-      query = query.not("id", "in", `(${excludedIds.join(",")})`);
+      const quoted = excludedIds.map((id) => `"${id}"`).join(",");
+      query = query.not("id", "in", `(${quoted})`);
     }
 
     const { data, error } = await query;
 
-    if (!error) {
-      setRequests((data ?? []) as any);
+    if (error) {
+      console.log("Marketplace query error:", error);
+      Alert.alert("Marketplace error", error.message);
+      setRequests([]);
       setCurrentIndex(0);
+      setLoading(false);
+      return;
     }
 
+    setRequests((data ?? []) as any);
+    setCurrentIndex(0);
     setLoading(false);
   }, []);
 
@@ -343,6 +382,8 @@ function RequestCard({
 
   const progress = total === 0 ? 0 : (remaining / total) * 100;
 
+  const email = request.profiles?.email ?? "unknown";
+
   return (
     <View style={styles.cardWrap}>
       {/* Progress */}
@@ -380,6 +421,10 @@ function RequestCard({
             </View>
 
             <Text style={styles.title}>{request.title}</Text>
+
+            {/* ✅ Posted by email */}
+            <Text style={styles.postedBy}>Posted by {email}</Text>
+
             <Text style={styles.desc}>{request.description}</Text>
 
             <View style={styles.details}>
@@ -590,8 +635,16 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
-    marginBottom: 8,
+    marginBottom: 4,
   },
+
+  postedBy: {
+    fontSize: 12,
+    color: theme.secondaryText,
+    marginBottom: 10,
+    fontWeight: "700",
+  },
+
   desc: {
     fontSize: 14,
     color: theme.secondaryText,

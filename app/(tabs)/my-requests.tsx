@@ -1,107 +1,296 @@
 import { Feather } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import type { Request } from "../../src/context/AppContext";
-import { useApp } from "../../src/context/useApp";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { supabase } from "../../src/lib/supabase";
+
+type Filter = "all" | "active" | "closed";
+
+type RequestRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  category: string;
+  budget_min: number;
+  budget_max: number;
+  location: string | null;
+  status: "active" | "matched" | "closed";
+  created_at: string;
+};
+
+type OfferMini = {
+  id: string;
+  request_id: string;
+  status: "pending" | "accepted" | "rejected";
+};
+
+type OfferCounts = { total: number; pending: number };
 
 export default function MyRequestsScreen() {
-  const { myRequests } = useApp();
+  const [loading, setLoading] = useState(true);
+  const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [countsByRequestId, setCountsByRequestId] = useState<
+    Map<string, OfferCounts>
+  >(new Map());
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+
+    const { data: userRes } = await supabase.auth.getUser();
+    const user = userRes.user;
+
+    if (!user) {
+      setRequests([]);
+      setCountsByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    const { data: reqs, error: reqErr } = await supabase
+      .from("requests")
+      .select(
+        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at",
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (reqErr) {
+      Alert.alert("Error", reqErr.message);
+      setRequests([]);
+      setCountsByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    const reqList = (reqs ?? []) as RequestRow[];
+    setRequests(reqList);
+
+    if (reqList.length === 0) {
+      setCountsByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    const ids = reqList.map((r) => r.id);
+
+    const { data: offers, error: offErr } = await supabase
+      .from("offers")
+      .select("id,request_id,status")
+      .in("request_id", ids);
+
+    if (offErr) {
+      setCountsByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    const map = new Map<string, OfferCounts>();
+    (offers ?? []).forEach((o: any) => {
+      const row = o as OfferMini;
+      const prev = map.get(row.request_id) ?? { total: 0, pending: 0 };
+      map.set(row.request_id, {
+        total: prev.total + 1,
+        pending: prev.pending + (row.status === "pending" ? 1 : 0),
+      });
+    });
+
+    setCountsByRequestId(map);
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const counts = useMemo(() => {
+    const all = requests.length;
+    const active = requests.filter((r) => r.status !== "closed").length; // active + matched
+    const closed = requests.filter((r) => r.status === "closed").length;
+    return { all, active, closed };
+  }, [requests]);
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return requests;
+    if (filter === "closed")
+      return requests.filter((r) => r.status === "closed");
+    return requests.filter((r) => r.status !== "closed"); // active + matched
+  }, [requests, filter]);
 
   return (
     <View style={styles.page}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.h1}>My Requests</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>My Requests</Text>
 
         <Pressable
           onPress={() => router.push("/create-request")}
-          style={({ pressed }) => [
-            styles.createBtn,
-            pressed && { opacity: 0.9 },
-          ]}
+          style={styles.createBtn}
         >
-          <Feather name="plus" size={20} color={theme.primaryText} />
+          <Feather name="plus" size={18} color="white" />
         </Pressable>
       </View>
 
-      {/* Content */}
-      {myRequests.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Feather name="plus" size={22} color={theme.primary} />
-          </View>
-          <Text style={styles.emptyTitle}>No requests yet</Text>
-          <Text style={styles.emptyText}>
-            Create your first request to get started
-          </Text>
+      {/* Filters */}
+      <View style={styles.filtersWrap}>
+        <View style={styles.filters}>
+          <FilterBtn
+            label={`All (${counts.all})`}
+            active={filter === "all"}
+            onPress={() => setFilter("all")}
+          />
+          <FilterBtn
+            label={`Active (${counts.active})`}
+            active={filter === "active"}
+            onPress={() => setFilter("active")}
+          />
+          <FilterBtn
+            label={`Closed (${counts.closed})`}
+            active={filter === "closed"}
+            onPress={() => setFilter("closed")}
+          />
+        </View>
+      </View>
 
-          <Pressable
-            onPress={() => router.push("/create-request")}
-            style={styles.primaryBtn}
-          >
-            <Text style={styles.primaryBtnText}>Create Request</Text>
-          </Pressable>
+      {loading ? (
+        <View style={styles.centerCard}>
+          <Text style={styles.muted}>Loading…</Text>
+        </View>
+      ) : filtered.length === 0 ? (
+        <View style={styles.centerCard}>
+          <Text style={styles.titleEmpty}>Nothing here</Text>
+          <Text style={styles.muted}>Create a request to see it here.</Text>
         </View>
       ) : (
-        <FlatList
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-          data={myRequests}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RequestRow request={item} />}
-        />
+        <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+          {filtered.map((r) => {
+            const offerCounts = countsByRequestId.get(r.id) ?? {
+              total: 0,
+              pending: 0,
+            };
+
+            return (
+              <Pressable
+                key={r.id}
+                onPress={() =>
+                  router.push({
+                    pathname: "/request/[id]",
+                    params: { id: r.id },
+                  } as any)
+                }
+                style={styles.card}
+              >
+                <View style={styles.topRow}>
+                  <Text style={styles.categoryPill}>{r.category}</Text>
+
+                  <View style={styles.rightBadges}>
+                    {offerCounts.total > 0 && (
+                      <View style={styles.offerPill}>
+                        <Text style={styles.offerPillText}>
+                          {offerCounts.total} offer
+                          {offerCounts.total === 1 ? "" : "s"}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View
+                      style={[
+                        styles.statusPill,
+                        r.status === "active"
+                          ? styles.statusActive
+                          : r.status === "matched"
+                            ? styles.statusMatched
+                            : styles.statusClosed,
+                      ]}
+                    >
+                      <Text style={styles.statusText}>
+                        {r.status === "matched"
+                          ? "MATCHED"
+                          : r.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={styles.title}>{r.title}</Text>
+                <Text style={styles.desc} numberOfLines={2}>
+                  {r.description}
+                </Text>
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaStrong}>
+                    ${r.budget_min.toLocaleString()} – $
+                    {r.budget_max.toLocaleString()}
+                  </Text>
+                  {!!r.location && (
+                    <Text style={styles.metaMuted}>• {r.location}</Text>
+                  )}
+                </View>
+
+                <View style={styles.footerRow}>
+                  <Text style={styles.smallMuted}>
+                    Posted {new Date(r.created_at).toLocaleDateString()}
+                  </Text>
+
+                  {offerCounts.pending > 0 ? (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push({
+                          pathname: "/request/offers",
+                          params: { id: r.id },
+                        } as any);
+                      }}
+                      style={styles.reviewBtn}
+                    >
+                      <Text style={styles.reviewBtnText}>
+                        Review ({offerCounts.pending})
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.smallMuted}>
+                      {offerCounts.total === 0
+                        ? "No offers yet"
+                        : "No pending offers"}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       )}
     </View>
   );
 }
 
-function RequestRow({ request }: { request: Request }) {
-  const statusStyle =
-    request.status === "active" ? styles.badgeActive : styles.badgeMuted;
-
+function FilterBtn({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
-      onPress={() =>
-        router.push({
-          pathname: "/request/[id]",
-          params: { id: request.id },
-        } as any)
-      }
+      onPress={onPress}
+      style={[styles.filterBtn, active && styles.filterBtnActive]}
     >
-      <View style={styles.cardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {request.title}
-          </Text>
-          <Text style={styles.cardDesc} numberOfLines={2}>
-            {request.description}
-          </Text>
-        </View>
-
-        <View style={[styles.badge, statusStyle]}>
-          <Text style={styles.badgeText}>{request.status}</Text>
-        </View>
-      </View>
-
-      <View style={styles.metaRow}>
-        <Text style={styles.category}>{request.category}</Text>
-        <View style={styles.budget}>
-          <Feather name="dollar-sign" size={16} color={theme.secondaryText} />
-          <Text style={styles.metaText}>
-            {request.budgetMin.toLocaleString()} -{" "}
-            {request.budgetMax.toLocaleString()}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.footerRow}>
-        <Text style={styles.footerText}>
-          {request.offersCount} {request.offersCount === 1 ? "offer" : "offers"}
-        </Text>
-        <Text style={styles.footerText}>
-          Posted {new Date(request.datePosted).toLocaleDateString()}
-        </Text>
-      </View>
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -114,97 +303,138 @@ const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
-  success: "#16A34A",
 };
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: theme.bg },
-  header: {
-    paddingTop: 14,
+  page: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingTop: 14,
+    backgroundColor: theme.bg,
+  },
+
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 12,
   },
-  h1: { fontSize: 20, fontWeight: "800", color: theme.primaryText },
-  createBtn: {
-    height: 44,
-    width: 44,
-    borderRadius: 14,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  header: { fontSize: 20, fontWeight: "900", color: theme.primaryText },
 
-  empty: {
-    flex: 1,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyIcon: {
-    height: 52,
-    width: 52,
-    borderRadius: 18,
-    backgroundColor: theme.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: "800", color: theme.primaryText },
-  emptyText: { marginTop: 6, color: theme.secondaryText, textAlign: "center" },
-  primaryBtn: {
-    marginTop: 14,
-    height: 44,
-    paddingHorizontal: 16,
+  createBtn: {
+    height: 40,
+    width: 40,
     borderRadius: 14,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: { color: "white", fontWeight: "800" },
+
+  filtersWrap: { alignItems: "center", marginBottom: 12 },
+  filters: {
+    flexDirection: "row",
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
+    padding: 6,
+    gap: 6,
+  },
+  filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
+  filterBtnActive: { backgroundColor: theme.accentSoft },
+  filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
+  filterTextActive: { color: theme.primaryText },
+
+  centerCard: {
+    flex: 1,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  titleEmpty: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
+  muted: { color: theme.secondaryText, textAlign: "center" },
 
   card: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
-    marginBottom: 12,
+    marginTop: 12,
   },
-  cardTop: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  cardTitle: { fontSize: 15, fontWeight: "800", color: theme.primaryText },
-  cardDesc: { marginTop: 4, color: theme.secondaryText, lineHeight: 18 },
 
-  badge: {
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  rightBadges: { flexDirection: "row", gap: 8, alignItems: "center" },
+
+  categoryPill: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1,
+    fontWeight: "900",
+    color: theme.primaryText,
   },
-  badgeActive: {
+
+  offerPill: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
+
+  statusPill: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  statusActive: {
     backgroundColor: theme.accentSoft,
     borderColor: theme.primary,
   },
-  badgeMuted: { backgroundColor: theme.bg, borderColor: theme.border },
-  badgeText: { fontSize: 12, fontWeight: "700", color: theme.primaryText },
+  statusMatched: { backgroundColor: "#FEF9C3", borderColor: "#F59E0B" },
+  statusClosed: { backgroundColor: theme.border, borderColor: theme.border },
+  statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
 
-  metaRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  title: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.primaryText,
   },
-  category: { color: theme.secondaryText, fontWeight: "700", fontSize: 12 },
-  budget: { flexDirection: "row", gap: 6, alignItems: "center" },
-  metaText: { color: theme.primaryText, fontWeight: "700", fontSize: 12 },
+  desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+
+  metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  metaStrong: { fontWeight: "900", color: theme.primaryText },
+  metaMuted: { color: theme.secondaryText },
 
   footerRow: {
     marginTop: 12,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
   },
-  footerText: { color: theme.secondaryText, fontSize: 12 },
+  smallMuted: { fontSize: 12, color: theme.secondaryText },
+
+  reviewBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
 });

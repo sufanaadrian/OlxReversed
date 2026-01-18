@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -10,46 +10,49 @@ import {
   Text,
   View,
 } from "react-native";
-import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
 
-type SwipeDir = "left" | "right";
-type Filter = "all" | "right" | "left";
+type Direction = "left" | "right";
+type Filter = "all" | "interested" | "skipped";
 
-type SwipeRowFromDb = {
-  user_id: string;
+type SwipeRow = {
   request_id: string;
-  direction: SwipeDir;
+  direction: Direction;
   created_at: string;
-
-  // Supabase join often comes as an array
-  requests: {
-    id: string;
-    title: string;
-    description: string;
-    category: string;
-    budget_min: number;
-    budget_max: number;
-    location: string | null;
-    created_at: string;
-  }[];
 };
 
-type NormalizedRow = {
-  user_id: string;
-  request_id: string;
-  direction: SwipeDir;
+type RequestRow = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  budget_min: number;
+  budget_max: number;
+  location: string | null;
   created_at: string;
-  request: SwipeRowFromDb["requests"][number];
+  status: "active" | "closed";
+  user_id: string;
+};
+
+type OfferMini = {
+  id: string;
+  request_id: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+};
+
+type Item = {
+  swipe: SwipeRow;
+  request: RequestRow;
 };
 
 export default function MyOffersScreen() {
-  const [filter, setFilter] = useState<Filter>("all");
-  const [email, setEmail] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const [rows, setRows] = useState<SwipeRowFromDb[]>([]);
   const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Item[]>([]);
+  const [offersByRequestId, setOffersByRequestId] = useState<
+    Map<string, OfferMini>
+  >(new Map());
+  const [filter, setFilter] = useState<Filter>("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,67 +60,102 @@ export default function MyOffersScreen() {
     const { data: userRes } = await supabase.auth.getUser();
     const user = userRes.user;
 
-    setEmail(user?.email ?? null);
-    setUserId(user?.id ?? null);
-
     if (!user) {
-      setRows([]);
+      setItems([]);
+      setOffersByRequestId(new Map());
       setLoading(false);
       return;
     }
 
-    // 1) fetch swipes
-    const { data: swipes, error: swipesErr } = await supabase
+    // 1) Load swipes for this user
+    const { data: swipes, error: swErr } = await supabase
       .from("request_swipes")
-      .select("user_id, request_id, direction, created_at")
+      .select("request_id,direction,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (swipesErr) {
-      setRows([]);
+    if (swErr) {
+      Alert.alert("Error", swErr.message);
+      setItems([]);
+      setOffersByRequestId(new Map());
       setLoading(false);
       return;
     }
 
-    const swipeList = (swipes ?? []) as {
-      user_id: string;
-      request_id: string;
-      direction: "left" | "right";
-      created_at: string;
-    }[];
+    const swipeList = (swipes ?? []) as SwipeRow[];
 
     if (swipeList.length === 0) {
-      setRows([]);
+      setItems([]);
+      setOffersByRequestId(new Map());
       setLoading(false);
       return;
     }
 
     const requestIds = swipeList.map((s) => s.request_id);
 
-    // 2) fetch requests referenced by swipes
+    // 2) Load requests referenced by swipes
     const { data: reqs, error: reqErr } = await supabase
       .from("requests")
       .select(
-        "id,title,description,category,budget_min,budget_max,location,created_at",
+        "id,title,description,category,budget_min,budget_max,location,created_at,status,user_id",
       )
       .in("id", requestIds);
 
     if (reqErr) {
-      // if this errors, it's almost certainly RLS on requests
-      setRows([]);
+      Alert.alert("Error", reqErr.message);
+      setItems([]);
+      setOffersByRequestId(new Map());
       setLoading(false);
       return;
     }
 
-    const reqMap = new Map((reqs ?? []).map((r: any) => [r.id, r]));
+    const reqMap = new Map<string, RequestRow>(
+      (reqs ?? []).map((r: any) => [r.id, r as RequestRow]),
+    );
 
-    // 3) rebuild rows in the shape your UI expects (requests as array)
-    const merged = swipeList.map((s) => ({
-      ...s,
-      requests: reqMap.get(s.request_id) ? [reqMap.get(s.request_id)] : [],
-    }));
+    const merged: Item[] = swipeList
+      .map((s) => {
+        const req = reqMap.get(s.request_id);
+        if (!req) return null;
+        return { swipe: s, request: req };
+      })
+      .filter(Boolean) as Item[];
 
-    setRows(merged as any);
+    setItems(merged);
+
+    // 3) Load MY offers for those requests (ALL statuses)
+    const { data: myOffers, error: offErr } = await supabase
+      .from("offers")
+      .select("id,request_id,status,created_at")
+      .eq("user_id", user.id)
+      .in("request_id", requestIds);
+
+    if (offErr) {
+      Alert.alert("Error", offErr.message);
+      setOffersByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    // If multiple offers exist (shouldn't due to unique constraint),
+    // keep the newest one for safety.
+    const map = new Map<string, OfferMini>();
+    (myOffers ?? []).forEach((o: any) => {
+      const offer = o as OfferMini;
+      const prev = map.get(offer.request_id);
+      if (!prev) {
+        map.set(offer.request_id, offer);
+        return;
+      }
+      if (
+        new Date(offer.created_at).getTime() >
+        new Date(prev.created_at).getTime()
+      ) {
+        map.set(offer.request_id, offer);
+      }
+    });
+
+    setOffersByRequestId(map);
     setLoading(false);
   }, []);
 
@@ -127,290 +165,274 @@ export default function MyOffersScreen() {
     }, [load]),
   );
 
-  const normalizedRows: NormalizedRow[] = useMemo(() => {
-    return rows
-      .map((r) => {
-        const req = r.requests?.[0];
-        if (!req) return null;
-        return {
-          user_id: r.user_id,
-          request_id: r.request_id,
-          direction: r.direction,
-          created_at: r.created_at,
-          request: req,
-        };
-      })
-      .filter(Boolean) as NormalizedRow[];
-  }, [rows]);
-
   const counts = useMemo(() => {
-    const all = normalizedRows.length;
-    const interested = normalizedRows.filter(
-      (r) => r.direction === "right",
+    const interested = items.filter(
+      (x) => x.swipe.direction === "right",
     ).length;
-    const skipped = normalizedRows.filter((r) => r.direction === "left").length;
+    const skipped = items.filter((x) => x.swipe.direction === "left").length;
+    const all = items.length;
     return { all, interested, skipped };
-  }, [normalizedRows]);
+  }, [items]);
 
-  const displayRows = useMemo(() => {
-    if (filter === "all") return normalizedRows;
-    return normalizedRows.filter((r) => r.direction === filter);
-  }, [normalizedRows, filter]);
+  const filtered = useMemo(() => {
+    if (filter === "all") return items;
+    if (filter === "interested")
+      return items.filter((x) => x.swipe.direction === "right");
+    return items.filter((x) => x.swipe.direction === "left");
+  }, [items, filter]);
 
-  const goSignIn = () => {
+  const removeSwipe = async (requestId: string) => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const user = userRes.user;
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("request_swipes")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("request_id", requestId);
+
+    if (error) {
+      Alert.alert("Error", error.message);
+      return;
+    }
+
+    // update UI immediately
+    setItems((prev) => prev.filter((x) => x.request.id !== requestId));
+    setOffersByRequestId((prev) => {
+      const next = new Map(prev);
+      next.delete(requestId);
+      return next;
+    });
+  };
+
+  const withdrawOffer = async (offerId: string, requestId: string) => {
+    Alert.alert("Withdraw offer", "Remove your offer for this request?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Withdraw",
+        style: "destructive",
+        onPress: async () => {
+          const { error } = await supabase
+            .from("offers")
+            .delete()
+            .eq("id", offerId);
+          if (error) {
+            Alert.alert("Error", error.message);
+            return;
+          }
+          setOffersByRequestId((prev) => {
+            const next = new Map(prev);
+            next.delete(requestId);
+            return next;
+          });
+        },
+      },
+    ]);
+  };
+
+  const openCreateOffer = (requestId: string, offerId?: string) => {
     router.push({
-      pathname: "/sign-in",
-      params: { redirect: "/(tabs)/my-offers" },
+      pathname: "/create-offer",
+      params: offerId ? { requestId, offerId } : { requestId },
     } as any);
   };
 
-  const removeSwipe = (requestId: string) => {
-    if (!userId) return;
-
-    Alert.alert(
-      "Remove",
-      "Remove this item from My Offers? It will appear again in Marketplace.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            // optimistic
-            setRows((prev) => prev.filter((r) => r.request_id !== requestId));
-
-            const { error } = await supabase
-              .from("request_swipes")
-              .delete()
-              .eq("user_id", userId)
-              .eq("request_id", requestId);
-
-            if (error) {
-              await load(); // rollback
-              Alert.alert("Could not remove", error.message);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const filterLabel =
-    filter === "all"
-      ? "items"
-      : filter === "right"
-        ? "interested items"
-        : "skipped items";
+  const chatSoon = () => Alert.alert("Functionality will be added soon");
 
   return (
-    <Screen>
-      <View style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>My Offers</Text>
+    <View style={styles.page}>
+      <Text style={styles.header}>My Offers</Text>
 
-          {/* Centered 3-button filter row */}
-          <View style={styles.filtersWrap}>
-            <View style={styles.filtersBar}>
-              <Pressable
-                onPress={() => setFilter("all")}
-                style={[
-                  styles.filterBtn,
-                  filter === "all" && styles.filterBtnActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    filter === "all" && styles.filterTextActive,
-                  ]}
-                >
-                  All
-                </Text>
-                <Text
-                  style={[
-                    styles.countPill,
-                    filter === "all" && styles.countPillActive,
-                  ]}
-                >
-                  {counts.all}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setFilter("right")}
-                style={[
-                  styles.filterBtn,
-                  filter === "right" && styles.filterBtnActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    filter === "right" && styles.filterTextActive,
-                  ]}
-                >
-                  Interested
-                </Text>
-                <Text
-                  style={[
-                    styles.countPill,
-                    filter === "right" && styles.countPillActive,
-                  ]}
-                >
-                  {counts.interested}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setFilter("left")}
-                style={[
-                  styles.filterBtn,
-                  filter === "left" && styles.filterBtnActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    filter === "left" && styles.filterTextActive,
-                  ]}
-                >
-                  Skipped
-                </Text>
-                <Text
-                  style={[
-                    styles.countPill,
-                    filter === "left" && styles.countPillActive,
-                  ]}
-                >
-                  {counts.skipped}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ flex: 1 }}>
-          {!email ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Feather name="lock" size={22} color={theme.primaryText} />
-              </View>
-              <Text style={styles.emptyTitle}>Sign in to save offers</Text>
-              <Text style={styles.emptyText}>
-                You can browse Marketplace without an account, but to save /
-                remove items here you need to sign in.
-              </Text>
-
-              <Pressable style={styles.primaryBtn} onPress={goSignIn}>
-                <Text style={styles.primaryBtnText}>Sign in</Text>
-              </Pressable>
-            </View>
-          ) : loading ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Loading…</Text>
-              <Text style={styles.emptyText}>Fetching your items</Text>
-            </View>
-          ) : displayRows.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View
-                style={[
-                  styles.emptyIcon,
-                  filter === "right" ? styles.iconSoft : styles.iconMuted,
-                ]}
-              >
-                <Feather
-                  name={
-                    filter === "right"
-                      ? "check"
-                      : filter === "left"
-                        ? "x"
-                        : "inbox"
-                  }
-                  size={22}
-                  color={theme.primaryText}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>No {filterLabel}</Text>
-              <Text style={styles.emptyText}>
-                {filter === "all"
-                  ? "Swipe in Marketplace to start building your list."
-                  : filter === "right"
-                    ? "Swipe right in Marketplace to save requests here."
-                    : "Swipe left in Marketplace to keep skipped items here."}
-              </Text>
-            </View>
-          ) : (
-            <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
-              {displayRows.map((r) => {
-                const req = r.request;
-                const isInterested = r.direction === "right";
-
-                return (
-                  <View key={`${req.id}-${r.created_at}`} style={styles.card}>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: "/request/[id]",
-                          params: { id: req.id },
-                        } as any)
-                      }
-                    >
-                      <View style={styles.cardTop}>
-                        <Text style={styles.badge}>{req.category}</Text>
-                        <Text
-                          style={[
-                            styles.statusPill,
-                            isInterested ? styles.statusOk : styles.statusNo,
-                          ]}
-                        >
-                          {isInterested ? "interested" : "skipped"}
-                        </Text>
-                      </View>
-
-                      <Text style={styles.cardTitle}>{req.title}</Text>
-                      <Text style={styles.cardDesc} numberOfLines={3}>
-                        {req.description}
-                      </Text>
-
-                      <View style={styles.metaRow}>
-                        <Text style={styles.metaText}>
-                          ${req.budget_min.toLocaleString()} – $
-                          {req.budget_max.toLocaleString()}
-                        </Text>
-                        {!!req.location && (
-                          <Text style={styles.metaSub}>• {req.location}</Text>
-                        )}
-                      </View>
-
-                      <Text style={styles.dateText}>
-                        Saved {new Date(r.created_at).toLocaleDateString()}
-                      </Text>
-                    </Pressable>
-
-                    <View style={styles.cardActions}>
-                      <Pressable
-                        onPress={() => removeSwipe(req.id)}
-                        style={({ pressed }) => [
-                          styles.removeBtn,
-                          pressed && { opacity: 0.85 },
-                        ]}
-                      >
-                        <Feather
-                          name="trash-2"
-                          size={16}
-                          color={theme.primaryText}
-                        />
-                        <Text style={styles.removeText}>Remove</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          )}
+      {/* Filters (centered) */}
+      <View style={styles.filtersWrap}>
+        <View style={styles.filters}>
+          <FilterBtn
+            label={`All (${counts.all})`}
+            active={filter === "all"}
+            onPress={() => setFilter("all")}
+          />
+          <FilterBtn
+            label={`Interested (${counts.interested})`}
+            active={filter === "interested"}
+            onPress={() => setFilter("interested")}
+          />
+          <FilterBtn
+            label={`Skipped (${counts.skipped})`}
+            active={filter === "skipped"}
+            onPress={() => setFilter("skipped")}
+          />
         </View>
       </View>
-    </Screen>
+
+      {loading ? (
+        <View style={styles.center}>
+          <Text style={styles.muted}>Loading…</Text>
+        </View>
+      ) : filtered.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={styles.titleEmpty}>Nothing here</Text>
+          <Text style={styles.muted}>
+            Swipe requests in Marketplace to populate this list.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+          {filtered.map(({ request, swipe }) => {
+            const isInterested = swipe.direction === "right";
+            const myOffer = offersByRequestId.get(request.id);
+            const offerStatus = myOffer?.status; // pending/accepted/rejected/undefined
+
+            const canEditOrWithdraw = isInterested && offerStatus === "pending";
+            const canChat = isInterested && offerStatus === "accepted";
+
+            return (
+              <View key={request.id} style={styles.card}>
+                <View style={styles.cardTopRow}>
+                  <Text style={styles.badge}>{request.category}</Text>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    {offerStatus && (
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          offerStatus === "pending" && styles.statusPending,
+                          offerStatus === "accepted" && styles.statusAccepted,
+                          offerStatus === "rejected" && styles.statusRejected,
+                        ]}
+                      >
+                        <Text style={styles.statusBadgeText}>
+                          {offerStatus.toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <Text style={styles.cardTitle}>{request.title}</Text>
+                <Text style={styles.cardDesc} numberOfLines={3}>
+                  {request.description}
+                </Text>
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaStrong}>
+                    ${request.budget_min.toLocaleString()} – $
+                    {request.budget_max.toLocaleString()}
+                  </Text>
+                  {!!request.location && (
+                    <Text style={styles.metaMuted}>• {request.location}</Text>
+                  )}
+                </View>
+
+                <View style={styles.footerRow}>
+                  <Text style={styles.smallMuted}>
+                    {isInterested ? "Interested" : "Skipped"} •{" "}
+                    {new Date(swipe.created_at).toLocaleDateString()}
+                  </Text>
+
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/request/[id]",
+                        params: { id: request.id },
+                      } as any)
+                    }
+                    style={styles.openBtn}
+                  >
+                    <Text style={styles.openBtnText}>Open</Text>
+                  </Pressable>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    onPress={() => removeSwipe(request.id)}
+                    style={styles.removeBtn}
+                  >
+                    <Feather name="trash-2" size={16} color={theme.danger} />
+                    <Text style={styles.removeText}>Remove</Text>
+                  </Pressable>
+
+                  {/* Only interested items can have offer actions */}
+                  {isInterested && (
+                    <>
+                      {/* No offer yet */}
+                      {!myOffer && (
+                        <Pressable
+                          onPress={() => openCreateOffer(request.id)}
+                          style={styles.primaryBtn}
+                        >
+                          <Text style={styles.primaryText}>Send offer</Text>
+                        </Pressable>
+                      )}
+
+                      {/* Pending offer -> edit/withdraw */}
+                      {canEditOrWithdraw && myOffer && (
+                        <View style={styles.splitActions}>
+                          <Pressable
+                            onPress={() =>
+                              openCreateOffer(request.id, myOffer.id)
+                            }
+                            style={styles.primaryBtn}
+                          >
+                            <Text style={styles.primaryText}>Edit offer</Text>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() =>
+                              withdrawOffer(myOffer.id, request.id)
+                            }
+                            style={styles.withdrawBtn}
+                          >
+                            <Text style={styles.withdrawText}>Withdraw</Text>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      {/* Accepted -> chat */}
+                      {canChat && (
+                        <Pressable onPress={chatSoon} style={styles.chatBtn}>
+                          <Text style={styles.chatBtnText}>Chat</Text>
+                        </Pressable>
+                      )}
+
+                      {/* Rejected -> no actions */}
+                    </>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+function FilterBtn({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.filterBtn, active && styles.filterBtnActive]}
+    >
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -422,63 +444,40 @@ const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
+  danger: "#B91C1C",
+  success: "#16A34A",
 };
 
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: theme.bg,
     paddingHorizontal: 16,
     paddingTop: 14,
+    backgroundColor: theme.bg,
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: theme.primaryText,
+    marginBottom: 12,
   },
 
-  header: { gap: 10, marginBottom: 10 },
-  title: { fontSize: 20, fontWeight: "900", color: theme.primaryText },
-
-  // Center the whole filters control
-  filtersWrap: { alignItems: "center" },
-  // 3 equal buttons; centered; looks like a segmented control
-  filtersBar: {
-    width: "100%",
-    maxWidth: 520,
+  filtersWrap: { alignItems: "center", marginBottom: 12 },
+  filters: {
     flexDirection: "row",
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 16,
-    overflow: "hidden",
-  },
-  filterBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
+    padding: 6,
     gap: 6,
   },
+  filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },
-
-  filterText: { fontWeight: "900", color: theme.secondaryText, fontSize: 12 },
+  filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
   filterTextActive: { color: theme.primaryText },
 
-  countPill: {
-    minWidth: 22,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: theme.border,
-    color: theme.secondaryText,
-    textAlign: "center",
-    fontWeight: "900",
-    fontSize: 11,
-  },
-  countPillActive: {
-    backgroundColor: theme.primary,
-    color: "white",
-  },
-
-  emptyState: {
+  center: {
     flex: 1,
     backgroundColor: theme.surface,
     borderWidth: 1,
@@ -487,41 +486,10 @@ const styles = StyleSheet.create({
     padding: 18,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 6,
   },
-  emptyIcon: {
-    height: 44,
-    width: 44,
-    borderRadius: 16,
-    backgroundColor: theme.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconSoft: { backgroundColor: theme.accentSoft },
-  iconMuted: { backgroundColor: theme.border },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: theme.primaryText,
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 13,
-    color: theme.secondaryText,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-
-  primaryBtn: {
-    marginTop: 4,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: theme.primary,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryBtnText: { color: "white", fontWeight: "900" },
+  titleEmpty: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
+  muted: { color: theme.secondaryText, textAlign: "center" },
 
   card: {
     backgroundColor: theme.surface,
@@ -531,10 +499,10 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 12,
   },
-  cardTop: {
+  cardTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
   },
 
   badge: {
@@ -546,16 +514,34 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.primaryText,
   },
-  statusPill: {
+
+  offerSentBadge: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 999,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    fontSize: 11,
   },
-  statusOk: { backgroundColor: theme.accentSoft, color: theme.primaryText },
-  statusNo: { backgroundColor: theme.border, color: theme.secondaryText },
+  offerSentText: { fontSize: 12, fontWeight: "900", color: theme.primary },
+
+  statusBadge: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  statusPending: {
+    borderColor: theme.primary,
+    backgroundColor: theme.accentSoft,
+  },
+  statusAccepted: { borderColor: theme.success, backgroundColor: "#DCFCE7" },
+  statusRejected: { borderColor: "#FCA5A5", backgroundColor: "#FEE2E2" },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
 
   cardTitle: {
     marginTop: 10,
@@ -566,26 +552,78 @@ const styles = StyleSheet.create({
   cardDesc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
 
   metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  metaText: { fontWeight: "900", color: theme.primaryText },
-  metaSub: { color: theme.secondaryText },
+  metaStrong: { fontWeight: "900", color: theme.primaryText },
+  metaMuted: { color: theme.secondaryText },
 
-  dateText: { marginTop: 10, fontSize: 12, color: theme.secondaryText },
-
-  cardActions: {
+  footerRow: {
     marginTop: 12,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
+  smallMuted: { fontSize: 12, color: theme.secondaryText },
+
+  openBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  openBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  actionsRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
   removeBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    height: 40,
+    gap: 6,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.bg,
+    borderColor: "#FCA5A5",
   },
-  removeText: { fontWeight: "900", color: theme.primaryText, fontSize: 13 },
+  removeText: { fontWeight: "900", color: theme.danger, fontSize: 12 },
+
+  primaryBtn: {
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: theme.primary,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  splitActions: { flexDirection: "row", gap: 10, alignItems: "center" },
+
+  withdrawBtn: {
+    height: 40,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    backgroundColor: theme.surface,
+  },
+  withdrawText: { fontWeight: "900", color: theme.danger, fontSize: 12 },
+
+  chatBtn: {
+    height: 40,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.success,
+  },
+  chatBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
 });
