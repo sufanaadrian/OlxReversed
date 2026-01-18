@@ -12,17 +12,12 @@ import {
 } from "react-native";
 import { supabase } from "../../src/lib/supabase";
 
-type Direction = "left" | "right";
-type Filter = "all" | "interested" | "skipped";
-
-type SwipeRow = {
-  request_id: string;
-  direction: Direction;
-  created_at: string;
-};
+type SwipeDirection = "left" | "right";
+type OfferStatus = "pending" | "accepted" | "rejected";
 
 type RequestRow = {
   id: string;
+  user_id: string;
   title: string;
   description: string;
   category: string;
@@ -30,132 +25,132 @@ type RequestRow = {
   budget_max: number;
   location: string | null;
   created_at: string;
-  status: "active" | "closed";
-  user_id: string;
+  status: string;
+  profiles?: { email: string | null } | null;
 };
 
-type OfferMini = {
+type SwipeRow = {
+  request_id: string;
+  direction: SwipeDirection;
+  created_at: string;
+  requests?: RequestRow | RequestRow[] | null; // supabase relation may come back as object/array
+};
+
+type OfferRow = {
   id: string;
   request_id: string;
-  status: "pending" | "accepted" | "rejected";
+  user_id: string;
+  status: OfferStatus;
+  price: number;
+  description: string;
   created_at: string;
 };
 
-type Item = {
-  swipe: SwipeRow;
-  request: RequestRow;
-};
+type Filter = "all" | "interested" | "skipped";
 
 export default function MyOffersScreen() {
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<Item[]>([]);
-  const [offersByRequestId, setOffersByRequestId] = useState<
-    Map<string, OfferMini>
-  >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
+
+  const [swipes, setSwipes] = useState<
+    {
+      request: RequestRow;
+      direction: SwipeDirection;
+      swipedAt: string;
+    }[]
+  >([]);
+
+  const [offers, setOffers] = useState<OfferRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user.id;
 
-    if (!user) {
-      setItems([]);
-      setOffersByRequestId(new Map());
+    if (!uid) {
+      setSwipes([]);
+      setOffers([]);
       setLoading(false);
       return;
     }
 
-    // 1) Load swipes for this user
-    const { data: swipes, error: swErr } = await supabase
+    // 1) Load swipes + embedded requests (explicit FK to profiles too)
+    const { data: swipeData, error: swipeErr } = await supabase
       .from("request_swipes")
-      .select("request_id,direction,created_at")
-      .eq("user_id", user.id)
+      .select(
+        `
+        request_id,
+        direction,
+        created_at,
+        requests:requests (
+          id,
+          user_id,
+          title,
+          description,
+          category,
+          budget_min,
+          budget_max,
+          location,
+          created_at,
+          status,
+          profiles!requests_user_id_fkey (
+            email
+          )
+        )
+      `,
+      )
+      .eq("user_id", uid)
       .order("created_at", { ascending: false });
 
-    if (swErr) {
-      Alert.alert("Error", swErr.message);
-      setItems([]);
-      setOffersByRequestId(new Map());
+    if (swipeErr) {
+      console.log("swipeErr", swipeErr);
+      Alert.alert("Error", swipeErr.message);
+      setSwipes([]);
+      setOffers([]);
       setLoading(false);
       return;
     }
 
-    const swipeList = (swipes ?? []) as SwipeRow[];
+    // Normalize: requests relation can be object or array depending on join config
+    const normalizedSwipes = (swipeData ?? [])
+      .map((row: any) => {
+        const req = Array.isArray(row.requests)
+          ? row.requests[0]
+          : row.requests;
 
-    if (swipeList.length === 0) {
-      setItems([]);
-      setOffersByRequestId(new Map());
-      setLoading(false);
-      return;
-    }
-
-    const requestIds = swipeList.map((s) => s.request_id);
-
-    // 2) Load requests referenced by swipes
-    const { data: reqs, error: reqErr } = await supabase
-      .from("requests")
-      .select(
-        "id,title,description,category,budget_min,budget_max,location,created_at,status,user_id",
-      )
-      .in("id", requestIds);
-
-    if (reqErr) {
-      Alert.alert("Error", reqErr.message);
-      setItems([]);
-      setOffersByRequestId(new Map());
-      setLoading(false);
-      return;
-    }
-
-    const reqMap = new Map<string, RequestRow>(
-      (reqs ?? []).map((r: any) => [r.id, r as RequestRow]),
-    );
-
-    const merged: Item[] = swipeList
-      .map((s) => {
-        const req = reqMap.get(s.request_id);
         if (!req) return null;
-        return { swipe: s, request: req };
+
+        return {
+          request: req as RequestRow,
+          direction: row.direction as SwipeDirection,
+          swipedAt: row.created_at as string,
+        };
       })
-      .filter(Boolean) as Item[];
+      .filter(Boolean) as {
+      request: RequestRow;
+      direction: SwipeDirection;
+      swipedAt: string;
+    }[];
+    [];
+    setSwipes(normalizedSwipes);
 
-    setItems(merged);
-
-    // 3) Load MY offers for those requests (ALL statuses)
-    const { data: myOffers, error: offErr } = await supabase
+    // 2) Load ALL offers made by this user (we will pick latest per request_id)
+    const { data: offerData, error: offerErr } = await supabase
       .from("offers")
-      .select("id,request_id,status,created_at")
-      .eq("user_id", user.id)
-      .in("request_id", requestIds);
+      .select("id,request_id,user_id,status,price,description,created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
 
-    if (offErr) {
-      Alert.alert("Error", offErr.message);
-      setOffersByRequestId(new Map());
+    if (offerErr) {
+      console.log("offerErr", offerErr);
+      Alert.alert("Error", offerErr.message);
+      setOffers([]);
       setLoading(false);
       return;
     }
 
-    // If multiple offers exist (shouldn't due to unique constraint),
-    // keep the newest one for safety.
-    const map = new Map<string, OfferMini>();
-    (myOffers ?? []).forEach((o: any) => {
-      const offer = o as OfferMini;
-      const prev = map.get(offer.request_id);
-      if (!prev) {
-        map.set(offer.request_id, offer);
-        return;
-      }
-      if (
-        new Date(offer.created_at).getTime() >
-        new Date(prev.created_at).getTime()
-      ) {
-        map.set(offer.request_id, offer);
-      }
-    });
-
-    setOffersByRequestId(map);
+    setOffers((offerData ?? []) as OfferRow[]);
     setLoading(false);
   }, []);
 
@@ -165,31 +160,47 @@ export default function MyOffersScreen() {
     }, [load]),
   );
 
-  const counts = useMemo(() => {
-    const interested = items.filter(
-      (x) => x.swipe.direction === "right",
-    ).length;
-    const skipped = items.filter((x) => x.swipe.direction === "left").length;
-    const all = items.length;
-    return { all, interested, skipped };
-  }, [items]);
+  // Latest offer per request_id (because ordered DESC, first seen is latest)
+  const latestOfferByRequestId = useMemo(() => {
+    const map = new Map<string, OfferRow>();
+    for (const o of offers) {
+      if (!map.has(o.request_id)) map.set(o.request_id, o);
+    }
+    return map;
+  }, [offers]);
 
-  const filtered = useMemo(() => {
-    if (filter === "all") return items;
+  const counts = useMemo(() => {
+    const all = swipes.length;
+    const interested = swipes.filter((s) => s.direction === "right").length;
+    const skipped = swipes.filter((s) => s.direction === "left").length;
+    return { all, interested, skipped };
+  }, [swipes]);
+
+  const visible = useMemo(() => {
+    if (filter === "all") return swipes;
     if (filter === "interested")
-      return items.filter((x) => x.swipe.direction === "right");
-    return items.filter((x) => x.swipe.direction === "left");
-  }, [items, filter]);
+      return swipes.filter((s) => s.direction === "right");
+    return swipes.filter((s) => s.direction === "left");
+  }, [swipes, filter]);
+
+  const openCreateOffer = (requestId: string) => {
+    // Adjust this path if your modal route is different
+    router.push({
+      pathname: "/(modals)/create-offer",
+      params: { requestId },
+    } as any);
+  };
 
   const removeSwipe = async (requestId: string) => {
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
-    if (!user) return;
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user.id;
+    if (!uid) return;
 
+    // Remove swipe record -> request can reappear in marketplace
     const { error } = await supabase
       .from("request_swipes")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", uid)
       .eq("request_id", requestId);
 
     if (error) {
@@ -197,54 +208,22 @@ export default function MyOffersScreen() {
       return;
     }
 
-    // update UI immediately
-    setItems((prev) => prev.filter((x) => x.request.id !== requestId));
-    setOffersByRequestId((prev) => {
-      const next = new Map(prev);
-      next.delete(requestId);
-      return next;
-    });
+    // reload
+    load();
   };
 
-  const withdrawOffer = async (offerId: string, requestId: string) => {
-    Alert.alert("Withdraw offer", "Remove your offer for this request?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Withdraw",
-        style: "destructive",
-        onPress: async () => {
-          const { error } = await supabase
-            .from("offers")
-            .delete()
-            .eq("id", offerId);
-          if (error) {
-            Alert.alert("Error", error.message);
-            return;
-          }
-          setOffersByRequestId((prev) => {
-            const next = new Map(prev);
-            next.delete(requestId);
-            return next;
-          });
-        },
-      },
-    ]);
+  const chatSoon = () => {
+    Alert.alert("Soon", "Chat functionality will be added soon");
   };
-
-  const openCreateOffer = (requestId: string, offerId?: string) => {
-    router.push({
-      pathname: "/create-offer",
-      params: offerId ? { requestId, offerId } : { requestId },
-    } as any);
-  };
-
-  const chatSoon = () => Alert.alert("Functionality will be added soon");
 
   return (
     <View style={styles.page}>
-      <Text style={styles.header}>My Offers</Text>
+      <View style={styles.header}>
+        <Text style={styles.h1}>My Offers</Text>
+        <Text style={styles.sub}>Requests you swiped on + your offers</Text>
+      </View>
 
-      {/* Filters (centered) */}
+      {/* Filters */}
       <View style={styles.filtersWrap}>
         <View style={styles.filters}>
           <FilterBtn
@@ -266,144 +245,165 @@ export default function MyOffersScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.muted}>Loading…</Text>
+        <View style={styles.centerCard}>
+          <Text style={styles.centerTitle}>Loading…</Text>
+          <Text style={styles.centerSub}>Fetching swipes & offers</Text>
         </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.titleEmpty}>Nothing here</Text>
-          <Text style={styles.muted}>
-            Swipe requests in Marketplace to populate this list.
+      ) : visible.length === 0 ? (
+        <View style={styles.centerCard}>
+          <Text style={styles.centerTitle}>No items</Text>
+          <Text style={styles.centerSub}>
+            {filter === "all"
+              ? "Swipe right on a request to see it here."
+              : filter === "interested"
+                ? "No interested requests yet."
+                : "No skipped requests yet."}
           </Text>
+
+          <Pressable
+            style={styles.btnPrimary}
+            onPress={() => router.push("/(tabs)/marketplace" as any)}
+          >
+            <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
-          {filtered.map(({ request, swipe }) => {
-            const isInterested = swipe.direction === "right";
-            const myOffer = offersByRequestId.get(request.id);
-            const offerStatus = myOffer?.status; // pending/accepted/rejected/undefined
+          {visible.map(({ request, direction }) => {
+            const latest = latestOfferByRequestId.get(request.id);
 
-            const canEditOrWithdraw = isInterested && offerStatus === "pending";
-            const canChat = isInterested && offerStatus === "accepted";
+            // Derive label + CTA based on latest offer
+            const offerState: OfferStatus | "none" = latest?.status ?? "none";
+
+            const canSendOffer =
+              direction === "right" &&
+              (offerState === "none" || offerState === "rejected");
+
+            const showPending = offerState === "pending";
+            const showAccepted = offerState === "accepted";
+            const showRejected = offerState === "rejected";
 
             return (
               <View key={request.id} style={styles.card}>
-                <View style={styles.cardTopRow}>
-                  <Text style={styles.badge}>{request.category}</Text>
+                <View style={styles.cardTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.category}>{request.category}</Text>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {request.title}
+                    </Text>
 
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      gap: 8,
-                      alignItems: "center",
-                    }}
-                  >
-                    {offerStatus && (
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          offerStatus === "pending" && styles.statusPending,
-                          offerStatus === "accepted" && styles.statusAccepted,
-                          offerStatus === "rejected" && styles.statusRejected,
-                        ]}
-                      >
-                        <Text style={styles.statusBadgeText}>
-                          {offerStatus.toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
+                    <Text style={styles.by} numberOfLines={1}>
+                      Posted by {request.profiles?.email ?? "unknown"}
+                    </Text>
                   </View>
-                </View>
 
-                <Text style={styles.cardTitle}>{request.title}</Text>
-                <Text style={styles.cardDesc} numberOfLines={3}>
-                  {request.description}
-                </Text>
-
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaStrong}>
-                    ${request.budget_min.toLocaleString()} – $
-                    {request.budget_max.toLocaleString()}
-                  </Text>
-                  {!!request.location && (
-                    <Text style={styles.metaMuted}>• {request.location}</Text>
-                  )}
-                </View>
-
-                <View style={styles.footerRow}>
-                  <Text style={styles.smallMuted}>
-                    {isInterested ? "Interested" : "Skipped"} •{" "}
-                    {new Date(swipe.created_at).toLocaleDateString()}
-                  </Text>
-
-                  <Pressable
-                    onPress={() =>
-                      router.push({
-                        pathname: "/request/[id]",
-                        params: { id: request.id },
-                      } as any)
-                    }
-                    style={styles.openBtn}
-                  >
-                    <Text style={styles.openBtnText}>Open</Text>
-                  </Pressable>
-                </View>
-
-                {/* Actions */}
-                <View style={styles.actionsRow}>
                   <Pressable
                     onPress={() => removeSwipe(request.id)}
                     style={styles.removeBtn}
                   >
-                    <Feather name="trash-2" size={16} color={theme.danger} />
-                    <Text style={styles.removeText}>Remove</Text>
+                    <Feather
+                      name="trash-2"
+                      size={16}
+                      color={theme.primaryText}
+                    />
                   </Pressable>
+                </View>
 
-                  {/* Only interested items can have offer actions */}
-                  {isInterested && (
-                    <>
-                      {/* No offer yet */}
-                      {!myOffer && (
-                        <Pressable
-                          onPress={() => openCreateOffer(request.id)}
-                          style={styles.primaryBtn}
-                        >
-                          <Text style={styles.primaryText}>Send offer</Text>
-                        </Pressable>
-                      )}
+                <Text style={styles.desc} numberOfLines={2}>
+                  {request.description}
+                </Text>
 
-                      {/* Pending offer -> edit/withdraw */}
-                      {canEditOrWithdraw && myOffer && (
-                        <View style={styles.splitActions}>
-                          <Pressable
-                            onPress={() =>
-                              openCreateOffer(request.id, myOffer.id)
-                            }
-                            style={styles.primaryBtn}
-                          >
-                            <Text style={styles.primaryText}>Edit offer</Text>
-                          </Pressable>
+                <View style={styles.metaRow}>
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>
+                      ${request.budget_min.toLocaleString()} - $
+                      {request.budget_max.toLocaleString()}
+                    </Text>
+                  </View>
 
-                          <Pressable
-                            onPress={() =>
-                              withdrawOffer(myOffer.id, request.id)
-                            }
-                            style={styles.withdrawBtn}
-                          >
-                            <Text style={styles.withdrawText}>Withdraw</Text>
-                          </Pressable>
-                        </View>
-                      )}
+                  <View
+                    style={[
+                      styles.pill,
+                      direction === "right"
+                        ? styles.pillInterested
+                        : styles.pillSkipped,
+                    ]}
+                  >
+                    <Text style={styles.pillText}>
+                      {direction === "right" ? "Interested" : "Skipped"}
+                    </Text>
+                  </View>
+                </View>
 
-                      {/* Accepted -> chat */}
-                      {canChat && (
-                        <Pressable onPress={chatSoon} style={styles.chatBtn}>
-                          <Text style={styles.chatBtnText}>Chat</Text>
-                        </Pressable>
-                      )}
+                {/* Offer status row */}
+                <View style={styles.statusRow}>
+                  {offerState === "none" && (
+                    <View style={[styles.statusPill, styles.statusNone]}>
+                      <Text style={styles.statusText}>NO OFFER YET</Text>
+                    </View>
+                  )}
 
-                      {/* Rejected -> no actions */}
-                    </>
+                  {showPending && (
+                    <View style={[styles.statusPill, styles.statusPending]}>
+                      <Text style={styles.statusText}>OFFER PENDING</Text>
+                    </View>
+                  )}
+
+                  {showAccepted && (
+                    <View style={[styles.statusPill, styles.statusAccepted]}>
+                      <Text style={styles.statusText}>ACCEPTED</Text>
+                    </View>
+                  )}
+
+                  {showRejected && (
+                    <View style={[styles.statusPill, styles.statusRejected]}>
+                      <Text style={styles.statusText}>
+                        REJECTED — send a new offer
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actionRow}>
+                  {canSendOffer && (
+                    <Pressable
+                      style={styles.btnPrimary}
+                      onPress={() => openCreateOffer(request.id)}
+                    >
+                      <Text style={styles.btnPrimaryText}>
+                        {offerState === "rejected"
+                          ? "Send new offer"
+                          : "Send offer"}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {showPending && (
+                    <Pressable
+                      style={styles.btnSecondary}
+                      onPress={() =>
+                        Alert.alert(
+                          "Pending",
+                          "You already have a pending offer for this request.",
+                        )
+                      }
+                    >
+                      <Text style={styles.btnSecondaryText}>View pending</Text>
+                    </Pressable>
+                  )}
+
+                  {showAccepted && (
+                    <Pressable style={styles.btnPrimary} onPress={chatSoon}>
+                      <Text style={styles.btnPrimaryText}>Chat</Text>
+                    </Pressable>
+                  )}
+
+                  {/* If skipped, no offer actions */}
+                  {direction === "left" && (
+                    <Text style={styles.skippedHint}>
+                      Skipped items are read-only.
+                    </Text>
                   )}
                 </View>
               </View>
@@ -438,29 +438,28 @@ function FilterBtn({
 
 const theme = {
   primary: "#1E40AF",
+  success: "#16A34A",
   bg: "#F9FAFB",
   surface: "#FFFFFF",
   primaryText: "#020617",
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
-  danger: "#B91C1C",
-  success: "#16A34A",
+  dangerSoft: "#FEE2E2",
+  successSoft: "#DCFCE7",
 };
 
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 14,
     backgroundColor: theme.bg,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  header: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: theme.primaryText,
-    marginBottom: 12,
-  },
+
+  header: { marginBottom: 10 },
+  h1: { fontSize: 22, fontWeight: "900", color: theme.primaryText },
+  sub: { marginTop: 4, color: theme.secondaryText },
 
   filtersWrap: { alignItems: "center", marginBottom: 12 },
   filters: {
@@ -471,13 +470,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 6,
     gap: 6,
+    justifyContent: "center",
   },
   filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },
-  filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
+  filterText: { fontWeight: "900", color: theme.secondaryText, fontSize: 12 },
   filterTextActive: { color: theme.primaryText },
 
-  center: {
+  centerCard: {
     flex: 1,
     backgroundColor: theme.surface,
     borderWidth: 1,
@@ -486,10 +486,10 @@ const styles = StyleSheet.create({
     padding: 18,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
   },
-  titleEmpty: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
-  muted: { color: theme.secondaryText, textAlign: "center" },
+  centerTitle: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
+  centerSub: { color: theme.secondaryText, textAlign: "center" },
 
   card: {
     backgroundColor: theme.surface,
@@ -497,133 +497,86 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
     borderRadius: 18,
     padding: 14,
-    marginTop: 12,
+    marginBottom: 12,
   },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.accentSoft,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    fontWeight: "900",
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  category: { color: theme.secondaryText, fontWeight: "900", fontSize: 12 },
+  title: {
     color: theme.primaryText,
-  },
-
-  offerSentBadge: {
-    backgroundColor: theme.accentSoft,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  offerSentText: { fontSize: 12, fontWeight: "900", color: theme.primary },
-
-  statusBadge: {
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
-  },
-  statusPending: {
-    borderColor: theme.primary,
-    backgroundColor: theme.accentSoft,
-  },
-  statusAccepted: { borderColor: theme.success, backgroundColor: "#DCFCE7" },
-  statusRejected: { borderColor: "#FCA5A5", backgroundColor: "#FEE2E2" },
-  statusBadgeText: {
-    fontSize: 12,
     fontWeight: "900",
-    color: theme.primaryText,
-  },
-
-  cardTitle: {
-    marginTop: 10,
     fontSize: 16,
-    fontWeight: "900",
-    color: theme.primaryText,
+    marginTop: 2,
   },
-  cardDesc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
-
-  metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  metaStrong: { fontWeight: "900", color: theme.primaryText },
-  metaMuted: { color: theme.secondaryText },
-
-  footerRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  smallMuted: { fontSize: 12, color: theme.secondaryText },
-
-  openBtn: {
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: theme.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  openBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
-
-  actionsRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+  by: {
+    color: theme.secondaryText,
+    fontWeight: "700",
+    fontSize: 12,
+    marginTop: 4,
   },
 
   removeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    height: 36,
+    width: 36,
+    borderRadius: 12,
+    backgroundColor: theme.bg,
     borderWidth: 1,
-    borderColor: "#FCA5A5",
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  removeText: { fontWeight: "900", color: theme.danger, fontSize: 12 },
 
-  primaryBtn: {
-    height: 40,
+  desc: { marginTop: 10, color: theme.secondaryText, lineHeight: 18 },
+
+  metaRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
+  pill: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+  },
+  pillInterested: {
+    backgroundColor: theme.accentSoft,
+    borderColor: theme.primary,
+  },
+  pillSkipped: { backgroundColor: theme.border, borderColor: theme.border },
+  pillText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+
+  statusRow: { marginTop: 12 },
+  statusPill: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14 },
+  statusNone: { backgroundColor: theme.border },
+  statusPending: { backgroundColor: theme.accentSoft },
+  statusAccepted: { backgroundColor: theme.successSoft },
+  statusRejected: { backgroundColor: theme.dangerSoft },
+  statusText: { fontWeight: "900", fontSize: 12, color: theme.primaryText },
+
+  actionRow: { marginTop: 12, gap: 10 },
+  btnPrimary: {
+    height: 44,
     borderRadius: 14,
     backgroundColor: theme.primary,
-    paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 12,
   },
-  primaryText: { color: "white", fontWeight: "900", fontSize: 12 },
+  btnPrimaryText: { color: "white", fontWeight: "900" },
 
-  splitActions: { flexDirection: "row", gap: 10, alignItems: "center" },
-
-  withdrawBtn: {
-    height: 40,
+  btnSecondary: {
+    height: 44,
     borderRadius: 14,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
     backgroundColor: theme.surface,
-  },
-  withdrawText: { fontWeight: "900", color: theme.danger, fontSize: 12 },
-
-  chatBtn: {
-    height: 40,
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.success,
+    paddingHorizontal: 12,
   },
-  chatBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+  btnSecondaryText: { color: theme.primaryText, fontWeight: "900" },
+
+  skippedHint: {
+    color: theme.secondaryText,
+    fontWeight: "700",
+    textAlign: "center",
+  },
 });

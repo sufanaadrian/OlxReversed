@@ -1,5 +1,6 @@
+import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -11,124 +12,227 @@ import {
 import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
 
+type OfferStatus = "pending" | "accepted" | "rejected";
+
+type OfferRow = {
+  id: string;
+  request_id: string;
+  user_id: string;
+  status: OfferStatus;
+  price: number;
+  description: string;
+  created_at: string;
+};
+
 export default function CreateOfferModal() {
-  const { requestId, offerId } = useLocalSearchParams<{
-    requestId: string;
-    offerId?: string;
-  }>();
+  const params = useLocalSearchParams();
+  const requestId = (params?.requestId as string) ?? "";
+
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    if (!offerId) return;
+  const [latestOffer, setLatestOffer] = useState<OfferRow | null>(null);
 
-    (async () => {
-      const { data } = await supabase
-        .from("offers")
-        .select("price,description")
-        .eq("id", offerId)
-        .single();
+  const loadLatestOffer = useCallback(async () => {
+    setChecking(true);
 
-      if (data) {
-        setPrice(String(data.price));
-        setDescription(data.description);
-      }
-    })();
-  }, [offerId]);
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user.id;
 
-  const submit = async () => {
-    if (!price || !description) {
-      Alert.alert("Missing fields", "Please fill all fields.");
+    if (!uid || !requestId) {
+      setLatestOffer(null);
+      setChecking(false);
       return;
     }
 
-    const numericPrice = Number(price);
-    if (Number.isNaN(numericPrice) || numericPrice <= 0) {
-      Alert.alert("Invalid price", "Enter a valid number.");
+    // Get latest offer for this request made by this user
+    const { data, error } = await supabase
+      .from("offers")
+      .select("id, request_id, user_id, status, price, description, created_at")
+      .eq("request_id", requestId)
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.log("loadLatestOffer error:", error);
+      setLatestOffer(null);
+    } else {
+      setLatestOffer((data?.[0] ?? null) as any);
+    }
+
+    setChecking(false);
+  }, [requestId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestOffer();
+    }, [loadLatestOffer]),
+  );
+
+  const canSend = useMemo(() => {
+    // No offer yet → can send
+    if (!latestOffer) return true;
+
+    // Pending exists → cannot send another
+    if (latestOffer.status === "pending") return false;
+
+    // Rejected → can send again
+    if (latestOffer.status === "rejected") return true;
+
+    // Accepted → usually block (deal already agreed)
+    if (latestOffer.status === "accepted") return false;
+
+    return true;
+  }, [latestOffer]);
+
+  const disabledReason = useMemo(() => {
+    if (!latestOffer) return "";
+    if (latestOffer.status === "pending")
+      return "You already have a pending offer for this request.";
+    if (latestOffer.status === "accepted")
+      return "Your offer was accepted. Chat will be available soon.";
+    return "";
+  }, [latestOffer]);
+
+  const onSubmit = async () => {
+    const p = Number(price);
+
+    if (!requestId) {
+      Alert.alert("Error", "Missing requestId");
+      return;
+    }
+
+    if (!Number.isFinite(p) || p <= 0) {
+      Alert.alert("Invalid price", "Please enter a valid numeric price.");
+      return;
+    }
+
+    if (description.trim().length < 3) {
+      Alert.alert("Invalid description", "Please write a short description.");
+      return;
+    }
+
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user.id;
+
+    if (!uid) {
+      Alert.alert("Sign in required", "Please sign in to send an offer.");
+      router.push("/sign-in" as any);
+      return;
+    }
+
+    // Block only if latest is pending/accepted
+    if (!canSend) {
+      Alert.alert("Offer not allowed", disabledReason || "Cannot send offer.");
       return;
     }
 
     setLoading(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const payload = {
-      price: numericPrice,
-      description,
-    };
-
-    const res = offerId
-      ? await supabase.from("offers").update(payload).eq("id", offerId)
-      : await supabase.from("offers").insert({
-          request_id: requestId,
-          user_id: user.id,
-          status: "pending",
-          ...payload,
-        });
+    // Insert NEW offer row every time (history)
+    const { error } = await supabase.from("offers").insert({
+      request_id: requestId,
+      user_id: uid,
+      price: p,
+      description: description.trim(),
+      status: "pending",
+    });
 
     setLoading(false);
 
-    if (res.error) {
-      if (res.error.code === "23505") {
-        Alert.alert("Offer already sent");
-        router.back();
+    if (error) {
+      // Unique pending index will throw 23505 if a pending exists
+      if ((error as any).code === "23505") {
+        Alert.alert(
+          "Offer already pending",
+          "You already have a pending offer for this request.",
+        );
+        loadLatestOffer();
         return;
       }
-      Alert.alert("Error", res.error.message);
+
+      Alert.alert("Error", error.message);
       return;
     }
 
+    Alert.alert("Sent", "Your offer was sent.");
     router.back();
   };
 
   return (
-    <Screen>
+    <Screen backgroundColor={theme.bg}>
       <View style={styles.page}>
-        <Text style={styles.title}>Send offer</Text>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Price</Text>
-          <TextInput
-            value={price}
-            onChangeText={setPrice}
-            placeholder="e.g. 1200"
-            keyboardType="numeric"
-            style={styles.input}
-          />
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Send offer</Text>
+          <View style={{ width: 56 }} />
         </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Describe what you’re offering"
-            multiline
-            numberOfLines={4}
-            style={[styles.input, styles.textarea]}
-          />
-        </View>
+        {checking ? (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>Checking existing offers…</Text>
+          </View>
+        ) : latestOffer ? (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              Latest offer status:{" "}
+              <Text style={{ fontWeight: "900" }}>
+                {latestOffer.status.toUpperCase()}
+              </Text>
+            </Text>
+
+            {!canSend && (
+              <Text style={[styles.infoText, { marginTop: 6 }]}>
+                {disabledReason}
+              </Text>
+            )}
+
+            {latestOffer.status === "rejected" && (
+              <Text style={[styles.infoText, { marginTop: 6 }]}>
+                Your last offer was rejected — you can send a new one.
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        <Text style={styles.label}>Price</Text>
+        <TextInput
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="numeric"
+          placeholder="e.g. 1200"
+          placeholderTextColor={theme.secondaryText}
+          style={styles.input}
+        />
+
+        <Text style={[styles.label, { marginTop: 12 }]}>Description</Text>
+        <TextInput
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Short message for the requester"
+          placeholderTextColor={theme.secondaryText}
+          style={[styles.input, styles.textArea]}
+          multiline
+        />
 
         <Pressable
-          style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
-          onPress={submit}
-          disabled={loading}
+          onPress={onSubmit}
+          style={({ pressed }) => [
+            styles.cta,
+            (!canSend || loading) && styles.ctaDisabled,
+            pressed && { opacity: 0.9 },
+          ]}
+          disabled={!canSend || loading}
         >
-          <Text style={styles.primaryText}>
-            {loading ? "Sending…" : "Send offer"}
+          <Text style={styles.ctaText}>
+            {loading ? "Sending..." : "Send offer"}
           </Text>
-        </Pressable>
-
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.cancel}>Cancel</Text>
         </Pressable>
       </View>
     </Screen>
@@ -145,59 +249,56 @@ const theme = {
 };
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    padding: 16,
-    gap: 16,
-  },
+  page: { flex: 1, paddingHorizontal: 16, paddingTop: 14, gap: 10 },
 
-  title: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: theme.primaryText,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
-
-  field: {
-    gap: 6,
-  },
-
-  label: {
-    fontWeight: "700",
-    color: theme.primaryText,
-  },
-
-  input: {
+  backBtn: {
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backText: { fontWeight: "900", color: theme.primaryText },
+  headerTitle: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
+
+  infoBox: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
     padding: 12,
-    fontSize: 15,
   },
+  infoText: { color: theme.secondaryText, fontWeight: "700" },
 
-  textarea: {
-    height: 120,
-    textAlignVertical: "top",
+  label: { fontWeight: "900", color: theme.primaryText, marginTop: 6 },
+  input: {
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 12,
+    color: theme.primaryText,
   },
+  textArea: { height: 110, paddingTop: 12, textAlignVertical: "top" },
 
-  primaryBtn: {
-    height: 50,
+  cta: {
+    height: 48,
     borderRadius: 16,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 16,
   },
-
-  primaryText: {
-    color: "white",
-    fontWeight: "900",
-    fontSize: 16,
-  },
-
-  cancel: {
-    textAlign: "center",
-    color: theme.secondaryText,
-    fontWeight: "700",
-  },
+  ctaDisabled: { opacity: 0.5 },
+  ctaText: { color: "white", fontWeight: "900" },
 });
