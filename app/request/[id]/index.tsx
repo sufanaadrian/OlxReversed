@@ -126,7 +126,7 @@ export default function RequestDetailScreen() {
         </View>
 
         {/* BUYER (OWNER) ACTIONS */}
-        {isOwner && request.status === "active" && (
+        {isOwner && (
           <View style={styles.actions}>
             <Pressable
               style={styles.primaryBtn}
