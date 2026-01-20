@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -45,6 +46,8 @@ type CounterCounts = { pending: number; accepted: number };
 
 export default function MyRequestsScreen() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [countsByRequestId, setCountsByRequestId] = useState<
     Map<string, OfferCounts>
@@ -54,8 +57,8 @@ export default function MyRequestsScreen() {
   >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner: boolean = true) => {
+    if (showSpinner) setLoading(true);
 
     const { data: userRes } = await supabase.auth.getUser();
     const user = userRes.user;
@@ -64,7 +67,7 @@ export default function MyRequestsScreen() {
       setRequests([]);
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -81,7 +84,7 @@ export default function MyRequestsScreen() {
       setRequests([]);
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -91,7 +94,7 @@ export default function MyRequestsScreen() {
     if (reqList.length === 0) {
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -108,7 +111,7 @@ export default function MyRequestsScreen() {
     if (offErr) {
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -140,7 +143,7 @@ export default function MyRequestsScreen() {
     if (coErr) {
       // Don’t block the screen if counters fail; just clear them.
       setCounterCountsByRequestId(new Map());
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -158,14 +161,24 @@ export default function MyRequestsScreen() {
     });
 
     setCounterCountsByRequestId(counterMap);
-    setLoading(false);
+
+    if (showSpinner) setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      load(true);
     }, [load]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load(false); // silent refresh (keeps content)
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const counts = useMemo(() => {
     const all = requests.length;
@@ -220,12 +233,24 @@ export default function MyRequestsScreen() {
           <Text style={styles.muted}>Loading…</Text>
         </View>
       ) : filtered.length === 0 ? (
-        <View style={styles.centerCard}>
-          <Text style={styles.titleEmpty}>Nothing here</Text>
-          <Text style={styles.muted}>Create a request to see it here.</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.centerCard}>
+            <Text style={styles.titleEmpty}>Nothing here</Text>
+            <Text style={styles.muted}>Create a request to see it here.</Text>
+          </View>
+        </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 18 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {filtered.map((r) => {
             const offerCounts = countsByRequestId.get(r.id) ?? {
               total: 0,
@@ -267,7 +292,7 @@ export default function MyRequestsScreen() {
                       </View>
                     )}
 
-                    {/* NEW: Deal pill if accepted offer OR accepted counter */}
+                    {/* Deal pill */}
                     {hasAcceptedDeal && (
                       <View style={styles.dealPill}>
                         <Text style={styles.dealPillText}>DEAL</Text>
@@ -344,7 +369,7 @@ export default function MyRequestsScreen() {
                       </Text>
                     </Pressable>
                   ) : hasPendingCounters ? (
-                    // PRIORITY 3: pending counters => show view offers
+                    // PRIORITY 3: pending counters => view offers
                     <Pressable
                       onPress={(e) => {
                         e.stopPropagation();
@@ -360,7 +385,6 @@ export default function MyRequestsScreen() {
                       </Text>
                     </Pressable>
                   ) : (
-                    // fallback
                     <Text style={styles.smallMuted}>
                       {offerCounts.total === 0
                         ? "No offers yet"
@@ -496,7 +520,6 @@ const styles = StyleSheet.create({
   },
   offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
 
-  // NEW: Deal pill
   dealPill: {
     backgroundColor: "#DCFCE7",
     borderRadius: 999,
@@ -550,7 +573,6 @@ const styles = StyleSheet.create({
   },
   reviewBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
 
-  // NEW: secondary action for counter pending (keeps your visual hierarchy)
   viewBtn: {
     height: 34,
     paddingHorizontal: 12,

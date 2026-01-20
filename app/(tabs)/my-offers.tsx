@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -55,6 +56,8 @@ type CounterOfferRow = {
 
 export default function MyOffersScreen() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [filter, setFilter] = useState<Filter>("all");
 
   const [swipes, setSwipes] = useState<
@@ -64,8 +67,10 @@ export default function MyOffersScreen() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counterOffers, setCounterOffers] = useState<CounterOfferRow[]>([]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // showSpinner=true -> used for initial/focus load
+  // showSpinner=false -> used for pull-to-refresh (keeps UI, shows refresh indicator only)
+  const load = useCallback(async (showSpinner: boolean = true) => {
+    if (showSpinner) setLoading(true);
 
     const { data: sess } = await supabase.auth.getSession();
     const uid = sess.session?.user.id;
@@ -74,7 +79,7 @@ export default function MyOffersScreen() {
       setSwipes([]);
       setOffers([]);
       setCounterOffers([]);
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -106,7 +111,7 @@ export default function MyOffersScreen() {
 
     if (swipeErr) {
       Alert.alert("Error", swipeErr.message);
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -140,7 +145,7 @@ export default function MyOffersScreen() {
     if (offerErr) {
       Alert.alert("Error", offerErr.message);
       setOffers([]);
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -158,19 +163,29 @@ export default function MyOffersScreen() {
     if (counterErr) {
       Alert.alert("Error", counterErr.message);
       setCounterOffers([]);
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
 
     setCounterOffers((counterData ?? []) as CounterOfferRow[]);
-    setLoading(false);
+
+    if (showSpinner) setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      load(true);
     }, [load]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load(false); // silent reload: keep UI, just refresh indicator
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   // Latest offer per request (newest first because offers state already ordered desc)
   const latestOfferByRequestId = useMemo(() => {
@@ -214,13 +229,7 @@ export default function MyOffersScreen() {
   const chatSoon = () =>
     Alert.alert("Soon", "Chat functionality will be added soon");
 
-  /**
-   * IMPORTANT FIX:
-   * When seller ACCEPTS a counter-offer, also mark the original offer as ACCEPTED and set its price to counter price.
-   * This makes state consistent across refresh and across both accounts.
-   */
   const acceptCounter = async (counter: CounterOfferRow) => {
-    // 1) accept counter
     const { error: cErr } = await supabase
       .from("counter_offers")
       .update({ status: "accepted" })
@@ -228,7 +237,6 @@ export default function MyOffersScreen() {
 
     if (cErr) return Alert.alert("Error", cErr.message);
 
-    // 2) update original offer to accepted + price = counter price
     const { error: oErr } = await supabase
       .from("offers")
       .update({ status: "accepted", price: counter.price })
@@ -237,7 +245,7 @@ export default function MyOffersScreen() {
     if (oErr) return Alert.alert("Error", oErr.message);
 
     Alert.alert("Accepted", "Counter-offer accepted. Next: chat (soon).");
-    load();
+    load(false);
   };
 
   const rejectCounter = async (counter: CounterOfferRow) => {
@@ -248,7 +256,7 @@ export default function MyOffersScreen() {
 
     if (error) return Alert.alert("Error", error.message);
 
-    load();
+    load(false);
   };
 
   return (
@@ -287,20 +295,32 @@ export default function MyOffersScreen() {
             <Text style={styles.centerSub}>Fetching swipes & offers</Text>
           </View>
         ) : visible.length === 0 ? (
-          <View style={styles.centerCard}>
-            <Text style={styles.centerTitle}>No items</Text>
-            <Text style={styles.centerSub}>
-              Swipe right on a request to see it here.
-            </Text>
-            <Pressable
-              style={styles.btnPrimary}
-              onPress={() => router.push("/(tabs)/marketplace" as any)}
-            >
-              <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
-            </Pressable>
-          </View>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            <View style={styles.centerCard}>
+              <Text style={styles.centerTitle}>No items</Text>
+              <Text style={styles.centerSub}>
+                Swipe right on a request to see it here.
+              </Text>
+              <Pressable
+                style={styles.btnPrimary}
+                onPress={() => router.push("/(tabs)/marketplace" as any)}
+              >
+                <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         ) : (
-          <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 18 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
             {visible.map(({ request, direction }) => {
               const latestOffer = latestOfferByRequestId.get(request.id);
               const counter = latestCounterByRequestId.get(request.id);
@@ -308,18 +328,9 @@ export default function MyOffersScreen() {
               const offerState: OfferStatus | "none" =
                 latestOffer?.status ?? "none";
 
-              /**
-               * ✅ COUNTER-OFFER OVERRIDES OFFER UI
-               * If counter is pending -> user should respond to counter, not send a new offer.
-               * If counter is accepted -> treat as accepted.
-               */
               const counterPending = counter?.status === "pending";
               const counterAccepted = counter?.status === "accepted";
-              const counterRejected =
-                counter?.status === "rejected" ||
-                counter?.status === "withdrawn";
 
-              // Effective state for UI
               let effectiveState:
                 | "none"
                 | OfferStatus
@@ -328,12 +339,11 @@ export default function MyOffersScreen() {
 
               if (counterPending) effectiveState = "counter_pending";
               if (counterAccepted) effectiveState = "counter_accepted";
-              // if counter rejected/withdrawn -> fall back to offerState (likely rejected)
 
               const canSendOffer =
                 direction === "right" &&
-                !counterPending && // 🚫 block resend while counter pending
-                !counterAccepted && // 🚫 block resend when counter accepted
+                !counterPending &&
+                !counterAccepted &&
                 (offerState === "none" || offerState === "rejected");
 
               return (
@@ -376,7 +386,6 @@ export default function MyOffersScreen() {
                     </View>
                   </View>
 
-                  {/* Counter-offer banner */}
                   {counter && (
                     <View style={styles.counterBox}>
                       <Text style={styles.counterTitle}>
@@ -418,7 +427,6 @@ export default function MyOffersScreen() {
                     </View>
                   )}
 
-                  {/* Status pill */}
                   <View style={styles.statusRow}>
                     {effectiveState === "none" && (
                       <View style={[styles.statusPill, styles.statusNone]}>
@@ -472,7 +480,6 @@ export default function MyOffersScreen() {
                       </Pressable>
                     )}
 
-                    {/* If counter pending, explicitly explain why resend isn't available */}
                     {counterPending && (
                       <Text style={styles.skippedHint}>
                         A counter-offer is pending. Respond to it above.
@@ -573,6 +580,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    marginTop: 12,
   },
   centerTitle: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
   centerSub: { color: theme.secondaryText, textAlign: "center" },
