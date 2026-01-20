@@ -24,7 +24,7 @@ type OfferRow = {
   description: string;
   status: OfferStatus;
   created_at: string;
-  profiles?: { email: string | null } | null; // optional embed
+  profiles?: { email: string | null } | null;
 };
 
 type RequestRow = {
@@ -32,6 +32,19 @@ type RequestRow = {
   user_id: string;
   title: string;
   status: string;
+};
+
+type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
+type CounterRow = {
+  id: string;
+  offer_id: string;
+  request_id: string;
+  requester_id: string;
+  seller_id: string;
+  price: number;
+  message: string | null;
+  status: CounterStatus;
+  created_at: string;
 };
 
 export default function RequestOffersScreen() {
@@ -43,11 +56,13 @@ export default function RequestOffersScreen() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
 
+  const [counters, setCounters] = useState<CounterRow[]>([]);
+
   const load = useCallback(async () => {
     if (!requestId) return;
     setLoading(true);
 
-    // Request (owner must be able to read)
+    // Request
     const { data: req, error: reqErr } = await supabase
       .from("requests")
       .select("id,user_id,title,status")
@@ -58,14 +73,14 @@ export default function RequestOffersScreen() {
       Alert.alert("Error", reqErr.message);
       setRequest(null);
       setOffers([]);
+      setCounters([]);
       setLoading(false);
       return;
     }
 
     setRequest(req as any);
 
-    // Offers: FETCH ALL STATUSES (no status filter)
-    // Optional: embed offerer email from profiles if you want.
+    // Offers: ALL STATUSES
     const { data: off, error: offErr } = await supabase
       .from("offers")
       .select(
@@ -88,11 +103,30 @@ export default function RequestOffersScreen() {
     if (offErr) {
       Alert.alert("Error", offErr.message);
       setOffers([]);
+      setCounters([]);
       setLoading(false);
       return;
     }
 
     setOffers((off ?? []) as any);
+
+    // Counter-offers for this request (so requester sees what they sent)
+    const { data: co, error: coErr } = await supabase
+      .from("counter_offers")
+      .select(
+        "id,offer_id,request_id,requester_id,seller_id,price,message,status,created_at",
+      )
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: false });
+
+    if (coErr) {
+      Alert.alert("Error", coErr.message);
+      setCounters([]);
+      setLoading(false);
+      return;
+    }
+
+    setCounters((co ?? []) as any);
     setLoading(false);
   }, [requestId]);
 
@@ -101,6 +135,15 @@ export default function RequestOffersScreen() {
       load();
     }, [load]),
   );
+
+  // Latest counter per offer_id (so each offer can show its counter state)
+  const latestCounterByOfferId = useMemo(() => {
+    const map = new Map<string, CounterRow>();
+    for (const c of counters) {
+      if (!map.has(c.offer_id)) map.set(c.offer_id, c);
+    }
+    return map;
+  }, [counters]);
 
   const counts = useMemo(() => {
     const all = offers.length;
@@ -116,7 +159,6 @@ export default function RequestOffersScreen() {
   }, [offers, filter]);
 
   const acceptOffer = async (offerId: string) => {
-    // Accept selected offer
     const { error: accErr } = await supabase
       .from("offers")
       .update({ status: "accepted" })
@@ -124,7 +166,6 @@ export default function RequestOffersScreen() {
 
     if (accErr) return Alert.alert("Error", accErr.message);
 
-    // Reject all other pending offers for this request
     const { error: rejErr } = await supabase
       .from("offers")
       .update({ status: "rejected" })
@@ -134,7 +175,6 @@ export default function RequestOffersScreen() {
 
     if (rejErr) return Alert.alert("Error", rejErr.message);
 
-    // Mark request as matched/in_progress (NOT closed)
     await supabase
       .from("requests")
       .update({ status: "matched" })
@@ -148,8 +188,65 @@ export default function RequestOffersScreen() {
       .from("offers")
       .update({ status: "rejected" })
       .eq("id", offerId);
+
     if (error) return Alert.alert("Error", error.message);
     await load();
+  };
+
+  // Reject menu: Reject or Reject-with-offer
+  const openRejectMenu = (offer: OfferRow) => {
+    const email = offer.profiles?.email ?? "user";
+    const existingCounter = latestCounterByOfferId.get(offer.id);
+
+    // If a counter is already pending, don’t allow spamming more counters
+    if (existingCounter?.status === "pending") {
+      Alert.alert(
+        "Counter-offer already sent",
+        "You already sent a counter-offer for this seller. Wait for them to accept/reject it.",
+        [
+          { text: "OK" },
+          {
+            text: "View counter",
+            onPress: () =>
+              router.push({
+                pathname: "/(modals)/counter-offer",
+                params: {
+                  offerId: offer.id,
+                  requestId: offer.request_id,
+                  sellerId: offer.user_id,
+                  sellerEmail: email,
+                  originalPrice: String(offer.price),
+                },
+              } as any),
+          },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert("Reject offer", "Choose an option:", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Reject",
+        style: "destructive",
+        onPress: () => rejectOffer(offer.id),
+      },
+      {
+        text: "Reject with offer",
+        onPress: () => {
+          router.push({
+            pathname: "/(modals)/counter-offer",
+            params: {
+              offerId: offer.id,
+              requestId: offer.request_id,
+              sellerId: offer.user_id,
+              sellerEmail: email,
+              originalPrice: String(offer.price),
+            },
+          } as any);
+        },
+      },
+    ]);
   };
 
   return (
@@ -213,6 +310,8 @@ export default function RequestOffersScreen() {
               const isPending = o.status === "pending";
               const isAccepted = o.status === "accepted";
 
+              const counter = latestCounterByOfferId.get(o.id);
+
               return (
                 <View key={o.id} style={styles.card}>
                   <View style={styles.cardTop}>
@@ -238,10 +337,27 @@ export default function RequestOffersScreen() {
                   </Text>
                   <Text style={styles.desc}>{o.description}</Text>
 
+                  {/* ✅ Counter-offer UI shown to requester */}
+                  {counter && (
+                    <View style={styles.counterBox}>
+                      <Text style={styles.counterTitle}>
+                        Counter-offer: €{Number(counter.price).toLocaleString()}
+                      </Text>
+                      {!!counter.message && (
+                        <Text style={styles.counterMsg} numberOfLines={3}>
+                          {counter.message}
+                        </Text>
+                      )}
+                      <Text style={styles.counterStatus}>
+                        Status: {counter.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+
                   {isPending && (
                     <View style={styles.actionsRow}>
                       <Pressable
-                        onPress={() => rejectOffer(o.id)}
+                        onPress={() => openRejectMenu(o)}
                         style={[styles.btn, styles.btnSecondary]}
                       >
                         <Text style={styles.btnSecondaryText}>Reject</Text>
@@ -310,8 +426,6 @@ const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
-  success: "#16A34A",
-  danger: "#DC2626",
 };
 
 const styles = StyleSheet.create({
@@ -400,6 +514,23 @@ const styles = StyleSheet.create({
     color: theme.primaryText,
   },
   desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+
+  counterBox: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+    borderRadius: 16,
+    padding: 12,
+    gap: 6,
+  },
+  counterTitle: { fontWeight: "900", color: theme.primaryText },
+  counterMsg: { color: theme.secondaryText, lineHeight: 18 },
+  counterStatus: {
+    fontWeight: "900",
+    color: theme.secondaryText,
+    fontSize: 12,
+  },
 
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   btn: {

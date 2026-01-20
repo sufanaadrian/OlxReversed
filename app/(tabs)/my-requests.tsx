@@ -33,13 +33,24 @@ type OfferMini = {
   status: "pending" | "accepted" | "rejected";
 };
 
-type OfferCounts = { total: number; pending: number };
+type OfferCounts = { total: number; pending: number; accepted: number };
+
+type CounterOfferMini = {
+  id: string;
+  request_id: string;
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
+};
+
+type CounterCounts = { pending: number; accepted: number };
 
 export default function MyRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [countsByRequestId, setCountsByRequestId] = useState<
     Map<string, OfferCounts>
+  >(new Map());
+  const [counterCountsByRequestId, setCounterCountsByRequestId] = useState<
+    Map<string, CounterCounts>
   >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -52,6 +63,7 @@ export default function MyRequestsScreen() {
     if (!user) {
       setRequests([]);
       setCountsByRequestId(new Map());
+      setCounterCountsByRequestId(new Map());
       setLoading(false);
       return;
     }
@@ -68,6 +80,7 @@ export default function MyRequestsScreen() {
       Alert.alert("Error", reqErr.message);
       setRequests([]);
       setCountsByRequestId(new Map());
+      setCounterCountsByRequestId(new Map());
       setLoading(false);
       return;
     }
@@ -77,12 +90,16 @@ export default function MyRequestsScreen() {
 
     if (reqList.length === 0) {
       setCountsByRequestId(new Map());
+      setCounterCountsByRequestId(new Map());
       setLoading(false);
       return;
     }
 
     const ids = reqList.map((r) => r.id);
 
+    // -------------------------
+    // OFFERS COUNTS (existing)
+    // -------------------------
     const { data: offers, error: offErr } = await supabase
       .from("offers")
       .select("id,request_id,status")
@@ -90,21 +107,57 @@ export default function MyRequestsScreen() {
 
     if (offErr) {
       setCountsByRequestId(new Map());
+      setCounterCountsByRequestId(new Map());
       setLoading(false);
       return;
     }
 
-    const map = new Map<string, OfferCounts>();
+    const offerMap = new Map<string, OfferCounts>();
     (offers ?? []).forEach((o: any) => {
       const row = o as OfferMini;
-      const prev = map.get(row.request_id) ?? { total: 0, pending: 0 };
-      map.set(row.request_id, {
+      const prev = offerMap.get(row.request_id) ?? {
+        total: 0,
+        pending: 0,
+        accepted: 0,
+      };
+      offerMap.set(row.request_id, {
         total: prev.total + 1,
         pending: prev.pending + (row.status === "pending" ? 1 : 0),
+        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
       });
     });
 
-    setCountsByRequestId(map);
+    setCountsByRequestId(offerMap);
+
+    // -------------------------
+    // COUNTER OFFERS COUNTS (new)
+    // -------------------------
+    const { data: counters, error: coErr } = await supabase
+      .from("counter_offers")
+      .select("id,request_id,status")
+      .in("request_id", ids);
+
+    if (coErr) {
+      // Don’t block the screen if counters fail; just clear them.
+      setCounterCountsByRequestId(new Map());
+      setLoading(false);
+      return;
+    }
+
+    const counterMap = new Map<string, CounterCounts>();
+    (counters ?? []).forEach((c: any) => {
+      const row = c as CounterOfferMini;
+      const prev = counterMap.get(row.request_id) ?? {
+        pending: 0,
+        accepted: 0,
+      };
+      counterMap.set(row.request_id, {
+        pending: prev.pending + (row.status === "pending" ? 1 : 0),
+        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+      });
+    });
+
+    setCounterCountsByRequestId(counterMap);
     setLoading(false);
   }, []);
 
@@ -177,7 +230,18 @@ export default function MyRequestsScreen() {
             const offerCounts = countsByRequestId.get(r.id) ?? {
               total: 0,
               pending: 0,
+              accepted: 0,
             };
+
+            const counterCounts = counterCountsByRequestId.get(r.id) ?? {
+              pending: 0,
+              accepted: 0,
+            };
+
+            const hasAcceptedDeal =
+              offerCounts.accepted > 0 || counterCounts.accepted > 0;
+
+            const hasPendingCounters = counterCounts.pending > 0;
 
             return (
               <Pressable
@@ -200,6 +264,13 @@ export default function MyRequestsScreen() {
                           {offerCounts.total} offer
                           {offerCounts.total === 1 ? "" : "s"}
                         </Text>
+                      </View>
+                    )}
+
+                    {/* NEW: Deal pill if accepted offer OR accepted counter */}
+                    {hasAcceptedDeal && (
+                      <View style={styles.dealPill}>
+                        <Text style={styles.dealPillText}>DEAL</Text>
                       </View>
                     )}
 
@@ -242,7 +313,22 @@ export default function MyRequestsScreen() {
                     Posted {new Date(r.created_at).toLocaleDateString()}
                   </Text>
 
-                  {offerCounts.pending > 0 ? (
+                  {/* PRIORITY 1: accepted deal => chat */}
+                  {hasAcceptedDeal ? (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        Alert.alert(
+                          "Soon",
+                          "Chat functionality will be added soon",
+                        );
+                      }}
+                      style={styles.reviewBtn}
+                    >
+                      <Text style={styles.reviewBtnText}>Chat</Text>
+                    </Pressable>
+                  ) : offerCounts.pending > 0 ? (
+                    // PRIORITY 2: pending offers => review
                     <Pressable
                       onPress={(e) => {
                         e.stopPropagation();
@@ -257,7 +343,24 @@ export default function MyRequestsScreen() {
                         Review ({offerCounts.pending})
                       </Text>
                     </Pressable>
+                  ) : hasPendingCounters ? (
+                    // PRIORITY 3: pending counters => show view offers
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push({
+                          pathname: "/request/offers",
+                          params: { id: r.id },
+                        } as any);
+                      }}
+                      style={styles.viewBtn}
+                    >
+                      <Text style={styles.viewBtnText}>
+                        Counter pending ({counterCounts.pending})
+                      </Text>
+                    </Pressable>
                   ) : (
+                    // fallback
                     <Text style={styles.smallMuted}>
                       {offerCounts.total === 0
                         ? "No offers yet"
@@ -393,6 +496,15 @@ const styles = StyleSheet.create({
   },
   offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
 
+  // NEW: Deal pill
+  dealPill: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  dealPillText: { fontSize: 12, fontWeight: "900", color: "#166534" },
+
   statusPill: {
     borderRadius: 999,
     paddingVertical: 6,
@@ -437,4 +549,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   reviewBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  // NEW: secondary action for counter pending (keeps your visual hierarchy)
+  viewBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewBtnText: { color: theme.primaryText, fontWeight: "900", fontSize: 12 },
 });
