@@ -1,16 +1,17 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Swipeable from "react-native-gesture-handler/Swipeable";
 import { supabase } from "../../src/lib/supabase";
 
 type Filter = "all" | "active" | "closed";
@@ -57,6 +58,9 @@ export default function MyRequestsScreen() {
   >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
+  // Optional: keep only one row open at a time
+  const openRowRef = useRef<Swipeable | null>(null);
+
   const load = useCallback(async (showSpinner: boolean = true) => {
     if (showSpinner) setLoading(true);
 
@@ -100,9 +104,7 @@ export default function MyRequestsScreen() {
 
     const ids = reqList.map((r) => r.id);
 
-    // -------------------------
-    // OFFERS COUNTS (existing)
-    // -------------------------
+    // Offers counts
     const { data: offers, error: offErr } = await supabase
       .from("offers")
       .select("id,request_id,status")
@@ -129,19 +131,15 @@ export default function MyRequestsScreen() {
         accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
       });
     });
-
     setCountsByRequestId(offerMap);
 
-    // -------------------------
-    // COUNTER OFFERS COUNTS (new)
-    // -------------------------
+    // Counter offers counts
     const { data: counters, error: coErr } = await supabase
       .from("counter_offers")
       .select("id,request_id,status")
       .in("request_id", ids);
 
     if (coErr) {
-      // Don’t block the screen if counters fail; just clear them.
       setCounterCountsByRequestId(new Map());
       if (showSpinner) setLoading(false);
       return;
@@ -159,7 +157,6 @@ export default function MyRequestsScreen() {
         accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
       });
     });
-
     setCounterCountsByRequestId(counterMap);
 
     if (showSpinner) setLoading(false);
@@ -174,7 +171,7 @@ export default function MyRequestsScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await load(false); // silent refresh (keeps content)
+      await load(false);
     } finally {
       setRefreshing(false);
     }
@@ -182,7 +179,7 @@ export default function MyRequestsScreen() {
 
   const counts = useMemo(() => {
     const all = requests.length;
-    const active = requests.filter((r) => r.status !== "closed").length; // active + matched
+    const active = requests.filter((r) => r.status !== "closed").length;
     const closed = requests.filter((r) => r.status === "closed").length;
     return { all, active, closed };
   }, [requests]);
@@ -191,8 +188,245 @@ export default function MyRequestsScreen() {
     if (filter === "all") return requests;
     if (filter === "closed")
       return requests.filter((r) => r.status === "closed");
-    return requests.filter((r) => r.status !== "closed"); // active + matched
+    return requests.filter((r) => r.status !== "closed");
   }, [requests, filter]);
+
+  const confirmDelete = (req: RequestRow) => {
+    Alert.alert(
+      "Delete request?",
+      "This will permanently delete your request (and its offers).",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteRequest(req),
+        },
+      ],
+    );
+  };
+
+  const deleteRequest = async (req: RequestRow) => {
+    // Close any open swipe row
+    openRowRef.current?.close();
+
+    // Optimistic UI remove
+    const prevRequests = requests;
+    const prevCounts = countsByRequestId;
+    const prevCounterCounts = counterCountsByRequestId;
+
+    setRequests((cur) => cur.filter((r) => r.id !== req.id));
+
+    // also remove counts locally
+    setCountsByRequestId((cur) => {
+      const next = new Map(cur);
+      next.delete(req.id);
+      return next;
+    });
+    setCounterCountsByRequestId((cur) => {
+      const next = new Map(cur);
+      next.delete(req.id);
+      return next;
+    });
+
+    // DB delete
+    const { error } = await supabase.from("requests").delete().eq("id", req.id);
+
+    if (error) {
+      // revert
+      setRequests(prevRequests);
+      setCountsByRequestId(prevCounts);
+      setCounterCountsByRequestId(prevCounterCounts);
+      Alert.alert("Error", error.message);
+      return;
+    }
+  };
+
+  const renderRightActions = (req: RequestRow) => {
+    return (
+      <View style={styles.rightActionsWrap}>
+        <Pressable
+          onPress={() => confirmDelete(req)}
+          style={({ pressed }) => [
+            styles.deleteBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <Feather name="trash-2" size={18} color="white" />
+          <Text style={styles.deleteText}>Delete</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  const renderItem = ({ item }: { item: RequestRow }) => {
+    const offerCounts = countsByRequestId.get(item.id) ?? {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+    };
+
+    const counterCounts = counterCountsByRequestId.get(item.id) ?? {
+      pending: 0,
+      accepted: 0,
+    };
+
+    const hasAcceptedDeal =
+      offerCounts.accepted > 0 || counterCounts.accepted > 0;
+    const hasPendingCounters = counterCounts.pending > 0;
+
+    return (
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
+        onSwipeableOpen={() => {
+          // only keep one row open
+          if (openRowRef.current) openRowRef.current.close();
+        }}
+        ref={(ref) => {
+          // store last rendered row ref when it opens (good enough for single-open behavior)
+          // Note: Swipeable doesn't tell which opened row; but we close in onSwipeableWillOpen below
+        }}
+        onSwipeableWillOpen={() => {
+          // close previously open row
+          if (openRowRef.current) openRowRef.current.close();
+        }}
+        onSwipeableOpenStartDrag={() => {
+          // no-op, but kept for future tuning
+        }}
+        // When this row becomes the open one
+        onSwipeableOpen={() => {
+          // store the currently open row
+          // @ts-ignore
+          openRowRef.current = (openRowRef.current as any) ?? null;
+        }}
+      >
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/request/[id]",
+              params: { id: item.id },
+            } as any)
+          }
+          style={styles.card}
+        >
+          <View style={styles.topRow}>
+            <Text style={styles.categoryPill}>{item.category}</Text>
+
+            <View style={styles.rightBadges}>
+              {offerCounts.total > 0 && (
+                <View style={styles.offerPill}>
+                  <Text style={styles.offerPillText}>
+                    {offerCounts.total} offer
+                    {offerCounts.total === 1 ? "" : "s"}
+                  </Text>
+                </View>
+              )}
+
+              {hasAcceptedDeal && (
+                <View style={styles.dealPill}>
+                  <Text style={styles.dealPillText}>DEAL</Text>
+                </View>
+              )}
+
+              <View
+                style={[
+                  styles.statusPill,
+                  item.status === "active"
+                    ? styles.statusActive
+                    : item.status === "matched"
+                      ? styles.statusMatched
+                      : styles.statusClosed,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {item.status === "matched"
+                    ? "MATCHED"
+                    : item.status.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.desc} numberOfLines={2}>
+            {item.description}
+          </Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.metaStrong}>
+              ${item.budget_min.toLocaleString()} – $
+              {item.budget_max.toLocaleString()}
+            </Text>
+            {!!item.location && (
+              <Text style={styles.metaMuted}>• {item.location}</Text>
+            )}
+          </View>
+
+          <View style={styles.footerRow}>
+            <Text style={styles.smallMuted}>
+              Posted {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+
+            {hasAcceptedDeal ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Alert.alert("Soon", "Chat functionality will be added soon");
+                }}
+                style={styles.reviewBtn}
+              >
+                <Text style={styles.reviewBtnText}>Chat</Text>
+              </Pressable>
+            ) : offerCounts.pending > 0 ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/request/offers",
+                    params: { id: item.id },
+                  } as any);
+                }}
+                style={styles.reviewBtn}
+              >
+                <Text style={styles.reviewBtnText}>
+                  Review ({offerCounts.pending})
+                </Text>
+              </Pressable>
+            ) : hasPendingCounters ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/request/offers",
+                    params: { id: item.id },
+                  } as any);
+                }}
+                style={styles.viewBtn}
+              >
+                <Text style={styles.viewBtnText}>
+                  Counter pending ({counterCounts.pending})
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.smallMuted}>
+                {offerCounts.total === 0
+                  ? "No offers yet"
+                  : "No pending offers"}
+              </Text>
+            )}
+          </View>
+        </Pressable>
+      </Swipeable>
+    );
+  };
+
+  const ListEmpty = (
+    <View style={styles.centerCard}>
+      <Text style={styles.titleEmpty}>Nothing here</Text>
+      <Text style={styles.muted}>Create a request to see it here.</Text>
+    </View>
+  );
 
   return (
     <View style={styles.page}>
@@ -207,7 +441,6 @@ export default function MyRequestsScreen() {
         </Pressable>
       </View>
 
-      {/* Filters */}
       <View style={styles.filtersWrap}>
         <View style={styles.filters}>
           <FilterBtn
@@ -232,170 +465,20 @@ export default function MyRequestsScreen() {
         <View style={styles.centerCard}>
           <Text style={styles.muted}>Loading…</Text>
         </View>
-      ) : filtered.length === 0 ? (
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          <View style={styles.centerCard}>
-            <Text style={styles.titleEmpty}>Nothing here</Text>
-            <Text style={styles.muted}>Create a request to see it here.</Text>
-          </View>
-        </ScrollView>
       ) : (
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 18 }}
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={[
+            styles.listContent,
+            filtered.length === 0 ? { flexGrow: 1 } : null,
+          ]}
+          ListEmptyComponent={ListEmpty}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-        >
-          {filtered.map((r) => {
-            const offerCounts = countsByRequestId.get(r.id) ?? {
-              total: 0,
-              pending: 0,
-              accepted: 0,
-            };
-
-            const counterCounts = counterCountsByRequestId.get(r.id) ?? {
-              pending: 0,
-              accepted: 0,
-            };
-
-            const hasAcceptedDeal =
-              offerCounts.accepted > 0 || counterCounts.accepted > 0;
-
-            const hasPendingCounters = counterCounts.pending > 0;
-
-            return (
-              <Pressable
-                key={r.id}
-                onPress={() =>
-                  router.push({
-                    pathname: "/request/[id]",
-                    params: { id: r.id },
-                  } as any)
-                }
-                style={styles.card}
-              >
-                <View style={styles.topRow}>
-                  <Text style={styles.categoryPill}>{r.category}</Text>
-
-                  <View style={styles.rightBadges}>
-                    {offerCounts.total > 0 && (
-                      <View style={styles.offerPill}>
-                        <Text style={styles.offerPillText}>
-                          {offerCounts.total} offer
-                          {offerCounts.total === 1 ? "" : "s"}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Deal pill */}
-                    {hasAcceptedDeal && (
-                      <View style={styles.dealPill}>
-                        <Text style={styles.dealPillText}>DEAL</Text>
-                      </View>
-                    )}
-
-                    <View
-                      style={[
-                        styles.statusPill,
-                        r.status === "active"
-                          ? styles.statusActive
-                          : r.status === "matched"
-                            ? styles.statusMatched
-                            : styles.statusClosed,
-                      ]}
-                    >
-                      <Text style={styles.statusText}>
-                        {r.status === "matched"
-                          ? "MATCHED"
-                          : r.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.title}>{r.title}</Text>
-                <Text style={styles.desc} numberOfLines={2}>
-                  {r.description}
-                </Text>
-
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaStrong}>
-                    ${r.budget_min.toLocaleString()} – $
-                    {r.budget_max.toLocaleString()}
-                  </Text>
-                  {!!r.location && (
-                    <Text style={styles.metaMuted}>• {r.location}</Text>
-                  )}
-                </View>
-
-                <View style={styles.footerRow}>
-                  <Text style={styles.smallMuted}>
-                    Posted {new Date(r.created_at).toLocaleDateString()}
-                  </Text>
-
-                  {/* PRIORITY 1: accepted deal => chat */}
-                  {hasAcceptedDeal ? (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        Alert.alert(
-                          "Soon",
-                          "Chat functionality will be added soon",
-                        );
-                      }}
-                      style={styles.reviewBtn}
-                    >
-                      <Text style={styles.reviewBtnText}>Chat</Text>
-                    </Pressable>
-                  ) : offerCounts.pending > 0 ? (
-                    // PRIORITY 2: pending offers => review
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push({
-                          pathname: "/request/offers",
-                          params: { id: r.id },
-                        } as any);
-                      }}
-                      style={styles.reviewBtn}
-                    >
-                      <Text style={styles.reviewBtnText}>
-                        Review ({offerCounts.pending})
-                      </Text>
-                    </Pressable>
-                  ) : hasPendingCounters ? (
-                    // PRIORITY 3: pending counters => view offers
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push({
-                          pathname: "/request/offers",
-                          params: { id: r.id },
-                        } as any);
-                      }}
-                      style={styles.viewBtn}
-                    >
-                      <Text style={styles.viewBtnText}>
-                        Counter pending ({counterCounts.pending})
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.smallMuted}>
-                      {offerCounts.total === 0
-                        ? "No offers yet"
-                        : "No pending offers"}
-                    </Text>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        />
       )}
     </View>
   );
@@ -471,6 +554,8 @@ const styles = StyleSheet.create({
   filterBtnActive: { backgroundColor: theme.accentSoft },
   filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
   filterTextActive: { color: theme.primaryText },
+
+  listContent: { paddingBottom: 18 },
 
   centerCard: {
     flex: 1,
@@ -584,4 +669,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   viewBtnText: { color: theme.primaryText, fontWeight: "900", fontSize: 12 },
+
+  // Swipe actions
+  rightActionsWrap: {
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginTop: 12,
+  },
+  deleteBtn: {
+    width: 92,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  deleteText: { color: "white", fontWeight: "900", fontSize: 12 },
 });
