@@ -304,7 +304,7 @@ export default function MyRequestsScreen() {
         <Pressable
           onPress={() =>
             router.push({
-              pathname: "/request/[id]",
+              pathname: "/request/[id]/offers",
               params: { id: item.id },
             } as any)
           }
