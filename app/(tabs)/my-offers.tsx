@@ -57,7 +57,6 @@ type CounterOfferRow = {
 export default function MyOffersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [filter, setFilter] = useState<Filter>("all");
 
   const [swipes, setSwipes] = useState<
@@ -67,8 +66,6 @@ export default function MyOffersScreen() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counterOffers, setCounterOffers] = useState<CounterOfferRow[]>([]);
 
-  // showSpinner=true -> used for initial/focus load
-  // showSpinner=false -> used for pull-to-refresh (keeps UI, shows refresh indicator only)
   const load = useCallback(async (showSpinner: boolean = true) => {
     if (showSpinner) setLoading(true);
 
@@ -181,13 +178,12 @@ export default function MyOffersScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await load(false); // silent reload: keep UI, just refresh indicator
+      await load(false);
     } finally {
       setRefreshing(false);
     }
   }, [load]);
 
-  // Latest offer per request (newest first because offers state already ordered desc)
   const latestOfferByRequestId = useMemo(() => {
     const map = new Map<string, OfferRow>();
     for (const o of offers) {
@@ -196,7 +192,6 @@ export default function MyOffersScreen() {
     return map;
   }, [offers]);
 
-  // Latest counter-offer per request (newest first)
   const latestCounterByRequestId = useMemo(() => {
     const map = new Map<string, CounterOfferRow>();
     for (const c of counterOffers) {
@@ -386,6 +381,7 @@ export default function MyOffersScreen() {
                     </View>
                   </View>
 
+                  {/* Counter-offer banner */}
                   {counter && (
                     <View style={styles.counterBox}>
                       <Text style={styles.counterTitle}>
@@ -400,6 +396,7 @@ export default function MyOffersScreen() {
                         Status: {counter.status.toUpperCase()}
                       </Text>
 
+                      {/* Only show actions while counter is pending */}
                       {counterPending && (
                         <View style={styles.counterActions}>
                           <Pressable
@@ -418,15 +415,10 @@ export default function MyOffersScreen() {
                           </Pressable>
                         </View>
                       )}
-
-                      {counterAccepted && (
-                        <Pressable style={styles.btnPrimary} onPress={chatSoon}>
-                          <Text style={styles.btnPrimaryText}>Chat</Text>
-                        </Pressable>
-                      )}
                     </View>
                   )}
 
+                  {/* Status pill */}
                   <View style={styles.statusRow}>
                     {effectiveState === "none" && (
                       <View style={[styles.statusPill, styles.statusNone]}>
@@ -466,6 +458,7 @@ export default function MyOffersScreen() {
                     )}
                   </View>
 
+                  {/* Actions */}
                   <View style={styles.actionRow}>
                     {canSendOffer && (
                       <Pressable
@@ -486,6 +479,7 @@ export default function MyOffersScreen() {
                       </Text>
                     )}
 
+                    {/* ✅ Single Chat button only (no duplicates) */}
                     {(offerState === "accepted" || counterAccepted) && (
                       <Pressable style={styles.btnPrimary} onPress={chatSoon}>
                         <Text style={styles.btnPrimaryText}>Chat</Text>
