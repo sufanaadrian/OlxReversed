@@ -14,6 +14,7 @@ import { Screen } from "../../../src/components/Screen";
 import { supabase } from "../../../src/lib/supabase";
 
 type OfferStatus = "pending" | "accepted" | "rejected";
+type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
 type Filter = "all" | OfferStatus;
 
 type OfferRow = {
@@ -27,24 +28,23 @@ type OfferRow = {
   profiles?: { email: string | null } | null;
 };
 
-type RequestRow = {
+type CounterOfferRow = {
   id: string;
-  user_id: string;
-  title: string;
-  status: string;
-};
-
-type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
-type CounterRow = {
-  id: string;
-  offer_id: string;
   request_id: string;
+  offer_id: string;
   requester_id: string;
   seller_id: string;
   price: number;
   message: string | null;
   status: CounterStatus;
   created_at: string;
+};
+
+type RequestRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  status: string;
 };
 
 export default function RequestOffersScreen() {
@@ -54,9 +54,8 @@ export default function RequestOffersScreen() {
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
-
-  const [counters, setCounters] = useState<CounterRow[]>([]);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -80,7 +79,7 @@ export default function RequestOffersScreen() {
 
     setRequest(req as any);
 
-    // Offers: ALL STATUSES
+    // Offers (all statuses)
     const { data: off, error: offErr } = await supabase
       .from("offers")
       .select(
@@ -110,11 +109,11 @@ export default function RequestOffersScreen() {
 
     setOffers((off ?? []) as any);
 
-    // Counter-offers for this request (so requester sees what they sent)
+    // Counter offers for this request (all statuses)
     const { data: co, error: coErr } = await supabase
       .from("counter_offers")
       .select(
-        "id,offer_id,request_id,requester_id,seller_id,price,message,status,created_at",
+        "id,request_id,offer_id,requester_id,seller_id,price,message,status,created_at",
       )
       .eq("request_id", requestId)
       .order("created_at", { ascending: false });
@@ -136,9 +135,9 @@ export default function RequestOffersScreen() {
     }, [load]),
   );
 
-  // Latest counter per offer_id (so each offer can show its counter state)
+  // Latest counter per offer_id (newest first already)
   const latestCounterByOfferId = useMemo(() => {
-    const map = new Map<string, CounterRow>();
+    const map = new Map<string, CounterOfferRow>();
     for (const c of counters) {
       if (!map.has(c.offer_id)) map.set(c.offer_id, c);
     }
@@ -148,15 +147,38 @@ export default function RequestOffersScreen() {
   const counts = useMemo(() => {
     const all = offers.length;
     const pending = offers.filter((o) => o.status === "pending").length;
-    const accepted = offers.filter((o) => o.status === "accepted").length;
-    const rejected = offers.filter((o) => o.status === "rejected").length;
+    const accepted = offers.filter((o) => {
+      const c = latestCounterByOfferId.get(o.id);
+      // If counter accepted, treat as accepted in the UI counts too
+      if (c?.status === "accepted") return true;
+      return o.status === "accepted";
+    }).length;
+    const rejected = offers.filter((o) => {
+      const c = latestCounterByOfferId.get(o.id);
+      // If counter accepted, don't count as rejected
+      if (c?.status === "accepted") return false;
+      return o.status === "rejected";
+    }).length;
+
     return { all, pending, accepted, rejected };
-  }, [offers]);
+  }, [offers, latestCounterByOfferId]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return offers;
-    return offers.filter((o) => o.status === filter);
-  }, [offers, filter]);
+
+    return offers.filter((o) => {
+      const c = latestCounterByOfferId.get(o.id);
+      // effective status logic
+      const effective =
+        c?.status === "accepted"
+          ? ("accepted" as const)
+          : c?.status === "pending"
+            ? ("pending" as const)
+            : o.status;
+
+      return effective === filter;
+    });
+  }, [offers, filter, latestCounterByOfferId]);
 
   const acceptOffer = async (offerId: string) => {
     const { error: accErr } = await supabase
@@ -193,61 +215,8 @@ export default function RequestOffersScreen() {
     await load();
   };
 
-  // Reject menu: Reject or Reject-with-offer
-  const openRejectMenu = (offer: OfferRow) => {
-    const email = offer.profiles?.email ?? "user";
-    const existingCounter = latestCounterByOfferId.get(offer.id);
-
-    // If a counter is already pending, don’t allow spamming more counters
-    if (existingCounter?.status === "pending") {
-      Alert.alert(
-        "Counter-offer already sent",
-        "You already sent a counter-offer for this seller. Wait for them to accept/reject it.",
-        [
-          { text: "OK" },
-          {
-            text: "View counter",
-            onPress: () =>
-              router.push({
-                pathname: "/(modals)/counter-offer",
-                params: {
-                  offerId: offer.id,
-                  requestId: offer.request_id,
-                  sellerId: offer.user_id,
-                  sellerEmail: email,
-                  originalPrice: String(offer.price),
-                },
-              } as any),
-          },
-        ],
-      );
-      return;
-    }
-
-    Alert.alert("Reject offer", "Choose an option:", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reject",
-        style: "destructive",
-        onPress: () => rejectOffer(offer.id),
-      },
-      {
-        text: "Reject with offer",
-        onPress: () => {
-          router.push({
-            pathname: "/(modals)/counter-offer",
-            params: {
-              offerId: offer.id,
-              requestId: offer.request_id,
-              sellerId: offer.user_id,
-              sellerEmail: email,
-              originalPrice: String(offer.price),
-            },
-          } as any);
-        },
-      },
-    ]);
-  };
+  const chatSoon = () =>
+    Alert.alert("Soon", "Chat functionality will be added soon");
 
   return (
     <Screen>
@@ -291,7 +260,6 @@ export default function RequestOffersScreen() {
           </View>
         </View>
 
-        {/* Content */}
         {loading ? (
           <View style={styles.centerCard}>
             <Text style={styles.muted}>Loading…</Text>
@@ -307,49 +275,59 @@ export default function RequestOffersScreen() {
           <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
             {filtered.map((o) => {
               const email = o.profiles?.email ?? "user";
-              const isPending = o.status === "pending";
-              const isAccepted = o.status === "accepted";
+              const latestCounter = latestCounterByOfferId.get(o.id);
 
-              const counter = latestCounterByOfferId.get(o.id);
+              // ✅ Effective status for the pill
+              const effectiveStatus: OfferStatus =
+                latestCounter?.status === "accepted"
+                  ? "accepted"
+                  : latestCounter?.status === "pending"
+                    ? "pending"
+                    : o.status;
+
+              const isPending = effectiveStatus === "pending";
+              const isAccepted = effectiveStatus === "accepted";
 
               return (
                 <View key={o.id} style={styles.card}>
                   <View style={styles.cardTop}>
                     <Text style={styles.seller}>{email}</Text>
+
                     <View
                       style={[
                         styles.statusPill,
                         isAccepted
                           ? styles.pillAccepted
-                          : o.status === "rejected"
+                          : effectiveStatus === "rejected"
                             ? styles.pillRejected
                             : styles.pillPending,
                       ]}
                     >
                       <Text style={styles.statusText}>
-                        {o.status.toUpperCase()}
+                        {effectiveStatus.toUpperCase()}
                       </Text>
                     </View>
                   </View>
 
                   <Text style={styles.price}>
-                    ${Number(o.price).toLocaleString()}
+                    €{Number(o.price).toLocaleString()}
                   </Text>
                   <Text style={styles.desc}>{o.description}</Text>
 
-                  {/* ✅ Counter-offer UI shown to requester */}
-                  {counter && (
+                  {/* Counter-offer history (if exists) */}
+                  {latestCounter && (
                     <View style={styles.counterBox}>
                       <Text style={styles.counterTitle}>
-                        Counter-offer: €{Number(counter.price).toLocaleString()}
+                        Counter-offer: €
+                        {Number(latestCounter.price).toLocaleString()}
                       </Text>
-                      {!!counter.message && (
-                        <Text style={styles.counterMsg} numberOfLines={3}>
-                          {counter.message}
+                      {!!latestCounter.message && (
+                        <Text style={styles.counterMsg}>
+                          {latestCounter.message}
                         </Text>
                       )}
                       <Text style={styles.counterStatus}>
-                        Status: {counter.status.toUpperCase()}
+                        Counter status: {latestCounter.status.toUpperCase()}
                       </Text>
                     </View>
                   )}
@@ -357,7 +335,7 @@ export default function RequestOffersScreen() {
                   {isPending && (
                     <View style={styles.actionsRow}>
                       <Pressable
-                        onPress={() => openRejectMenu(o)}
+                        onPress={() => rejectOffer(o.id)}
                         style={[styles.btn, styles.btnSecondary]}
                       >
                         <Text style={styles.btnSecondaryText}>Reject</Text>
@@ -375,12 +353,7 @@ export default function RequestOffersScreen() {
                   {isAccepted && (
                     <View style={styles.actionsRow}>
                       <Pressable
-                        onPress={() =>
-                          Alert.alert(
-                            "Soon",
-                            "Chat functionality will be added soon",
-                          )
-                        }
+                        onPress={chatSoon}
                         style={[styles.btn, styles.btnPrimary]}
                       >
                         <Text style={styles.btnPrimaryText}>Chat</Text>
@@ -426,6 +399,8 @@ const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
+  success: "#16A34A",
+  danger: "#DC2626",
 };
 
 const styles = StyleSheet.create({
@@ -516,20 +491,20 @@ const styles = StyleSheet.create({
   desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
 
   counterBox: {
-    marginTop: 12,
+    marginTop: 10,
+    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.bg,
-    borderRadius: 16,
-    padding: 12,
-    gap: 6,
+    borderRadius: 14,
+    padding: 10,
+    gap: 4,
   },
   counterTitle: { fontWeight: "900", color: theme.primaryText },
-  counterMsg: { color: theme.secondaryText, lineHeight: 18 },
+  counterMsg: { color: theme.secondaryText },
   counterStatus: {
+    fontSize: 12,
     fontWeight: "900",
     color: theme.secondaryText,
-    fontSize: 12,
   },
 
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
