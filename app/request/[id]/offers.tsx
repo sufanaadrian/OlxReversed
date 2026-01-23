@@ -13,7 +13,7 @@ import {
 import { Screen } from "../../../src/components/Screen";
 import { supabase } from "../../../src/lib/supabase";
 
-type OfferStatus = "pending" | "accepted" | "rejected";
+type OfferStatus = "pending" | "accepted" | "rejected" | "withdrawn"; // ✅ add withdrawn
 type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
 type Filter = "all" | OfferStatus;
 
@@ -79,7 +79,7 @@ export default function RequestOffersScreen() {
 
     setRequest(req as any);
 
-    // Offers (all statuses)
+    // Offers (all statuses, INCLUDING withdrawn)
     const { data: off, error: offErr } = await supabase
       .from("offers")
       .select(
@@ -146,21 +146,31 @@ export default function RequestOffersScreen() {
 
   const counts = useMemo(() => {
     const all = offers.length;
-    const pending = offers.filter((o) => o.status === "pending").length;
-    const accepted = offers.filter((o) => {
+
+    const pending = offers.filter((o) => {
+      if (o.status === "withdrawn") return false; // withdrawn isn't pending
       const c = latestCounterByOfferId.get(o.id);
-      // If counter accepted, treat as accepted in the UI counts too
+      if (c?.status === "pending") return true;
+      return o.status === "pending";
+    }).length;
+
+    const accepted = offers.filter((o) => {
+      if (o.status === "withdrawn") return false;
+      const c = latestCounterByOfferId.get(o.id);
       if (c?.status === "accepted") return true;
       return o.status === "accepted";
     }).length;
+
     const rejected = offers.filter((o) => {
       const c = latestCounterByOfferId.get(o.id);
-      // If counter accepted, don't count as rejected
+      // If counter accepted, do NOT count as rejected
       if (c?.status === "accepted") return false;
       return o.status === "rejected";
     }).length;
 
-    return { all, pending, accepted, rejected };
+    const withdrawn = offers.filter((o) => o.status === "withdrawn").length;
+
+    return { all, pending, accepted, rejected, withdrawn };
   }, [offers, latestCounterByOfferId]);
 
   const filtered = useMemo(() => {
@@ -168,13 +178,20 @@ export default function RequestOffersScreen() {
 
     return offers.filter((o) => {
       const c = latestCounterByOfferId.get(o.id);
-      // effective status logic
-      const effective =
-        c?.status === "accepted"
-          ? ("accepted" as const)
-          : c?.status === "pending"
-            ? ("pending" as const)
-            : o.status;
+
+      // ✅ Effective status logic for filtering:
+      // - withdrawn stays withdrawn
+      // - counter accepted => accepted
+      // - counter pending => pending
+      // - else offer status
+      const effective: OfferStatus =
+        o.status === "withdrawn"
+          ? "withdrawn"
+          : c?.status === "accepted"
+            ? "accepted"
+            : c?.status === "pending"
+              ? "pending"
+              : o.status;
 
       return effective === filter;
     });
@@ -217,6 +234,7 @@ export default function RequestOffersScreen() {
 
   const chatSoon = () =>
     Alert.alert("Soon", "Chat functionality will be added soon");
+
   // Reject menu: Reject or Reject-with-offer
   const openRejectMenu = (offer: OfferRow) => {
     const email = offer.profiles?.email ?? "user";
@@ -272,6 +290,7 @@ export default function RequestOffersScreen() {
       },
     ]);
   };
+
   return (
     <Screen>
       <View style={styles.page}>
@@ -311,6 +330,12 @@ export default function RequestOffersScreen() {
               active={filter === "rejected"}
               onPress={() => setFilter("rejected")}
             />
+            {/* ✅ optional (keeps everything else same): show withdrawn filter */}
+            <FilterBtn
+              label={`Withdrawn (${counts.withdrawn})`}
+              active={filter === "withdrawn"}
+              onPress={() => setFilter("withdrawn")}
+            />
           </View>
         </View>
 
@@ -333,14 +358,17 @@ export default function RequestOffersScreen() {
 
               // ✅ Effective status for the pill
               const effectiveStatus: OfferStatus =
-                latestCounter?.status === "accepted"
-                  ? "accepted"
-                  : latestCounter?.status === "pending"
-                    ? "pending"
-                    : o.status;
+                o.status === "withdrawn"
+                  ? "withdrawn"
+                  : latestCounter?.status === "accepted"
+                    ? "accepted"
+                    : latestCounter?.status === "pending"
+                      ? "pending"
+                      : o.status;
 
               const isPending = effectiveStatus === "pending";
               const isAccepted = effectiveStatus === "accepted";
+              const isWithdrawn = effectiveStatus === "withdrawn";
 
               return (
                 <View key={o.id} style={styles.card}>
@@ -352,9 +380,11 @@ export default function RequestOffersScreen() {
                         styles.statusPill,
                         isAccepted
                           ? styles.pillAccepted
-                          : effectiveStatus === "rejected"
-                            ? styles.pillRejected
-                            : styles.pillPending,
+                          : isWithdrawn
+                            ? styles.pillWithdrawn
+                            : effectiveStatus === "rejected"
+                              ? styles.pillRejected
+                              : styles.pillPending,
                       ]}
                     >
                       <Text style={styles.statusText}>
@@ -367,6 +397,16 @@ export default function RequestOffersScreen() {
                     €{Number(o.price).toLocaleString()}
                   </Text>
                   <Text style={styles.desc}>{o.description}</Text>
+
+                  {/* ✅ Withdrawn banner */}
+                  {o.status === "withdrawn" && (
+                    <View style={styles.counterBox}>
+                      <Text style={styles.counterTitle}>Offer withdrawn</Text>
+                      <Text style={styles.counterMsg}>
+                        The seller withdrew this offer.
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Counter-offer history (if exists) */}
                   {latestCounter && (
@@ -386,7 +426,8 @@ export default function RequestOffersScreen() {
                     </View>
                   )}
 
-                  {isPending && (
+                  {/* Actions: only if effectively pending (and not withdrawn) */}
+                  {isPending && !isWithdrawn && (
                     <View style={styles.actionsRow}>
                       <Pressable
                         onPress={() => openRejectMenu(o)}
@@ -534,6 +575,7 @@ const styles = StyleSheet.create({
   pillPending: { backgroundColor: theme.accentSoft },
   pillAccepted: { backgroundColor: "#DCFCE7" },
   pillRejected: { backgroundColor: "#FEE2E2" },
+  pillWithdrawn: { backgroundColor: "#E5E7EB" }, // ✅ neutral for withdrawn
   statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
 
   price: {

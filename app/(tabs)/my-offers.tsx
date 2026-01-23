@@ -1,6 +1,7 @@
+import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -10,12 +11,16 @@ import {
   Text,
   View,
 } from "react-native";
+import Swipeable from "react-native-gesture-handler/Swipeable";
 import { supabase } from "../../src/lib/supabase";
 
 type SwipeDirection = "left" | "right";
 type OfferStatus = "pending" | "accepted" | "rejected";
+type OfferStatusDb = OfferStatus | "withdrawn";
 type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
+
 type Filter = "all" | "interested" | "skipped";
+type OfferViewFilter = "active" | "withdrawn" | "all";
 
 type RequestRow = {
   id: string;
@@ -35,7 +40,7 @@ type OfferRow = {
   id: string;
   request_id: string;
   user_id: string;
-  status: OfferStatus;
+  status: OfferStatusDb;
   price: number;
   description: string;
   created_at: string;
@@ -44,9 +49,9 @@ type OfferRow = {
 type CounterOfferRow = {
   id: string;
   request_id: string;
-  offer_id: string; // original offer id
+  offer_id: string;
   requester_id: string;
-  seller_id: string; // me
+  seller_id: string;
   price: number;
   message: string | null;
   status: CounterStatus;
@@ -56,7 +61,9 @@ type CounterOfferRow = {
 export default function MyOffersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const [filter, setFilter] = useState<Filter>("all");
+  const [offerView, setOfferView] = useState<OfferViewFilter>("active");
 
   const [swipes, setSwipes] = useState<
     Array<{ request: RequestRow; direction: SwipeDirection; swipedAt: string }>
@@ -64,6 +71,9 @@ export default function MyOffersScreen() {
 
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counterOffers, setCounterOffers] = useState<CounterOfferRow[]>([]);
+
+  // ✅ store the currently open row so we can close it
+  const openRowRef = useRef<Swipeable | null>(null);
 
   const load = useCallback(async (showSpinner: boolean = true) => {
     if (showSpinner) setLoading(true);
@@ -131,7 +141,7 @@ export default function MyOffersScreen() {
 
     setSwipes(normalizedSwipes);
 
-    // 2) my offers (as seller)
+    // 2) my offers (include withdrawn so you can filter them)
     const { data: offerData, error: offerErr } = await supabase
       .from("offers")
       .select("id,request_id,user_id,status,price,description,created_at")
@@ -206,12 +216,36 @@ export default function MyOffersScreen() {
     return { all, interested, skipped };
   }, [swipes]);
 
-  const visible = useMemo(() => {
+  const offerViewCounts = useMemo(() => {
+    let active = 0;
+    let withdrawn = 0;
+
+    for (const { request } of swipes) {
+      const latestOffer = latestOfferByRequestId.get(request.id);
+      if (!latestOffer) continue;
+      if (latestOffer.status === "withdrawn") withdrawn += 1;
+      else active += 1;
+    }
+
+    return { active, withdrawn };
+  }, [swipes, latestOfferByRequestId]);
+
+  const visibleBySwipe = useMemo(() => {
     if (filter === "all") return swipes;
     if (filter === "interested")
       return swipes.filter((s) => s.direction === "right");
     return swipes.filter((s) => s.direction === "left");
   }, [swipes, filter]);
+
+  const visible = useMemo(() => {
+    if (offerView === "all") return visibleBySwipe;
+
+    return visibleBySwipe.filter(({ request }) => {
+      const latestOffer = latestOfferByRequestId.get(request.id);
+      if (offerView === "withdrawn") return latestOffer?.status === "withdrawn";
+      return latestOffer != null && latestOffer.status !== "withdrawn";
+    });
+  }, [visibleBySwipe, offerView, latestOfferByRequestId]);
 
   const openCreateOffer = (requestId: string) => {
     router.push({
@@ -253,12 +287,66 @@ export default function MyOffersScreen() {
     load(false);
   };
 
+  const confirmWithdraw = (offerId: string) => {
+    Alert.alert("Withdraw offer?", "This will withdraw your offer.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Withdraw",
+        style: "destructive",
+        onPress: () => withdrawOffer(offerId),
+      },
+    ]);
+  };
+
+  const withdrawOffer = async (offerId: string) => {
+    // close open swipe row
+    openRowRef.current?.close();
+
+    // ✅ use select so we KNOW it updated (debug-friendly)
+    const { data, error } = await supabase
+      .from("offers")
+      .update({ status: "withdrawn" })
+      .eq("id", offerId)
+      .select("id,status");
+
+    if (error) return Alert.alert("Error", error.message);
+
+    if (!data || data.length === 0) {
+      Alert.alert(
+        "Not updated",
+        "No rows were updated. This usually means RLS blocked it OR the offerId was wrong.",
+      );
+      return;
+    }
+
+    Alert.alert("Withdrawn", "Your offer was withdrawn.");
+    load(false);
+  };
+
+  const renderRightActions = (offerId: string) => {
+    return (
+      <View style={styles.rightActionsWrap}>
+        <Pressable
+          onPress={() => confirmWithdraw(offerId)}
+          style={({ pressed }) => [
+            styles.withdrawBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <Feather name="trash-2" size={18} color="white" />
+          <Text style={styles.withdrawText}>Withdraw</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.page}>
       <View style={styles.header}>
         <Text style={styles.h1}>My Offers</Text>
       </View>
 
+      {/* swipe filter row */}
       <View style={styles.filtersWrap}>
         <View style={styles.filters}>
           <FilterBtn
@@ -279,6 +367,27 @@ export default function MyOffersScreen() {
         </View>
       </View>
 
+      {/* offer filter row */}
+      <View style={styles.filtersWrap}>
+        <View style={styles.filters}>
+          <FilterBtn
+            label={`Active (${offerViewCounts.active})`}
+            active={offerView === "active"}
+            onPress={() => setOfferView("active")}
+          />
+          <FilterBtn
+            label={`Withdrawn (${offerViewCounts.withdrawn})`}
+            active={offerView === "withdrawn"}
+            onPress={() => setOfferView("withdrawn")}
+          />
+          <FilterBtn
+            label={`All offers`}
+            active={offerView === "all"}
+            onPress={() => setOfferView("all")}
+          />
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.centerCard}>
           <Text style={styles.centerTitle}>Loading…</Text>
@@ -293,9 +402,7 @@ export default function MyOffersScreen() {
         >
           <View style={styles.centerCard}>
             <Text style={styles.centerTitle}>No items</Text>
-            <Text style={styles.centerSub}>
-              Swipe right on a request to see it here.
-            </Text>
+            <Text style={styles.centerSub}>No items in this filter.</Text>
             <Pressable
               style={styles.btnPrimary}
               onPress={() => router.push("/(tabs)/marketplace" as any)}
@@ -316,7 +423,9 @@ export default function MyOffersScreen() {
             const counter = latestCounterByRequestId.get(request.id);
 
             const offerState: OfferStatus | "none" =
-              latestOffer?.status ?? "none";
+              latestOffer?.status === "withdrawn"
+                ? "none"
+                : (latestOffer?.status ?? "none");
 
             const counterPending = counter?.status === "pending";
             const counterAccepted = counter?.status === "accepted";
@@ -336,158 +445,184 @@ export default function MyOffersScreen() {
               !counterAccepted &&
               (offerState === "none" || offerState === "rejected");
 
+            // ✅ don’t allow withdrawing accepted or already withdrawn
+            const canWithdraw =
+              !!latestOffer &&
+              latestOffer.status !== "accepted" &&
+              latestOffer.status !== "withdrawn";
+
+            // ✅ each row needs its own ref so openRowRef works
+            const rowRef = React.createRef<Swipeable>();
+
             return (
-              <View key={request.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.category}>{request.category}</Text>
-                    <Text style={styles.title} numberOfLines={1}>
-                      {request.title}
-                    </Text>
-                    <Text style={styles.by} numberOfLines={1}>
-                      Posted by {request.profiles?.email ?? "unknown"}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.desc} numberOfLines={2}>
-                  {request.description}
-                </Text>
-
-                <View style={styles.metaRow}>
-                  <View style={styles.pill}>
-                    <Text style={styles.pillText}>
-                      €{request.budget_min.toLocaleString()} - €
-                      {request.budget_max.toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.pill,
-                      direction === "right"
-                        ? styles.pillInterested
-                        : styles.pillSkipped,
-                    ]}
-                  >
-                    <Text style={styles.pillText}>
-                      {direction === "right" ? "Interested" : "Skipped"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Counter-offer banner */}
-                {counter && (
-                  <View style={styles.counterBox}>
-                    <Text style={styles.counterTitle}>
-                      Counter-offer: €{Number(counter.price).toLocaleString()}
-                    </Text>
-                    {!!counter.message && (
-                      <Text style={styles.counterMsg} numberOfLines={3}>
-                        {counter.message}
+              <Swipeable
+                key={request.id}
+                ref={rowRef}
+                renderRightActions={() =>
+                  canWithdraw && latestOffer
+                    ? renderRightActions(latestOffer.id)
+                    : null
+                }
+                overshootRight={false}
+                onSwipeableWillOpen={() => {
+                  if (
+                    openRowRef.current &&
+                    openRowRef.current !== rowRef.current
+                  ) {
+                    openRowRef.current.close();
+                  }
+                }}
+                onSwipeableOpen={() => {
+                  openRowRef.current = rowRef.current;
+                }}
+              >
+                <View style={styles.card}>
+                  <View style={styles.cardTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.category}>{request.category}</Text>
+                      <Text style={styles.title} numberOfLines={1}>
+                        {request.title}
                       </Text>
-                    )}
-                    <Text style={styles.counterStatus}>
-                      Status: {counter.status.toUpperCase()}
-                    </Text>
+                      <Text style={styles.by} numberOfLines={1}>
+                        Posted by {request.profiles?.email ?? "unknown"}
+                      </Text>
+                    </View>
+                  </View>
 
-                    {/* Only show actions while counter is pending */}
-                    {counterPending && (
-                      <View style={styles.counterActions}>
-                        <Pressable
-                          style={styles.btnPrimary}
-                          onPress={() => acceptCounter(counter)}
-                        >
-                          <Text style={styles.btnPrimaryText}>
-                            Accept counter
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          style={styles.btnSecondary}
-                          onPress={() => rejectCounter(counter)}
-                        >
-                          <Text style={styles.btnSecondaryText}>Reject</Text>
-                        </Pressable>
+                  <Text style={styles.desc} numberOfLines={2}>
+                    {request.description}
+                  </Text>
+
+                  <View style={styles.metaRow}>
+                    <View style={styles.pill}>
+                      <Text style={styles.pillText}>
+                        €{request.budget_min.toLocaleString()} - €
+                        {request.budget_max.toLocaleString()}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.pill,
+                        direction === "right"
+                          ? styles.pillInterested
+                          : styles.pillSkipped,
+                      ]}
+                    >
+                      <Text style={styles.pillText}>
+                        {direction === "right" ? "Interested" : "Skipped"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {counter && (
+                    <View style={styles.counterBox}>
+                      <Text style={styles.counterTitle}>
+                        Counter-offer: €{Number(counter.price).toLocaleString()}
+                      </Text>
+                      {!!counter.message && (
+                        <Text style={styles.counterMsg} numberOfLines={3}>
+                          {counter.message}
+                        </Text>
+                      )}
+                      <Text style={styles.counterStatus}>
+                        Status: {counter.status.toUpperCase()}
+                      </Text>
+
+                      {counterPending && (
+                        <View style={styles.counterActions}>
+                          <Pressable
+                            style={styles.btnPrimary}
+                            onPress={() => acceptCounter(counter)}
+                          >
+                            <Text style={styles.btnPrimaryText}>
+                              Accept counter
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.btnSecondary}
+                            onPress={() => rejectCounter(counter)}
+                          >
+                            <Text style={styles.btnSecondaryText}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={styles.statusRow}>
+                    {effectiveState === "none" && (
+                      <View style={[styles.statusPill, styles.statusNone]}>
+                        <Text style={styles.statusText}>NO OFFER YET</Text>
+                      </View>
+                    )}
+                    {effectiveState === "pending" && (
+                      <View style={[styles.statusPill, styles.statusPending]}>
+                        <Text style={styles.statusText}>OFFER PENDING</Text>
+                      </View>
+                    )}
+                    {effectiveState === "accepted" && (
+                      <View style={[styles.statusPill, styles.statusAccepted]}>
+                        <Text style={styles.statusText}>ACCEPTED</Text>
+                      </View>
+                    )}
+                    {effectiveState === "rejected" && (
+                      <View style={[styles.statusPill, styles.statusRejected]}>
+                        <Text style={styles.statusText}>
+                          REJECTED — YOU CAN RESEND
+                        </Text>
+                      </View>
+                    )}
+                    {effectiveState === "counter_pending" && (
+                      <View style={[styles.statusPill, styles.statusPending]}>
+                        <Text style={styles.statusText}>
+                          COUNTER-OFFER PENDING
+                        </Text>
+                      </View>
+                    )}
+                    {effectiveState === "counter_accepted" && (
+                      <View style={[styles.statusPill, styles.statusAccepted]}>
+                        <Text style={styles.statusText}>
+                          COUNTER-OFFER ACCEPTED
+                        </Text>
                       </View>
                     )}
                   </View>
-                )}
 
-                {/* Status pill */}
-                <View style={styles.statusRow}>
-                  {effectiveState === "none" && (
-                    <View style={[styles.statusPill, styles.statusNone]}>
-                      <Text style={styles.statusText}>NO OFFER YET</Text>
-                    </View>
-                  )}
-                  {effectiveState === "pending" && (
-                    <View style={[styles.statusPill, styles.statusPending]}>
-                      <Text style={styles.statusText}>OFFER PENDING</Text>
-                    </View>
-                  )}
-                  {effectiveState === "accepted" && (
-                    <View style={[styles.statusPill, styles.statusAccepted]}>
-                      <Text style={styles.statusText}>ACCEPTED</Text>
-                    </View>
-                  )}
-                  {effectiveState === "rejected" && (
-                    <View style={[styles.statusPill, styles.statusRejected]}>
-                      <Text style={styles.statusText}>
-                        REJECTED — YOU CAN RESEND
+                  <View style={styles.actionRow}>
+                    {canSendOffer && (
+                      <Pressable
+                        style={styles.btnPrimary}
+                        onPress={() => openCreateOffer(request.id)}
+                      >
+                        <Text style={styles.btnPrimaryText}>
+                          {offerState === "rejected"
+                            ? "Send new offer"
+                            : "Send offer"}
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {counterPending && (
+                      <Text style={styles.skippedHint}>
+                        A counter-offer is pending. Respond to it above.
                       </Text>
-                    </View>
-                  )}
-                  {effectiveState === "counter_pending" && (
-                    <View style={[styles.statusPill, styles.statusPending]}>
-                      <Text style={styles.statusText}>
-                        COUNTER-OFFER PENDING
+                    )}
+
+                    {(offerState === "accepted" || counterAccepted) && (
+                      <Pressable style={styles.btnPrimary} onPress={chatSoon}>
+                        <Text style={styles.btnPrimaryText}>Chat</Text>
+                      </Pressable>
+                    )}
+
+                    {direction === "left" && (
+                      <Text style={styles.skippedHint}>
+                        Skipped items are read-only.
                       </Text>
-                    </View>
-                  )}
-                  {effectiveState === "counter_accepted" && (
-                    <View style={[styles.statusPill, styles.statusAccepted]}>
-                      <Text style={styles.statusText}>
-                        COUNTER-OFFER ACCEPTED
-                      </Text>
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </View>
-
-                {/* Actions */}
-                <View style={styles.actionRow}>
-                  {canSendOffer && (
-                    <Pressable
-                      style={styles.btnPrimary}
-                      onPress={() => openCreateOffer(request.id)}
-                    >
-                      <Text style={styles.btnPrimaryText}>
-                        {offerState === "rejected"
-                          ? "Send new offer"
-                          : "Send offer"}
-                      </Text>
-                    </Pressable>
-                  )}
-
-                  {counterPending && (
-                    <Text style={styles.skippedHint}>
-                      A counter-offer is pending. Respond to it above.
-                    </Text>
-                  )}
-
-                  {/* ✅ Single Chat button only (no duplicates) */}
-                  {(offerState === "accepted" || counterAccepted) && (
-                    <Pressable style={styles.btnPrimary} onPress={chatSoon}>
-                      <Text style={styles.btnPrimaryText}>Chat</Text>
-                    </Pressable>
-                  )}
-
-                  {direction === "left" && (
-                    <Text style={styles.skippedHint}>
-                      Skipped items are read-only.
-                    </Text>
-                  )}
-                </View>
-              </View>
+              </Swipeable>
             );
           })}
         </ScrollView>
@@ -536,10 +671,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
-
   header: { marginBottom: 10 },
   h1: { fontSize: 22, fontWeight: "900", color: theme.primaryText },
-  sub: { marginTop: 4, color: theme.secondaryText },
 
   filtersWrap: { alignItems: "center", marginBottom: 12 },
   filters: {
@@ -667,4 +800,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
   },
+
+  rightActionsWrap: {
+    width: 110,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginBottom: 12,
+  },
+  withdrawBtn: {
+    width: 100,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  withdrawText: { color: "white", fontWeight: "900", fontSize: 12 },
 });
