@@ -29,13 +29,20 @@ type RequestRow = {
   created_at: string;
 };
 
+// ✅ UPDATED: include withdrawn
 type OfferMini = {
   id: string;
   request_id: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
 };
 
-type OfferCounts = { total: number; pending: number; accepted: number };
+// ✅ UPDATED: include withdrawn
+type OfferCounts = {
+  total: number;
+  pending: number;
+  accepted: number;
+  withdrawn: number;
+};
 
 type CounterOfferMini = {
   id: string;
@@ -58,7 +65,6 @@ export default function MyRequestsScreen() {
   >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
-  // Optional: keep only one row open at a time
   const openRowRef = useRef<Swipeable | null>(null);
 
   const load = useCallback(async (showSpinner: boolean = true) => {
@@ -104,7 +110,7 @@ export default function MyRequestsScreen() {
 
     const ids = reqList.map((r) => r.id);
 
-    // Offers counts
+    // Offers counts (includes withdrawn)
     const { data: offers, error: offErr } = await supabase
       .from("offers")
       .select("id,request_id,status")
@@ -124,11 +130,14 @@ export default function MyRequestsScreen() {
         total: 0,
         pending: 0,
         accepted: 0,
+        withdrawn: 0,
       };
+
       offerMap.set(row.request_id, {
         total: prev.total + 1,
         pending: prev.pending + (row.status === "pending" ? 1 : 0),
         accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+        withdrawn: prev.withdrawn + (row.status === "withdrawn" ? 1 : 0),
       });
     });
     setCountsByRequestId(offerMap);
@@ -207,17 +216,14 @@ export default function MyRequestsScreen() {
   };
 
   const deleteRequest = async (req: RequestRow) => {
-    // Close any open swipe row
     openRowRef.current?.close();
 
-    // Optimistic UI remove
     const prevRequests = requests;
     const prevCounts = countsByRequestId;
     const prevCounterCounts = counterCountsByRequestId;
 
     setRequests((cur) => cur.filter((r) => r.id !== req.id));
 
-    // also remove counts locally
     setCountsByRequestId((cur) => {
       const next = new Map(cur);
       next.delete(req.id);
@@ -229,11 +235,9 @@ export default function MyRequestsScreen() {
       return next;
     });
 
-    // DB delete
     const { error } = await supabase.from("requests").delete().eq("id", req.id);
 
     if (error) {
-      // revert
       setRequests(prevRequests);
       setCountsByRequestId(prevCounts);
       setCounterCountsByRequestId(prevCounterCounts);
@@ -264,6 +268,7 @@ export default function MyRequestsScreen() {
       total: 0,
       pending: 0,
       accepted: 0,
+      withdrawn: 0,
     };
 
     const counterCounts = counterCountsByRequestId.get(item.id) ?? {
@@ -274,31 +279,18 @@ export default function MyRequestsScreen() {
     const hasAcceptedDeal =
       offerCounts.accepted > 0 || counterCounts.accepted > 0;
     const hasPendingCounters = counterCounts.pending > 0;
+    const hasWithdrawnOffers = offerCounts.withdrawn > 0;
 
     return (
       <Swipeable
         renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
-        onSwipeableOpen={() => {
-          // only keep one row open
-          if (openRowRef.current) openRowRef.current.close();
-        }}
-        ref={(ref) => {
-          // store last rendered row ref when it opens (good enough for single-open behavior)
-          // Note: Swipeable doesn't tell which opened row; but we close in onSwipeableWillOpen below
-        }}
         onSwipeableWillOpen={() => {
-          // close previously open row
           if (openRowRef.current) openRowRef.current.close();
         }}
-        onSwipeableOpenStartDrag={() => {
-          // no-op, but kept for future tuning
-        }}
-        // When this row becomes the open one
-        onSwipeableOpen={() => {
-          // store the currently open row
-          // @ts-ignore
-          openRowRef.current = (openRowRef.current as any) ?? null;
+        onSwipeableOpen={(direction, swipeable) => {
+          // ✅ FIX: store the opened row so only one stays open
+          openRowRef.current = swipeable;
         }}
       >
         <Pressable
@@ -319,6 +311,15 @@ export default function MyRequestsScreen() {
                   <Text style={styles.offerPillText}>
                     {offerCounts.total} offer
                     {offerCounts.total === 1 ? "" : "s"}
+                  </Text>
+                </View>
+              )}
+
+              {/* ✅ NEW: withdrawn badge */}
+              {hasWithdrawnOffers && (
+                <View style={styles.withdrawnPill}>
+                  <Text style={styles.withdrawnPillText}>
+                    {offerCounts.withdrawn} withdrawn
                   </Text>
                 </View>
               )}
@@ -408,6 +409,10 @@ export default function MyRequestsScreen() {
                   Counter pending ({counterCounts.pending})
                 </Text>
               </Pressable>
+            ) : hasWithdrawnOffers ? (
+              <Text style={styles.smallMuted}>
+                Withdrawn ({offerCounts.withdrawn})
+              </Text>
             ) : (
               <Text style={styles.smallMuted}>
                 {offerCounts.total === 0
@@ -605,6 +610,19 @@ const styles = StyleSheet.create({
   },
   offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
 
+  // ✅ NEW withdrawn badge styles
+  withdrawnPill: {
+    backgroundColor: theme.border,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  withdrawnPillText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+
   dealPill: {
     backgroundColor: "#DCFCE7",
     borderRadius: 999,
@@ -670,7 +688,6 @@ const styles = StyleSheet.create({
   },
   viewBtnText: { color: theme.primaryText, fontWeight: "900", fontSize: 12 },
 
-  // Swipe actions
   rightActionsWrap: {
     justifyContent: "center",
     alignItems: "flex-end",
