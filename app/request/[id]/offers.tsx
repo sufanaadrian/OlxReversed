@@ -325,6 +325,15 @@ export default function RequestOffersScreen() {
             />
           </View>
         </View>
+        {counts.withdrawn > 0 && (
+          <View style={styles.warnBox}>
+            <Feather name="alert-triangle" size={16} color={theme.danger} />
+            <Text style={styles.warnText}>
+              {counts.withdrawn} offer{counts.withdrawn === 1 ? "" : "s"} were
+              withdrawn by sellers.
+            </Text>
+          </View>
+        )}
 
         {loading ? (
           <View style={styles.centerCard}>
@@ -603,4 +612,23 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
   },
   btnSecondaryText: { color: theme.primaryText, fontWeight: "900" },
+
+  warnBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  warnText: {
+    flex: 1,
+    color: theme.danger,
+    fontWeight: "800",
+    fontSize: 12,
+  },
 });

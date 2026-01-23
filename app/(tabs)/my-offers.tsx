@@ -254,6 +254,21 @@ export default function MyOffersScreen() {
     } as any);
   };
 
+  const openEditOffer = (offer: OfferRow) => {
+    // close open swipe row so the UI doesn’t stay stuck
+    openRowRef.current?.close();
+
+    router.push({
+      pathname: "/(modals)/edit-offer",
+      params: {
+        offerId: offer.id,
+        requestId: offer.request_id,
+        price: String(offer.price),
+        description: offer.description ?? "",
+      },
+    } as any);
+  };
+
   const chatSoon = () =>
     Alert.alert("Soon", "Chat functionality will be added soon");
 
@@ -323,18 +338,27 @@ export default function MyOffersScreen() {
     load(false);
   };
 
-  const renderRightActions = (offerId: string) => {
+  // ✅ NEW: right actions now have 2 buttons (Edit + Withdraw)
+  const renderRightActions = (offer: OfferRow) => {
     return (
       <View style={styles.rightActionsWrap}>
         <Pressable
-          onPress={() => confirmWithdraw(offerId)}
+          onPress={() => openEditOffer(offer)}
+          style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.9 }]}
+        >
+          <Feather name="edit-2" size={18} color="white" />
+          <Text style={styles.actionText}>Edit</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => confirmWithdraw(offer.id)}
           style={({ pressed }) => [
             styles.withdrawBtn,
             pressed && { opacity: 0.9 },
           ]}
         >
           <Feather name="trash-2" size={18} color="white" />
-          <Text style={styles.withdrawText}>Withdraw</Text>
+          <Text style={styles.actionText}>Withdraw</Text>
         </Pressable>
       </View>
     );
@@ -445,8 +469,8 @@ export default function MyOffersScreen() {
               !counterAccepted &&
               (offerState === "none" || offerState === "rejected");
 
-            // ✅ don’t allow withdrawing accepted or already withdrawn
-            const canWithdraw =
+            // ✅ allow edit/withdraw only if not accepted and not withdrawn
+            const canEditOrWithdraw =
               !!latestOffer &&
               latestOffer.status !== "accepted" &&
               latestOffer.status !== "withdrawn";
@@ -459,8 +483,8 @@ export default function MyOffersScreen() {
                 key={request.id}
                 ref={rowRef}
                 renderRightActions={() =>
-                  canWithdraw && latestOffer
-                    ? renderRightActions(latestOffer.id)
+                  canEditOrWithdraw && latestOffer
+                    ? renderRightActions(latestOffer)
                     : null
                 }
                 overshootRight={false}
@@ -801,14 +825,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  // ✅ UPDATED: space for 2 buttons
   rightActionsWrap: {
-    width: 110,
-    justifyContent: "center",
-    alignItems: "flex-end",
+    width: 210,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 12,
+    paddingRight: 6,
+  },
+  editBtn: {
+    width: 95,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
   },
   withdrawBtn: {
-    width: 100,
+    width: 105,
     height: "100%",
     borderRadius: 18,
     backgroundColor: "#DC2626",
@@ -817,5 +855,5 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
   },
-  withdrawText: { color: "white", fontWeight: "900", fontSize: 12 },
+  actionText: { color: "white", fontWeight: "900", fontSize: 12 },
 });
