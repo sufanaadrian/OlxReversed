@@ -10,7 +10,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
 
 type SwipeDirection = "left" | "right";
@@ -255,250 +254,245 @@ export default function MyOffersScreen() {
   };
 
   return (
-    <Screen>
-      <View style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.h1}>My Offers</Text>
-          <Text style={styles.sub}>
-            Requests you swiped + your offers + counter-offers
-          </Text>
-        </View>
+    <View style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.h1}>My Offers</Text>
+      </View>
 
-        <View style={styles.filtersWrap}>
-          <View style={styles.filters}>
-            <FilterBtn
-              label={`All (${counts.all})`}
-              active={filter === "all"}
-              onPress={() => setFilter("all")}
-            />
-            <FilterBtn
-              label={`Interested (${counts.interested})`}
-              active={filter === "interested"}
-              onPress={() => setFilter("interested")}
-            />
-            <FilterBtn
-              label={`Skipped (${counts.skipped})`}
-              active={filter === "skipped"}
-              onPress={() => setFilter("skipped")}
-            />
-          </View>
+      <View style={styles.filtersWrap}>
+        <View style={styles.filters}>
+          <FilterBtn
+            label={`All (${counts.all})`}
+            active={filter === "all"}
+            onPress={() => setFilter("all")}
+          />
+          <FilterBtn
+            label={`Interested (${counts.interested})`}
+            active={filter === "interested"}
+            onPress={() => setFilter("interested")}
+          />
+          <FilterBtn
+            label={`Skipped (${counts.skipped})`}
+            active={filter === "skipped"}
+            onPress={() => setFilter("skipped")}
+          />
         </View>
+      </View>
 
-        {loading ? (
+      {loading ? (
+        <View style={styles.centerCard}>
+          <Text style={styles.centerTitle}>Loading…</Text>
+          <Text style={styles.centerSub}>Fetching swipes & offers</Text>
+        </View>
+      ) : visible.length === 0 ? (
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <View style={styles.centerCard}>
-            <Text style={styles.centerTitle}>Loading…</Text>
-            <Text style={styles.centerSub}>Fetching swipes & offers</Text>
+            <Text style={styles.centerTitle}>No items</Text>
+            <Text style={styles.centerSub}>
+              Swipe right on a request to see it here.
+            </Text>
+            <Pressable
+              style={styles.btnPrimary}
+              onPress={() => router.push("/(tabs)/marketplace" as any)}
+            >
+              <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
+            </Pressable>
           </View>
-        ) : visible.length === 0 ? (
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            <View style={styles.centerCard}>
-              <Text style={styles.centerTitle}>No items</Text>
-              <Text style={styles.centerSub}>
-                Swipe right on a request to see it here.
-              </Text>
-              <Pressable
-                style={styles.btnPrimary}
-                onPress={() => router.push("/(tabs)/marketplace" as any)}
-              >
-                <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        ) : (
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: 18 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            {visible.map(({ request, direction }) => {
-              const latestOffer = latestOfferByRequestId.get(request.id);
-              const counter = latestCounterByRequestId.get(request.id);
+        </ScrollView>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 18 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {visible.map(({ request, direction }) => {
+            const latestOffer = latestOfferByRequestId.get(request.id);
+            const counter = latestCounterByRequestId.get(request.id);
 
-              const offerState: OfferStatus | "none" =
-                latestOffer?.status ?? "none";
+            const offerState: OfferStatus | "none" =
+              latestOffer?.status ?? "none";
 
-              const counterPending = counter?.status === "pending";
-              const counterAccepted = counter?.status === "accepted";
+            const counterPending = counter?.status === "pending";
+            const counterAccepted = counter?.status === "accepted";
 
-              let effectiveState:
-                | "none"
-                | OfferStatus
-                | "counter_pending"
-                | "counter_accepted" = offerState;
+            let effectiveState:
+              | "none"
+              | OfferStatus
+              | "counter_pending"
+              | "counter_accepted" = offerState;
 
-              if (counterPending) effectiveState = "counter_pending";
-              if (counterAccepted) effectiveState = "counter_accepted";
+            if (counterPending) effectiveState = "counter_pending";
+            if (counterAccepted) effectiveState = "counter_accepted";
 
-              const canSendOffer =
-                direction === "right" &&
-                !counterPending &&
-                !counterAccepted &&
-                (offerState === "none" || offerState === "rejected");
+            const canSendOffer =
+              direction === "right" &&
+              !counterPending &&
+              !counterAccepted &&
+              (offerState === "none" || offerState === "rejected");
 
-              return (
-                <View key={request.id} style={styles.card}>
-                  <View style={styles.cardTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.category}>{request.category}</Text>
-                      <Text style={styles.title} numberOfLines={1}>
-                        {request.title}
-                      </Text>
-                      <Text style={styles.by} numberOfLines={1}>
-                        Posted by {request.profiles?.email ?? "unknown"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.desc} numberOfLines={2}>
-                    {request.description}
-                  </Text>
-
-                  <View style={styles.metaRow}>
-                    <View style={styles.pill}>
-                      <Text style={styles.pillText}>
-                        €{request.budget_min.toLocaleString()} - €
-                        {request.budget_max.toLocaleString()}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.pill,
-                        direction === "right"
-                          ? styles.pillInterested
-                          : styles.pillSkipped,
-                      ]}
-                    >
-                      <Text style={styles.pillText}>
-                        {direction === "right" ? "Interested" : "Skipped"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Counter-offer banner */}
-                  {counter && (
-                    <View style={styles.counterBox}>
-                      <Text style={styles.counterTitle}>
-                        Counter-offer: €{Number(counter.price).toLocaleString()}
-                      </Text>
-                      {!!counter.message && (
-                        <Text style={styles.counterMsg} numberOfLines={3}>
-                          {counter.message}
-                        </Text>
-                      )}
-                      <Text style={styles.counterStatus}>
-                        Status: {counter.status.toUpperCase()}
-                      </Text>
-
-                      {/* Only show actions while counter is pending */}
-                      {counterPending && (
-                        <View style={styles.counterActions}>
-                          <Pressable
-                            style={styles.btnPrimary}
-                            onPress={() => acceptCounter(counter)}
-                          >
-                            <Text style={styles.btnPrimaryText}>
-                              Accept counter
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={styles.btnSecondary}
-                            onPress={() => rejectCounter(counter)}
-                          >
-                            <Text style={styles.btnSecondaryText}>Reject</Text>
-                          </Pressable>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Status pill */}
-                  <View style={styles.statusRow}>
-                    {effectiveState === "none" && (
-                      <View style={[styles.statusPill, styles.statusNone]}>
-                        <Text style={styles.statusText}>NO OFFER YET</Text>
-                      </View>
-                    )}
-                    {effectiveState === "pending" && (
-                      <View style={[styles.statusPill, styles.statusPending]}>
-                        <Text style={styles.statusText}>OFFER PENDING</Text>
-                      </View>
-                    )}
-                    {effectiveState === "accepted" && (
-                      <View style={[styles.statusPill, styles.statusAccepted]}>
-                        <Text style={styles.statusText}>ACCEPTED</Text>
-                      </View>
-                    )}
-                    {effectiveState === "rejected" && (
-                      <View style={[styles.statusPill, styles.statusRejected]}>
-                        <Text style={styles.statusText}>
-                          REJECTED — YOU CAN RESEND
-                        </Text>
-                      </View>
-                    )}
-                    {effectiveState === "counter_pending" && (
-                      <View style={[styles.statusPill, styles.statusPending]}>
-                        <Text style={styles.statusText}>
-                          COUNTER-OFFER PENDING
-                        </Text>
-                      </View>
-                    )}
-                    {effectiveState === "counter_accepted" && (
-                      <View style={[styles.statusPill, styles.statusAccepted]}>
-                        <Text style={styles.statusText}>
-                          COUNTER-OFFER ACCEPTED
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Actions */}
-                  <View style={styles.actionRow}>
-                    {canSendOffer && (
-                      <Pressable
-                        style={styles.btnPrimary}
-                        onPress={() => openCreateOffer(request.id)}
-                      >
-                        <Text style={styles.btnPrimaryText}>
-                          {offerState === "rejected"
-                            ? "Send new offer"
-                            : "Send offer"}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    {counterPending && (
-                      <Text style={styles.skippedHint}>
-                        A counter-offer is pending. Respond to it above.
-                      </Text>
-                    )}
-
-                    {/* ✅ Single Chat button only (no duplicates) */}
-                    {(offerState === "accepted" || counterAccepted) && (
-                      <Pressable style={styles.btnPrimary} onPress={chatSoon}>
-                        <Text style={styles.btnPrimaryText}>Chat</Text>
-                      </Pressable>
-                    )}
-
-                    {direction === "left" && (
-                      <Text style={styles.skippedHint}>
-                        Skipped items are read-only.
-                      </Text>
-                    )}
+            return (
+              <View key={request.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.category}>{request.category}</Text>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {request.title}
+                    </Text>
+                    <Text style={styles.by} numberOfLines={1}>
+                      Posted by {request.profiles?.email ?? "unknown"}
+                    </Text>
                   </View>
                 </View>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-    </Screen>
+
+                <Text style={styles.desc} numberOfLines={2}>
+                  {request.description}
+                </Text>
+
+                <View style={styles.metaRow}>
+                  <View style={styles.pill}>
+                    <Text style={styles.pillText}>
+                      €{request.budget_min.toLocaleString()} - €
+                      {request.budget_max.toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.pill,
+                      direction === "right"
+                        ? styles.pillInterested
+                        : styles.pillSkipped,
+                    ]}
+                  >
+                    <Text style={styles.pillText}>
+                      {direction === "right" ? "Interested" : "Skipped"}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Counter-offer banner */}
+                {counter && (
+                  <View style={styles.counterBox}>
+                    <Text style={styles.counterTitle}>
+                      Counter-offer: €{Number(counter.price).toLocaleString()}
+                    </Text>
+                    {!!counter.message && (
+                      <Text style={styles.counterMsg} numberOfLines={3}>
+                        {counter.message}
+                      </Text>
+                    )}
+                    <Text style={styles.counterStatus}>
+                      Status: {counter.status.toUpperCase()}
+                    </Text>
+
+                    {/* Only show actions while counter is pending */}
+                    {counterPending && (
+                      <View style={styles.counterActions}>
+                        <Pressable
+                          style={styles.btnPrimary}
+                          onPress={() => acceptCounter(counter)}
+                        >
+                          <Text style={styles.btnPrimaryText}>
+                            Accept counter
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.btnSecondary}
+                          onPress={() => rejectCounter(counter)}
+                        >
+                          <Text style={styles.btnSecondaryText}>Reject</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Status pill */}
+                <View style={styles.statusRow}>
+                  {effectiveState === "none" && (
+                    <View style={[styles.statusPill, styles.statusNone]}>
+                      <Text style={styles.statusText}>NO OFFER YET</Text>
+                    </View>
+                  )}
+                  {effectiveState === "pending" && (
+                    <View style={[styles.statusPill, styles.statusPending]}>
+                      <Text style={styles.statusText}>OFFER PENDING</Text>
+                    </View>
+                  )}
+                  {effectiveState === "accepted" && (
+                    <View style={[styles.statusPill, styles.statusAccepted]}>
+                      <Text style={styles.statusText}>ACCEPTED</Text>
+                    </View>
+                  )}
+                  {effectiveState === "rejected" && (
+                    <View style={[styles.statusPill, styles.statusRejected]}>
+                      <Text style={styles.statusText}>
+                        REJECTED — YOU CAN RESEND
+                      </Text>
+                    </View>
+                  )}
+                  {effectiveState === "counter_pending" && (
+                    <View style={[styles.statusPill, styles.statusPending]}>
+                      <Text style={styles.statusText}>
+                        COUNTER-OFFER PENDING
+                      </Text>
+                    </View>
+                  )}
+                  {effectiveState === "counter_accepted" && (
+                    <View style={[styles.statusPill, styles.statusAccepted]}>
+                      <Text style={styles.statusText}>
+                        COUNTER-OFFER ACCEPTED
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actionRow}>
+                  {canSendOffer && (
+                    <Pressable
+                      style={styles.btnPrimary}
+                      onPress={() => openCreateOffer(request.id)}
+                    >
+                      <Text style={styles.btnPrimaryText}>
+                        {offerState === "rejected"
+                          ? "Send new offer"
+                          : "Send offer"}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {counterPending && (
+                    <Text style={styles.skippedHint}>
+                      A counter-offer is pending. Respond to it above.
+                    </Text>
+                  )}
+
+                  {/* ✅ Single Chat button only (no duplicates) */}
+                  {(offerState === "accepted" || counterAccepted) && (
+                    <Pressable style={styles.btnPrimary} onPress={chatSoon}>
+                      <Text style={styles.btnPrimaryText}>Chat</Text>
+                    </Pressable>
+                  )}
+
+                  {direction === "left" && (
+                    <Text style={styles.skippedHint}>
+                      Skipped items are read-only.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 

@@ -217,7 +217,61 @@ export default function RequestOffersScreen() {
 
   const chatSoon = () =>
     Alert.alert("Soon", "Chat functionality will be added soon");
+  // Reject menu: Reject or Reject-with-offer
+  const openRejectMenu = (offer: OfferRow) => {
+    const email = offer.profiles?.email ?? "user";
+    const existingCounter = latestCounterByOfferId.get(offer.id);
 
+    // If a counter is already pending, don’t allow spamming more counters
+    if (existingCounter?.status === "pending") {
+      Alert.alert(
+        "Counter-offer already sent",
+        "You already sent a counter-offer for this seller. Wait for them to accept/reject it.",
+        [
+          { text: "OK" },
+          {
+            text: "View counter",
+            onPress: () =>
+              router.push({
+                pathname: "/(modals)/counter-offer",
+                params: {
+                  offerId: offer.id,
+                  requestId: offer.request_id,
+                  sellerId: offer.user_id,
+                  sellerEmail: email,
+                  originalPrice: String(offer.price),
+                },
+              } as any),
+          },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert("Reject offer", "Choose an option:", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Reject",
+        style: "destructive",
+        onPress: () => rejectOffer(offer.id),
+      },
+      {
+        text: "Reject with offer",
+        onPress: () => {
+          router.push({
+            pathname: "/(modals)/counter-offer",
+            params: {
+              offerId: offer.id,
+              requestId: offer.request_id,
+              sellerId: offer.user_id,
+              sellerEmail: email,
+              originalPrice: String(offer.price),
+            },
+          } as any);
+        },
+      },
+    ]);
+  };
   return (
     <Screen>
       <View style={styles.page}>
@@ -335,7 +389,7 @@ export default function RequestOffersScreen() {
                   {isPending && (
                     <View style={styles.actionsRow}>
                       <Pressable
-                        onPress={() => rejectOffer(o.id)}
+                        onPress={() => openRejectMenu(o)}
                         style={[styles.btn, styles.btnSecondary]}
                       >
                         <Text style={styles.btnSecondaryText}>Reject</Text>
