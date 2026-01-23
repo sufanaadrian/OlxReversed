@@ -63,7 +63,7 @@ export default function MyOffersScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [filter, setFilter] = useState<Filter>("all");
-  const [offerView, setOfferView] = useState<OfferViewFilter>("active");
+  const [offerView, setOfferView] = useState<OfferViewFilter>("all");
 
   const [swipes, setSwipes] = useState<
     Array<{ request: RequestRow; direction: SwipeDirection; swipedAt: string }>
@@ -369,45 +369,52 @@ export default function MyOffersScreen() {
       <View style={styles.header}>
         <Text style={styles.h1}>My Offers</Text>
       </View>
-
-      {/* swipe filter row */}
+      {/* ✅ single combined filter row */}
       <View style={styles.filtersWrap}>
         <View style={styles.filters}>
           <FilterBtn
             label={`All (${counts.all})`}
-            active={filter === "all"}
-            onPress={() => setFilter("all")}
+            active={filter === "all" && offerView === "all"}
+            onPress={() => {
+              setFilter("all");
+              setOfferView("all");
+            }}
           />
+
           <FilterBtn
             label={`Interested (${counts.interested})`}
-            active={filter === "interested"}
-            onPress={() => setFilter("interested")}
+            active={filter === "interested" && offerView === "all"}
+            onPress={() => {
+              setFilter("interested");
+              setOfferView("all");
+            }}
           />
-          <FilterBtn
-            label={`Skipped (${counts.skipped})`}
-            active={filter === "skipped"}
-            onPress={() => setFilter("skipped")}
-          />
-        </View>
-      </View>
 
-      {/* offer filter row */}
-      <View style={styles.filtersWrap}>
-        <View style={styles.filters}>
           <FilterBtn
             label={`Active (${offerViewCounts.active})`}
-            active={offerView === "active"}
-            onPress={() => setOfferView("active")}
+            active={filter === "all" && offerView === "active"}
+            onPress={() => {
+              setFilter("all");
+              setOfferView("active");
+            }}
           />
+
+          <FilterBtn
+            label={`Skipped (${counts.skipped})`}
+            active={filter === "skipped" && offerView === "all"}
+            onPress={() => {
+              setFilter("skipped");
+              setOfferView("all");
+            }}
+          />
+
           <FilterBtn
             label={`Withdrawn (${offerViewCounts.withdrawn})`}
-            active={offerView === "withdrawn"}
-            onPress={() => setOfferView("withdrawn")}
-          />
-          <FilterBtn
-            label={`All offers`}
-            active={offerView === "all"}
-            onPress={() => setOfferView("all")}
+            active={filter === "all" && offerView === "withdrawn"}
+            onPress={() => {
+              setFilter("all");
+              setOfferView("withdrawn");
+            }}
           />
         </View>
       </View>

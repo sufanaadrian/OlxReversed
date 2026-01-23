@@ -187,11 +187,6 @@ export default function MarketplaceScreen() {
       request_id: currentRequest.id,
       direction,
     });
-
-    // If RIGHT swipe, send user to My Offers (your desired UX)
-    if (direction === "right") {
-      router.push("/(tabs)/my-offers" as any);
-    }
   };
 
   return (
