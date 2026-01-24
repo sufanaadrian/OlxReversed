@@ -12,8 +12,7 @@ import {
 import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
 
-type OfferStatus = "pending" | "accepted" | "rejected";
-
+type OfferStatus = "pending" | "accepted" | "rejected" | "withdrawn";
 type OfferRow = {
   id: string;
   request_id: string;

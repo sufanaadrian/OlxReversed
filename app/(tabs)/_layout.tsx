@@ -185,10 +185,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -22, // lifts above the tab bar like OLX
+    marginTop: -15, // lifts above the tab bar like OLX
     elevation: 6,
     shadowColor: "#000",
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
   },

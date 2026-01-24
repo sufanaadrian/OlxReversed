@@ -1,18 +1,31 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  FlatList,
   Pressable,
-  ScrollView,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Swipeable from "react-native-gesture-handler/Swipeable";
 import { supabase } from "../../src/lib/supabase";
 
-type Filter = "all" | "active" | "closed";
+type Filter = "all" | "active" | "matched" | "closed";
+
+function getStatusLabel(status: "active" | "matched" | "closed") {
+  switch (status) {
+    case "active":
+      return "OPEN";
+    case "matched":
+      return "NEGOTIATING";
+    case "closed":
+      return "CLOSED";
+  }
+}
 
 type RequestRow = {
   id: string;
@@ -27,24 +40,46 @@ type RequestRow = {
   created_at: string;
 };
 
+// ✅ UPDATED: include withdrawn
 type OfferMini = {
   id: string;
   request_id: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
 };
 
-type OfferCounts = { total: number; pending: number };
+// ✅ UPDATED: include withdrawn
+type OfferCounts = {
+  total: number;
+  pending: number;
+  accepted: number;
+  withdrawn: number;
+};
+
+type CounterOfferMini = {
+  id: string;
+  request_id: string;
+  status: "pending" | "accepted" | "rejected" | "withdrawn";
+};
+
+type CounterCounts = { pending: number; accepted: number };
 
 export default function MyRequestsScreen() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [countsByRequestId, setCountsByRequestId] = useState<
     Map<string, OfferCounts>
   >(new Map());
+  const [counterCountsByRequestId, setCounterCountsByRequestId] = useState<
+    Map<string, CounterCounts>
+  >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const openRowRef = useRef<Swipeable | null>(null);
+
+  const load = useCallback(async (showSpinner: boolean = true) => {
+    if (showSpinner) setLoading(true);
 
     const { data: userRes } = await supabase.auth.getUser();
     const user = userRes.user;
@@ -52,7 +87,8 @@ export default function MyRequestsScreen() {
     if (!user) {
       setRequests([]);
       setCountsByRequestId(new Map());
-      setLoading(false);
+      setCounterCountsByRequestId(new Map());
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -68,7 +104,8 @@ export default function MyRequestsScreen() {
       Alert.alert("Error", reqErr.message);
       setRequests([]);
       setCountsByRequestId(new Map());
-      setLoading(false);
+      setCounterCountsByRequestId(new Map());
+      if (showSpinner) setLoading(false);
       return;
     }
 
@@ -77,12 +114,14 @@ export default function MyRequestsScreen() {
 
     if (reqList.length === 0) {
       setCountsByRequestId(new Map());
-      setLoading(false);
+      setCounterCountsByRequestId(new Map());
+      if (showSpinner) setLoading(false);
       return;
     }
 
     const ids = reqList.map((r) => r.id);
 
+    // Offers counts (includes withdrawn)
     const { data: offers, error: offErr } = await supabase
       .from("offers")
       .select("id,request_id,status")
@@ -90,43 +129,302 @@ export default function MyRequestsScreen() {
 
     if (offErr) {
       setCountsByRequestId(new Map());
-      setLoading(false);
+      setCounterCountsByRequestId(new Map());
+      if (showSpinner) setLoading(false);
       return;
     }
 
-    const map = new Map<string, OfferCounts>();
+    const offerMap = new Map<string, OfferCounts>();
     (offers ?? []).forEach((o: any) => {
       const row = o as OfferMini;
-      const prev = map.get(row.request_id) ?? { total: 0, pending: 0 };
-      map.set(row.request_id, {
+      const prev = offerMap.get(row.request_id) ?? {
+        total: 0,
+        pending: 0,
+        accepted: 0,
+        withdrawn: 0,
+      };
+
+      offerMap.set(row.request_id, {
         total: prev.total + 1,
         pending: prev.pending + (row.status === "pending" ? 1 : 0),
+        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+        withdrawn: prev.withdrawn + (row.status === "withdrawn" ? 1 : 0),
       });
     });
+    setCountsByRequestId(offerMap);
 
-    setCountsByRequestId(map);
-    setLoading(false);
+    // Counter offers counts
+    const { data: counters, error: coErr } = await supabase
+      .from("counter_offers")
+      .select("id,request_id,status")
+      .in("request_id", ids);
+
+    if (coErr) {
+      setCounterCountsByRequestId(new Map());
+      if (showSpinner) setLoading(false);
+      return;
+    }
+
+    const counterMap = new Map<string, CounterCounts>();
+    (counters ?? []).forEach((c: any) => {
+      const row = c as CounterOfferMini;
+      const prev = counterMap.get(row.request_id) ?? {
+        pending: 0,
+        accepted: 0,
+      };
+      counterMap.set(row.request_id, {
+        pending: prev.pending + (row.status === "pending" ? 1 : 0),
+        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+      });
+    });
+    setCounterCountsByRequestId(counterMap);
+
+    if (showSpinner) setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      load(true);
     }, [load]),
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load(false);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
   const counts = useMemo(() => {
     const all = requests.length;
-    const active = requests.filter((r) => r.status !== "closed").length; // active + matched
+    const active = requests.filter((r) => r.status === "active").length;
+    const matched = requests.filter((r) => r.status === "matched").length;
     const closed = requests.filter((r) => r.status === "closed").length;
-    return { all, active, closed };
+    return { all, active, matched, closed };
   }, [requests]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return requests;
-    if (filter === "closed")
-      return requests.filter((r) => r.status === "closed");
-    return requests.filter((r) => r.status !== "closed"); // active + matched
+    return requests.filter((r) => r.status === filter);
   }, [requests, filter]);
+
+  const confirmDelete = (req: RequestRow) => {
+    Alert.alert(
+      "Delete request?",
+      "This will permanently delete your request (and its offers).",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteRequest(req),
+        },
+      ],
+    );
+  };
+
+  const deleteRequest = async (req: RequestRow) => {
+    openRowRef.current?.close();
+
+    const prevRequests = requests;
+    const prevCounts = countsByRequestId;
+    const prevCounterCounts = counterCountsByRequestId;
+
+    setRequests((cur) => cur.filter((r) => r.id !== req.id));
+
+    setCountsByRequestId((cur) => {
+      const next = new Map(cur);
+      next.delete(req.id);
+      return next;
+    });
+    setCounterCountsByRequestId((cur) => {
+      const next = new Map(cur);
+      next.delete(req.id);
+      return next;
+    });
+
+    const { error } = await supabase.from("requests").delete().eq("id", req.id);
+
+    if (error) {
+      setRequests(prevRequests);
+      setCountsByRequestId(prevCounts);
+      setCounterCountsByRequestId(prevCounterCounts);
+      Alert.alert("Error", error.message);
+      return;
+    }
+  };
+
+  const renderRightActions = (req: RequestRow) => {
+    return (
+      <View style={styles.rightActionsWrap}>
+        <Pressable
+          onPress={() => confirmDelete(req)}
+          style={({ pressed }) => [
+            styles.deleteBtn,
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <Feather name="trash-2" size={18} color="white" />
+          <Text style={styles.deleteText}>Delete</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  const renderItem = ({ item }: { item: RequestRow }) => {
+    const offerCounts = countsByRequestId.get(item.id) ?? {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+      withdrawn: 0,
+    };
+
+    const counterCounts = counterCountsByRequestId.get(item.id) ?? {
+      pending: 0,
+      accepted: 0,
+    };
+
+    const hasAcceptedDeal =
+      offerCounts.accepted > 0 || counterCounts.accepted > 0;
+    const hasPendingCounters = counterCounts.pending > 0;
+    const hasWithdrawnOffers = offerCounts.withdrawn > 0;
+
+    return (
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
+        onSwipeableWillOpen={() => {
+          if (openRowRef.current) openRowRef.current.close();
+        }}
+        onSwipeableOpen={(direction, swipeable) => {
+          // ✅ FIX: store the opened row so only one stays open
+          openRowRef.current = swipeable;
+        }}
+      >
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/request/[id]/offers",
+              params: { id: item.id },
+            } as any)
+          }
+          style={styles.card}
+        >
+          <View style={styles.topRow}>
+            <Text style={styles.categoryPill}>{item.category}</Text>
+
+            <View style={styles.rightBadges}>
+              {offerCounts.total > 0 && (
+                <View style={styles.offerPill}>
+                  <Text style={styles.offerPillText}>
+                    {offerCounts.total} offer
+                    {offerCounts.total === 1 ? "" : "s"}
+                  </Text>
+                </View>
+              )}
+
+              <View
+                style={[
+                  styles.statusPill,
+                  item.status === "active"
+                    ? styles.statusOpen
+                    : item.status === "matched"
+                      ? styles.statusNegotiating
+                      : styles.statusClosed,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {getStatusLabel(item.status)}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.desc} numberOfLines={2}>
+            {item.description}
+          </Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.metaStrong}>
+              ${item.budget_min.toLocaleString()} – $
+              {item.budget_max.toLocaleString()}
+            </Text>
+            {!!item.location && (
+              <Text style={styles.metaMuted}>• {item.location}</Text>
+            )}
+          </View>
+
+          <View style={styles.footerRow}>
+            <Text style={styles.smallMuted}>
+              Posted {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+
+            {hasAcceptedDeal ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Alert.alert("Soon", "Chat functionality will be added soon");
+                }}
+                style={styles.reviewBtn}
+              >
+                <Text style={styles.reviewBtnText}>Chat</Text>
+              </Pressable>
+            ) : offerCounts.pending > 0 ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/request/offers",
+                    params: { id: item.id },
+                  } as any);
+                }}
+                style={styles.reviewBtn}
+              >
+                <Text style={styles.reviewBtnText}>
+                  Review ({offerCounts.pending})
+                </Text>
+              </Pressable>
+            ) : hasPendingCounters ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push({
+                    pathname: "/request/offers",
+                    params: { id: item.id },
+                  } as any);
+                }}
+                style={styles.viewBtn}
+              >
+                <Text style={styles.viewBtnText}>
+                  Counter pending ({counterCounts.pending})
+                </Text>
+              </Pressable>
+            ) : hasWithdrawnOffers ? (
+              <Text style={styles.smallMuted}>
+                Withdrawn ({offerCounts.withdrawn})
+              </Text>
+            ) : (
+              <Text style={styles.smallMuted}>
+                {offerCounts.total === 0
+                  ? "No offers yet"
+                  : "No pending offers"}
+              </Text>
+            )}
+          </View>
+        </Pressable>
+      </Swipeable>
+    );
+  };
+
+  const ListEmpty = (
+    <View style={styles.centerCard}>
+      <Text style={styles.titleEmpty}>Nothing here</Text>
+      <Text style={styles.muted}>Create a request to see it here.</Text>
+    </View>
+  );
 
   return (
     <View style={styles.page}>
@@ -141,7 +439,6 @@ export default function MyRequestsScreen() {
         </Pressable>
       </View>
 
-      {/* Filters */}
       <View style={styles.filtersWrap}>
         <View style={styles.filters}>
           <FilterBtn
@@ -149,11 +446,19 @@ export default function MyRequestsScreen() {
             active={filter === "all"}
             onPress={() => setFilter("all")}
           />
+
           <FilterBtn
-            label={`Active (${counts.active})`}
+            label={`Open (${counts.active})`}
             active={filter === "active"}
             onPress={() => setFilter("active")}
           />
+
+          <FilterBtn
+            label={`Negotiating (${counts.matched})`}
+            active={filter === "matched"}
+            onPress={() => setFilter("matched")}
+          />
+
           <FilterBtn
             label={`Closed (${counts.closed})`}
             active={filter === "closed"}
@@ -166,109 +471,20 @@ export default function MyRequestsScreen() {
         <View style={styles.centerCard}>
           <Text style={styles.muted}>Loading…</Text>
         </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.centerCard}>
-          <Text style={styles.titleEmpty}>Nothing here</Text>
-          <Text style={styles.muted}>Create a request to see it here.</Text>
-        </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
-          {filtered.map((r) => {
-            const offerCounts = countsByRequestId.get(r.id) ?? {
-              total: 0,
-              pending: 0,
-            };
-
-            return (
-              <Pressable
-                key={r.id}
-                onPress={() =>
-                  router.push({
-                    pathname: "/request/[id]",
-                    params: { id: r.id },
-                  } as any)
-                }
-                style={styles.card}
-              >
-                <View style={styles.topRow}>
-                  <Text style={styles.categoryPill}>{r.category}</Text>
-
-                  <View style={styles.rightBadges}>
-                    {offerCounts.total > 0 && (
-                      <View style={styles.offerPill}>
-                        <Text style={styles.offerPillText}>
-                          {offerCounts.total} offer
-                          {offerCounts.total === 1 ? "" : "s"}
-                        </Text>
-                      </View>
-                    )}
-
-                    <View
-                      style={[
-                        styles.statusPill,
-                        r.status === "active"
-                          ? styles.statusActive
-                          : r.status === "matched"
-                            ? styles.statusMatched
-                            : styles.statusClosed,
-                      ]}
-                    >
-                      <Text style={styles.statusText}>
-                        {r.status === "matched"
-                          ? "MATCHED"
-                          : r.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.title}>{r.title}</Text>
-                <Text style={styles.desc} numberOfLines={2}>
-                  {r.description}
-                </Text>
-
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaStrong}>
-                    ${r.budget_min.toLocaleString()} – $
-                    {r.budget_max.toLocaleString()}
-                  </Text>
-                  {!!r.location && (
-                    <Text style={styles.metaMuted}>• {r.location}</Text>
-                  )}
-                </View>
-
-                <View style={styles.footerRow}>
-                  <Text style={styles.smallMuted}>
-                    Posted {new Date(r.created_at).toLocaleDateString()}
-                  </Text>
-
-                  {offerCounts.pending > 0 ? (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push({
-                          pathname: "/request/offers",
-                          params: { id: r.id },
-                        } as any);
-                      }}
-                      style={styles.reviewBtn}
-                    >
-                      <Text style={styles.reviewBtnText}>
-                        Review ({offerCounts.pending})
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.smallMuted}>
-                      {offerCounts.total === 0
-                        ? "No offers yet"
-                        : "No pending offers"}
-                    </Text>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={[
+            styles.listContent,
+            filtered.length === 0 ? { flexGrow: 1 } : null,
+          ]}
+          ListEmptyComponent={ListEmpty}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
       )}
     </View>
   );
@@ -345,6 +561,8 @@ const styles = StyleSheet.create({
   filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
   filterTextActive: { color: theme.primaryText },
 
+  listContent: { paddingBottom: 18 },
+
   centerCard: {
     flex: 1,
     backgroundColor: theme.surface,
@@ -393,6 +611,27 @@ const styles = StyleSheet.create({
   },
   offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
 
+  // ✅ NEW withdrawn badge styles
+  withdrawnPill: {
+    backgroundColor: theme.border,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  withdrawnPillText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+
+  dealPill: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  dealPillText: { fontSize: 12, fontWeight: "900", color: "#166534" },
+
   statusPill: {
     borderRadius: 999,
     paddingVertical: 6,
@@ -407,6 +646,12 @@ const styles = StyleSheet.create({
   statusMatched: { backgroundColor: "#FEF9C3", borderColor: "#F59E0B" },
   statusClosed: { backgroundColor: theme.border, borderColor: theme.border },
   statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+  statusOpen: {
+    backgroundColor: "#2f855a", // or whatever you use for "active"
+  },
+  statusNegotiating: {
+    backgroundColor: "#805ad5", // pick any color you like
+  },
 
   title: {
     marginTop: 10,
@@ -437,4 +682,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   reviewBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  viewBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewBtnText: { color: theme.primaryText, fontWeight: "900", fontSize: 12 },
+
+  rightActionsWrap: {
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginTop: 12,
+  },
+  deleteBtn: {
+    width: 92,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  deleteText: { color: "white", fontWeight: "900", fontSize: 12 },
 });
