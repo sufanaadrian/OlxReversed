@@ -68,6 +68,11 @@ export default function MyOffersScreen() {
 
   const [filter, setFilter] = useState<CombinedFilter>("all");
 
+  const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
+  const toggleThread = (requestId: string) => {
+    setOpenThreads((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
+  };
+
   const [swipes, setSwipes] = useState<
     { request: RequestRow; direction: SwipeDirection; swipedAt: string }[]
   >([]);
@@ -217,6 +222,36 @@ export default function MyOffersScreen() {
     return map;
   }, [counterOffers]);
 
+  const offersByRequestId = useMemo(() => {
+    const map = new Map<string, OfferRow[]>();
+    for (const o of offers) {
+      const arr = map.get(o.request_id) ?? [];
+      arr.push(o);
+      map.set(o.request_id, arr);
+    }
+    // newest first
+    for (const [k, arr] of map) {
+      arr.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+      map.set(k, arr);
+    }
+    return map;
+  }, [offers]);
+
+  const countersByOfferId = useMemo(() => {
+    const map = new Map<string, CounterOfferRow[]>();
+    for (const c of counterOffers) {
+      const arr = map.get(c.offer_id) ?? [];
+      arr.push(c);
+      map.set(c.offer_id, arr);
+    }
+    // newest first
+    for (const [k, arr] of map) {
+      arr.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+      map.set(k, arr);
+    }
+    return map;
+  }, [counterOffers]);
+
   const counts = useMemo(() => {
     const all = swipes.length;
 
@@ -247,10 +282,17 @@ export default function MyOffersScreen() {
 
   const visibleBySwipe = useMemo(() => {
     if (filter === "all") return swipes;
-    if (filter === "interested")
-      return swipes.filter((s) => s.direction === "right");
+
+    if (filter === "interested") {
+      return swipes.filter(({ request, direction }) => {
+        if (direction !== "right") return false;
+        const latestOffer = latestOfferByRequestId.get(request.id);
+        return latestOffer == null; // ✅ same rule as the count
+      });
+    }
+
     return swipes.filter((s) => s.direction === "left");
-  }, [swipes, filter]);
+  }, [swipes, filter, latestOfferByRequestId]);
 
   const visible = useMemo(() => {
     // start from all swipes
@@ -476,10 +518,14 @@ export default function MyOffersScreen() {
             const latestOffer = latestOfferByRequestId.get(request.id);
             const counter = latestCounterByRequestId.get(request.id);
 
+            const requestOffers = offersByRequestId.get(request.id) ?? [];
+            const isThreadOpen = !!openThreads[request.id];
+
+            // Map "withdrawn" to "none" to satisfy the type constraint
             const offerState: OfferStatus | "none" =
               latestOffer?.status === "withdrawn"
                 ? "none"
-                : (latestOffer?.status ?? "none");
+                : ((latestOffer?.status as OfferStatus) ?? "none");
 
             const counterPending = counter?.status === "pending";
             const counterAccepted = counter?.status === "accepted";
@@ -568,39 +614,103 @@ export default function MyOffersScreen() {
                       </Text>
                     </View>
                   </View>
-
-                  {counter && (
-                    <View style={styles.counterBox}>
-                      <Text style={styles.counterTitle}>
-                        Counter-offer: €{Number(counter.price).toLocaleString()}
-                      </Text>
-                      {!!counter.message && (
-                        <Text style={styles.counterMsg} numberOfLines={3}>
-                          {counter.message}
+                  {requestOffers.length > 0 && (
+                    <View style={styles.threadHeader}>
+                      <Pressable
+                        style={styles.btnSecondary}
+                        onPress={() => toggleThread(request.id)}
+                      >
+                        <Text style={styles.threadToggleText}>
+                          {isThreadOpen
+                            ? "Hide negotiation"
+                            : `Show negotiation (${requestOffers.length})`}
                         </Text>
-                      )}
-                      <Text style={styles.counterStatus}>
-                        Status: {counter.status.toUpperCase()}
-                      </Text>
+                      </Pressable>
+                    </View>
+                  )}
 
-                      {counterPending && (
-                        <View style={styles.counterActions}>
-                          <Pressable
-                            style={styles.btnPrimary}
-                            onPress={() => acceptCounter(counter)}
+                  {isThreadOpen && requestOffers.length > 1 && (
+                    <View style={styles.threadWrap}>
+                      <Text style={styles.threadTitle}>Negotiation</Text>
+
+                      {requestOffers.map((o, idx) => {
+                        const counters = countersByOfferId.get(o.id) ?? [];
+                        const isLatest = idx === 0;
+
+                        return (
+                          <View
+                            key={o.id}
+                            style={[
+                              styles.threadNode,
+                              isLatest && styles.threadNodeLatest,
+                            ]}
                           >
-                            <Text style={styles.btnPrimaryText}>
-                              Accept counter
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={styles.btnSecondary}
-                            onPress={() => rejectCounter(counter)}
-                          >
-                            <Text style={styles.btnSecondaryText}>Reject</Text>
-                          </Pressable>
-                        </View>
-                      )}
+                            <View style={styles.offerRow}>
+                              <Text style={styles.offerMain}>
+                                Offer: €{Number(o.price).toLocaleString()}
+                              </Text>
+                              <Text style={styles.offerMeta}>
+                                {o.status.toUpperCase()} •{" "}
+                                {new Date(o.created_at).toLocaleString()}
+                              </Text>
+                            </View>
+
+                            {!!o.description && (
+                              <Text style={styles.offerDesc} numberOfLines={2}>
+                                {o.description}
+                              </Text>
+                            )}
+
+                            {counters.map((c) => {
+                              const counterPending = c.status === "pending";
+
+                              return (
+                                <View key={c.id} style={styles.counterNode}>
+                                  <Text style={styles.counterMain}>
+                                    ↳ Counter: €
+                                    {Number(c.price).toLocaleString()}
+                                  </Text>
+
+                                  {!!c.message && (
+                                    <Text
+                                      style={styles.counterMsg}
+                                      numberOfLines={3}
+                                    >
+                                      {c.message}
+                                    </Text>
+                                  )}
+
+                                  <Text style={styles.counterMeta}>
+                                    {c.status.toUpperCase()} •{" "}
+                                    {new Date(c.created_at).toLocaleString()}
+                                  </Text>
+
+                                  {isLatest && counterPending && (
+                                    <View style={styles.counterActions}>
+                                      <Pressable
+                                        style={styles.btnPrimary}
+                                        onPress={() => acceptCounter(c)}
+                                      >
+                                        <Text style={styles.btnPrimaryText}>
+                                          Accept counter
+                                        </Text>
+                                      </Pressable>
+                                      <Pressable
+                                        style={styles.btnSecondary}
+                                        onPress={() => rejectCounter(c)}
+                                      >
+                                        <Text style={styles.btnSecondaryText}>
+                                          Reject
+                                        </Text>
+                                      </Pressable>
+                                    </View>
+                                  )}
+                                </View>
+                              );
+                            })}
+                          </View>
+                        );
+                      })}
                     </View>
                   )}
 
@@ -639,6 +749,11 @@ export default function MyOffersScreen() {
                         <Text style={styles.statusText}>
                           COUNTER-OFFER ACCEPTED
                         </Text>
+                      </View>
+                    )}
+                    {effectiveState === "withdrawn" && (
+                      <View style={[styles.statusPill, styles.statusWithdrawn]}>
+                        <Text style={styles.statusText}>WITHDRAWN</Text>
                       </View>
                     )}
                   </View>
@@ -800,6 +915,23 @@ const styles = StyleSheet.create({
   pillSkipped: { backgroundColor: theme.border, borderColor: theme.border },
   pillText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
 
+  myOfferBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  myOfferTitle: { fontWeight: "900", color: theme.primaryText },
+  myOfferDesc: { marginTop: 4, color: theme.secondaryText, fontWeight: "700" },
+  myOfferMeta: {
+    marginTop: 6,
+    color: theme.secondaryText,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
   counterBox: {
     marginTop: 12,
     borderWidth: 1,
@@ -810,13 +942,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   counterTitle: { fontWeight: "900", color: theme.primaryText },
-  counterMsg: { color: theme.secondaryText, lineHeight: 18 },
   counterStatus: {
     fontWeight: "900",
     color: theme.secondaryText,
     fontSize: 12,
   },
-  counterActions: { flexDirection: "row", gap: 10, marginTop: 8 },
 
   statusRow: { marginTop: 12 },
   statusPill: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14 },
@@ -824,6 +954,8 @@ const styles = StyleSheet.create({
   statusPending: { backgroundColor: theme.accentSoft },
   statusAccepted: { backgroundColor: theme.successSoft },
   statusRejected: { backgroundColor: theme.dangerSoft },
+  statusWithdrawn: { backgroundColor: theme.dangerSoft },
+
   statusText: { fontWeight: "900", fontSize: 12, color: theme.primaryText },
 
   actionRow: { marginTop: 12, gap: 10 },
@@ -886,4 +1018,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   actionText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  threadHeader: { marginTop: 10 },
+  threadToggle: { paddingVertical: 6 },
+  threadToggleText: { fontWeight: "900", color: theme.primaryText },
+
+  threadWrap: { marginTop: 10, gap: 10 },
+  threadTitle: { fontWeight: "900", color: theme.primaryText },
+
+  threadNode: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.border,
+    paddingLeft: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: theme.bg,
+  },
+  threadNodeLatest: { borderLeftColor: theme.primary },
+
+  offerRow: { gap: 2 },
+  offerMain: { fontWeight: "900", color: theme.primaryText },
+  offerMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
+  offerDesc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+
+  counterNode: {
+    marginTop: 10,
+    marginLeft: 6,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    gap: 4,
+  },
+  counterMain: { fontWeight: "900", color: theme.primaryText },
+  counterMsg: { color: theme.secondaryText, lineHeight: 18 },
+  counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
+  counterActions: { flexDirection: "row", gap: 10, marginTop: 8 },
 });
