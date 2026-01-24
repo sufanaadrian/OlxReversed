@@ -19,9 +19,6 @@ type OfferStatus = "pending" | "accepted" | "rejected";
 type OfferStatusDb = OfferStatus | "withdrawn";
 type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
 
-type Filter = "all" | "interested" | "skipped";
-type OfferViewFilter = "active" | "withdrawn" | "all";
-
 type RequestRow = {
   id: string;
   user_id: string;
@@ -62,11 +59,17 @@ export default function MyOffersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [filter, setFilter] = useState<Filter>("all");
-  const [offerView, setOfferView] = useState<OfferViewFilter>("all");
+  type CombinedFilter =
+    | "all"
+    | "interested"
+    | "skipped"
+    | "active"
+    | "withdrawn";
+
+  const [filter, setFilter] = useState<CombinedFilter>("all");
 
   const [swipes, setSwipes] = useState<
-    Array<{ request: RequestRow; direction: SwipeDirection; swipedAt: string }>
+    { request: RequestRow; direction: SwipeDirection; swipedAt: string }[]
   >([]);
 
   const [offers, setOffers] = useState<OfferRow[]>([]);
@@ -127,17 +130,22 @@ export default function MyOffersScreen() {
           ? row.requests[0]
           : row.requests;
         if (!req) return null;
+
         return {
           request: req as RequestRow,
           direction: row.direction as SwipeDirection,
           swipedAt: row.created_at as string,
         };
       })
-      .filter(Boolean) as Array<{
-      request: RequestRow;
-      direction: SwipeDirection;
-      swipedAt: string;
-    }>;
+      .filter(
+        (
+          x,
+        ): x is {
+          request: RequestRow;
+          direction: SwipeDirection;
+          swipedAt: string;
+        } => x !== null,
+      );
 
     setSwipes(normalizedSwipes);
 
@@ -211,10 +219,17 @@ export default function MyOffersScreen() {
 
   const counts = useMemo(() => {
     const all = swipes.length;
-    const interested = swipes.filter((s) => s.direction === "right").length;
+
+    const interested = swipes.filter(({ request, direction }) => {
+      if (direction !== "right") return false;
+      const latestOffer = latestOfferByRequestId.get(request.id);
+      return latestOffer == null; // ✅ only if no offer ever sent
+    }).length;
+
     const skipped = swipes.filter((s) => s.direction === "left").length;
+
     return { all, interested, skipped };
-  }, [swipes]);
+  }, [swipes, latestOfferByRequestId]);
 
   const offerViewCounts = useMemo(() => {
     let active = 0;
@@ -238,14 +253,37 @@ export default function MyOffersScreen() {
   }, [swipes, filter]);
 
   const visible = useMemo(() => {
-    if (offerView === "all") return visibleBySwipe;
+    // start from all swipes
+    let base = swipes;
 
-    return visibleBySwipe.filter(({ request }) => {
-      const latestOffer = latestOfferByRequestId.get(request.id);
-      if (offerView === "withdrawn") return latestOffer?.status === "withdrawn";
-      return latestOffer != null && latestOffer.status !== "withdrawn";
-    });
-  }, [visibleBySwipe, offerView, latestOfferByRequestId]);
+    // 1) swipe-based filters
+    if (filter === "interested") {
+      base = base.filter(({ request, direction }) => {
+        if (direction !== "right") return false;
+        const latestOffer = latestOfferByRequestId.get(request.id);
+        return latestOffer == null; // <-- key change: no offer ever sent
+      });
+    }
+
+    if (filter === "skipped") base = base.filter((s) => s.direction === "left");
+
+    // 2) offer-based filters (needs latestOfferByRequestId)
+    if (filter === "withdrawn") {
+      base = base.filter(({ request }) => {
+        const latestOffer = latestOfferByRequestId.get(request.id);
+        return latestOffer?.status === "withdrawn";
+      });
+    }
+
+    if (filter === "active") {
+      base = base.filter(({ request }) => {
+        const latestOffer = latestOfferByRequestId.get(request.id);
+        return latestOffer != null && latestOffer.status !== "withdrawn";
+      });
+    }
+
+    return base;
+  }, [swipes, filter, latestOfferByRequestId]);
 
   const openCreateOffer = (requestId: string) => {
     router.push({
@@ -374,47 +412,32 @@ export default function MyOffersScreen() {
         <View style={styles.filters}>
           <FilterBtn
             label={`All (${counts.all})`}
-            active={filter === "all" && offerView === "all"}
-            onPress={() => {
-              setFilter("all");
-              setOfferView("all");
-            }}
+            active={filter === "all"}
+            onPress={() => setFilter("all")}
           />
 
           <FilterBtn
             label={`Interested (${counts.interested})`}
-            active={filter === "interested" && offerView === "all"}
-            onPress={() => {
-              setFilter("interested");
-              setOfferView("all");
-            }}
+            active={filter === "interested"}
+            onPress={() => setFilter("interested")}
           />
 
           <FilterBtn
             label={`Active (${offerViewCounts.active})`}
-            active={filter === "all" && offerView === "active"}
-            onPress={() => {
-              setFilter("all");
-              setOfferView("active");
-            }}
+            active={filter === "active"}
+            onPress={() => setFilter("active")}
           />
 
           <FilterBtn
             label={`Skipped (${counts.skipped})`}
-            active={filter === "skipped" && offerView === "all"}
-            onPress={() => {
-              setFilter("skipped");
-              setOfferView("all");
-            }}
+            active={filter === "skipped"}
+            onPress={() => setFilter("skipped")}
           />
 
           <FilterBtn
             label={`Withdrawn (${offerViewCounts.withdrawn})`}
-            active={filter === "all" && offerView === "withdrawn"}
-            onPress={() => {
-              setFilter("all");
-              setOfferView("withdrawn");
-            }}
+            active={filter === "withdrawn"}
+            onPress={() => setFilter("withdrawn")}
           />
         </View>
       </View>

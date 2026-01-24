@@ -14,7 +14,18 @@ import {
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import { supabase } from "../../src/lib/supabase";
 
-type Filter = "all" | "active" | "closed";
+type Filter = "all" | "active" | "matched" | "closed";
+
+function getStatusLabel(status: "active" | "matched" | "closed") {
+  switch (status) {
+    case "active":
+      return "OPEN";
+    case "matched":
+      return "NEGOTIATING";
+    case "closed":
+      return "CLOSED";
+  }
+}
 
 type RequestRow = {
   id: string;
@@ -188,16 +199,15 @@ export default function MyRequestsScreen() {
 
   const counts = useMemo(() => {
     const all = requests.length;
-    const active = requests.filter((r) => r.status !== "closed").length;
+    const active = requests.filter((r) => r.status === "active").length;
+    const matched = requests.filter((r) => r.status === "matched").length;
     const closed = requests.filter((r) => r.status === "closed").length;
-    return { all, active, closed };
+    return { all, active, matched, closed };
   }, [requests]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return requests;
-    if (filter === "closed")
-      return requests.filter((r) => r.status === "closed");
-    return requests.filter((r) => r.status !== "closed");
+    return requests.filter((r) => r.status === filter);
   }, [requests, filter]);
 
   const confirmDelete = (req: RequestRow) => {
@@ -315,35 +325,18 @@ export default function MyRequestsScreen() {
                 </View>
               )}
 
-              {/* ✅ NEW: withdrawn badge */}
-              {hasWithdrawnOffers && (
-                <View style={styles.withdrawnPill}>
-                  <Text style={styles.withdrawnPillText}>
-                    {offerCounts.withdrawn} withdrawn
-                  </Text>
-                </View>
-              )}
-
-              {hasAcceptedDeal && (
-                <View style={styles.dealPill}>
-                  <Text style={styles.dealPillText}>DEAL</Text>
-                </View>
-              )}
-
               <View
                 style={[
                   styles.statusPill,
                   item.status === "active"
-                    ? styles.statusActive
+                    ? styles.statusOpen
                     : item.status === "matched"
-                      ? styles.statusMatched
+                      ? styles.statusNegotiating
                       : styles.statusClosed,
                 ]}
               >
                 <Text style={styles.statusText}>
-                  {item.status === "matched"
-                    ? "MATCHED"
-                    : item.status.toUpperCase()}
+                  {getStatusLabel(item.status)}
                 </Text>
               </View>
             </View>
@@ -453,11 +446,19 @@ export default function MyRequestsScreen() {
             active={filter === "all"}
             onPress={() => setFilter("all")}
           />
+
           <FilterBtn
-            label={`Active (${counts.active})`}
+            label={`Open (${counts.active})`}
             active={filter === "active"}
             onPress={() => setFilter("active")}
           />
+
+          <FilterBtn
+            label={`Negotiating (${counts.matched})`}
+            active={filter === "matched"}
+            onPress={() => setFilter("matched")}
+          />
+
           <FilterBtn
             label={`Closed (${counts.closed})`}
             active={filter === "closed"}
@@ -645,6 +646,12 @@ const styles = StyleSheet.create({
   statusMatched: { backgroundColor: "#FEF9C3", borderColor: "#F59E0B" },
   statusClosed: { backgroundColor: theme.border, borderColor: theme.border },
   statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+  statusOpen: {
+    backgroundColor: "#2f855a", // or whatever you use for "active"
+  },
+  statusNegotiating: {
+    backgroundColor: "#805ad5", // pick any color you like
+  },
 
   title: {
     marginTop: 10,
