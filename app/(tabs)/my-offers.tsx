@@ -362,7 +362,7 @@ export default function MyOffersScreen() {
 
     const { error: oErr } = await supabase
       .from("offers")
-      .update({ status: "accepted", price: counter.price })
+      .update({ status: "accepted" })
       .eq("id", counter.offer_id);
 
     if (oErr) return Alert.alert("Error", oErr.message);
@@ -519,7 +519,7 @@ export default function MyOffersScreen() {
             const counter = latestCounterByRequestId.get(request.id);
 
             const requestOffers = offersByRequestId.get(request.id) ?? [];
-            const isThreadOpen = !!openThreads[request.id];
+            const isThreadOpen = openThreads[request.id] !== false;
 
             // Map "withdrawn" to "none" to satisfy the type constraint
             const offerState: OfferStatus | "none" =
@@ -629,12 +629,15 @@ export default function MyOffersScreen() {
                     </View>
                   )}
 
-                  {isThreadOpen && requestOffers.length > 1 && (
+                  {isThreadOpen && requestOffers.length > 0 && (
                     <View style={styles.threadWrap}>
                       <Text style={styles.threadTitle}>Negotiation</Text>
 
                       {requestOffers.map((o, idx) => {
                         const counters = countersByOfferId.get(o.id) ?? [];
+                        const acceptedCounter =
+                          counters.find((x) => x.status === "accepted") ?? null; // OK even newest-first
+
                         const isLatest = idx === 0;
 
                         return (
@@ -645,21 +648,54 @@ export default function MyOffersScreen() {
                               isLatest && styles.threadNodeLatest,
                             ]}
                           >
-                            <View style={styles.offerRow}>
-                              <Text style={styles.offerMain}>
-                                Offer: €{Number(o.price).toLocaleString()}
-                              </Text>
+                            {isLatest && (
+                              <View style={styles.currentBadge}>
+                                <Text style={styles.currentBadgeText}>
+                                  CURRENT
+                                </Text>
+                              </View>
+                            )}
+
+                            <View style={styles.offerHeaderRow}>
+                              {acceptedCounter ? (
+                                // Vinted style (only when counter accepted)
+                                <View style={styles.offerCompareRow}>
+                                  <Text style={styles.oldOfferText}>
+                                    €{Number(o.price).toLocaleString()} •
+                                    REJECTED
+                                  </Text>
+
+                                  <Text style={styles.arrowText}>→</Text>
+
+                                  <Text style={styles.newOfferText}>
+                                    €
+                                    {Number(
+                                      acceptedCounter.price,
+                                    ).toLocaleString()}{" "}
+                                    • ACCEPTED
+                                  </Text>
+                                </View>
+                              ) : (
+                                // Normal style (always show status)
+                                <Text
+                                  style={[
+                                    styles.offerMain,
+                                    (o.status === "rejected" ||
+                                      o.status === "withdrawn") &&
+                                      styles.offerMainBad,
+                                    o.status === "accepted" &&
+                                      styles.offerMainGood,
+                                  ]}
+                                >
+                                  €{Number(o.price).toLocaleString()} •{" "}
+                                  {o.status.toUpperCase()}
+                                </Text>
+                              )}
+
                               <Text style={styles.offerMeta}>
-                                {o.status.toUpperCase()} •{" "}
                                 {new Date(o.created_at).toLocaleString()}
                               </Text>
                             </View>
-
-                            {!!o.description && (
-                              <Text style={styles.offerDesc} numberOfLines={2}>
-                                {o.description}
-                              </Text>
-                            )}
 
                             {counters.map((c) => {
                               const counterPending = c.status === "pending";
@@ -667,7 +703,8 @@ export default function MyOffersScreen() {
                               return (
                                 <View key={c.id} style={styles.counterNode}>
                                   <Text style={styles.counterMain}>
-                                    ↳ Counter: €
+                                    ↳ {request.profiles?.email ?? "unknown"} 's
+                                    counter offer: €
                                     {Number(c.price).toLocaleString()}
                                   </Text>
 
@@ -681,7 +718,19 @@ export default function MyOffersScreen() {
                                   )}
 
                                   <Text style={styles.counterMeta}>
-                                    {c.status.toUpperCase()} •{" "}
+                                    <Text
+                                      style={{
+                                        fontWeight: "900",
+                                        color:
+                                          o.status === "rejected"
+                                            ? "#dc2626" // red
+                                            : o.status === "withdrawn"
+                                              ? "#dc2626" // red for withdrawn too (optional)
+                                              : "#16a34a", // green for accepted / pending
+                                      }}
+                                    >
+                                      {c.status.toUpperCase()} •{" "}
+                                    </Text>
                                     {new Date(c.created_at).toLocaleString()}
                                   </Text>
 
@@ -1034,12 +1083,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: theme.bg,
   },
-  threadNodeLatest: { borderLeftColor: theme.primary },
 
   offerRow: { gap: 2 },
   offerMain: { fontWeight: "900", color: theme.primaryText },
   offerMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
-  offerDesc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+  offerDesc: {
+    marginTop: 6,
+    marginBottom: 6,
+    color: theme.secondaryText,
+    lineHeight: 18,
+  },
 
   counterNode: {
     marginTop: 10,
@@ -1051,6 +1104,45 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
     gap: 4,
   },
+
+  threadNodeLatest: {
+    borderLeftColor: theme.primary,
+    backgroundColor: "#f0f9ff",
+  },
+
+  currentBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 4,
+  },
+
+  currentBadgeText: {
+    color: "white",
+    fontWeight: "900",
+    fontSize: 10,
+  },
+  offerHeaderRow: { gap: 6 },
+  offerCompareRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  offerMainGood: { color: "#16a34a" },
+  offerMainBad: { color: "#dc2626" },
+
+  oldOfferText: {
+    fontWeight: "900",
+    color: "#dc2626",
+    textDecorationLine: "line-through",
+  },
+  arrowText: { fontWeight: "900", color: theme.secondaryText },
+  newOfferText: { fontWeight: "900", color: "#16a34a" },
+
   counterMain: { fontWeight: "900", color: theme.primaryText },
   counterMsg: { color: theme.secondaryText, lineHeight: 18 },
   counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
