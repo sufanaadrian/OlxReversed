@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -56,6 +57,7 @@ export default function RequestOffersScreen() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -168,6 +170,15 @@ export default function RequestOffersScreen() {
 
     return { all, pending, accepted, rejected, withdrawn };
   }, [offers, latestCounterByOfferId]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return offers;
@@ -297,7 +308,11 @@ export default function RequestOffersScreen() {
         </View>
 
         <View style={styles.filtersWrap}>
-          <View style={styles.filters}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
             <FilterBtn
               label={`All (${counts.all})`}
               active={filter === "all"}
@@ -323,6 +338,9 @@ export default function RequestOffersScreen() {
               active={filter === "withdrawn"}
               onPress={() => setFilter("withdrawn")}
             />
+          </ScrollView>
+          <View pointerEvents="none" style={styles.scrollHint}>
+            <Text style={styles.scrollHintArrow}>›</Text>
           </View>
         </View>
         {counts.withdrawn > 0 && (
@@ -340,14 +358,26 @@ export default function RequestOffersScreen() {
             <Text style={styles.muted}>Loading…</Text>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={styles.centerCard}>
-            <Text style={styles.titleEmpty}>No offers</Text>
-            <Text style={styles.muted}>
-              There are no offers in this filter.
-            </Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            <View style={styles.centerCard}>
+              <Text style={styles.titleEmpty}>No offers</Text>
+              <Text style={styles.muted}>
+                There are no offers in this filter.
+              </Text>
+            </View>
+          </ScrollView>
         ) : (
-          <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 18 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
             {filtered.map((o) => {
               const email = o.profiles?.email ?? "user";
               const latestCounter = latestCounterByOfferId.get(o.id);
@@ -518,17 +548,35 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
   headerSub: { fontSize: 12, color: theme.secondaryText },
 
-  filtersWrap: { alignItems: "center", marginBottom: 12 },
-  filters: {
-    flexDirection: "row",
+  filtersWrap: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 16,
     padding: 6,
+    marginBottom: 6,
+    overflow: "hidden", // 🔑 clips scrolling content
+  },
+  filters: {
+    flexDirection: "row",
     gap: 6,
-    flexWrap: "wrap",
+    paddingRight: 20, // 👈 keeps last pill visible
+  },
+  scrollHint: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
     justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.8)", // adjust to theme
+  },
+
+  scrollHintArrow: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: theme.secondaryText,
   },
   filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },
