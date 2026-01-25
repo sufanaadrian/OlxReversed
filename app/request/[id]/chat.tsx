@@ -58,6 +58,7 @@ type MessageRow = {
   sender_id: string;
   text: string;
   created_at: string;
+  read_at?: string | null;
   profiles?: { email: string | null } | null;
 };
 
@@ -87,6 +88,10 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [closeWorking, setCloseWorking] = useState(false);
 
+  // WhatsApp-like additions
+  const [otherOnline, setOtherOnline] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
+
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [acceptedOffer, setAcceptedOffer] = useState<OfferRow | null>(null);
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
@@ -97,11 +102,34 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<MessageRow> | null>(null);
 
+  // Presence + typing channel (one per request)
+  const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(
+    null,
+  );
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
   const refreshMeId = useCallback(async () => {
     const { data: sess } = await supabase.auth.getSession();
     const uid = sess.session?.user.id ?? null;
     setMeId(uid);
     return uid;
+  }, []);
+
+  const markAsRead = useCallback(async (offerId: string, uid: string) => {
+    // Requires: messages.read_at column.
+    // Mark all messages from the other user as read.
+    const { error } = await supabase
+      .from("messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("offer_id", offerId)
+      .neq("sender_id", uid)
+      .is("read_at", null);
+
+    if (error) {
+      // Don't block UI; just log.
+      console.log("markAsRead error:", error);
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -140,6 +168,7 @@ export default function ChatScreen() {
 
     const accepted = (off?.[0] ?? null) as OfferRow | null;
     setAcceptedOffer(accepted);
+
     // Determine the agreed / final price:
     // - Prefer requests.final_price if you store it
     // - Else, if an accepted counter_offer exists for this offer, use that price
@@ -147,12 +176,10 @@ export default function ChatScreen() {
     if (accepted) {
       let agreed: number | null = null;
 
-      // 1) request.final_price (if column exists / populated)
       const reqAny: any = req as any;
       if (typeof reqAny?.final_price === "number") {
         agreed = reqAny.final_price;
       } else {
-        // 2) accepted counter offer price (if any)
         const { data: accCounters, error: coErr } = await supabase
           .from("counter_offers")
           .select("price,created_at")
@@ -161,13 +188,10 @@ export default function ChatScreen() {
           .order("created_at", { ascending: false })
           .limit(1);
 
-        if (coErr) {
-          console.log("accepted counter fetch error:", coErr);
-        }
+        if (coErr) console.log("accepted counter fetch error:", coErr);
         agreed = (accCounters?.[0]?.price ?? null) as any;
       }
 
-      // 3) fallback
       if (agreed == null) agreed = accepted.price;
       setFinalPrice(Number(agreed));
     } else {
@@ -198,7 +222,7 @@ export default function ChatScreen() {
     const { data: msgs, error: msgErr } = await supabase
       .from("messages")
       .select(
-        "id,offer_id,sender_id,text,created_at,profiles!messages_sender_id_fkey ( email )",
+        "id,offer_id,sender_id,text,created_at,read_at,profiles!messages_sender_id_fkey ( email )",
       )
       .eq("offer_id", accepted.id)
       .order("created_at", { ascending: false })
@@ -214,11 +238,14 @@ export default function ChatScreen() {
     setMessages((msgs ?? []) as any);
     setLoading(false);
 
+    // Mark read when opening chat
+    if (uid) await markAsRead(accepted.id, uid);
+
     setTimeout(
       () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
       30,
     );
-  }, [requestId, refreshMeId]);
+  }, [requestId, refreshMeId, markAsRead]);
 
   // Load on focus
   useFocusEffect(
@@ -242,15 +269,14 @@ export default function ChatScreen() {
           table: "messages",
           filter: `offer_id=eq.${offerId}`,
         },
-        (payload) => {
+        async (payload) => {
           const m = payload.new as MessageRow;
+
           setMessages((prev) => {
             // If we have an optimistic message that matches this insert, remove it
             const next = prev.filter((x) => {
               const isOptimistic = x.id.startsWith("optimistic-");
               if (!isOptimistic) return true;
-
-              // match by same sender + same text (good enough for MVP)
               return !(x.sender_id === m.sender_id && x.text === m.text);
             });
 
@@ -258,6 +284,29 @@ export default function ChatScreen() {
             if (next.some((x) => x.id === m.id)) return next;
             return [m, ...next];
           });
+
+          // If message is from other user and we're in chat, mark as read
+          if (meId && m.sender_id !== meId) {
+            await markAsRead(offerId, meId);
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `offer_id=eq.${offerId}`,
+        },
+        (payload) => {
+          // Update read receipts for my messages
+          const updatedMsg = payload.new as MessageRow;
+          setMessages((prev) =>
+            prev.map((x) =>
+              x.id === updatedMsg.id ? { ...x, ...updatedMsg } : x,
+            ),
+          );
         },
       )
       .subscribe();
@@ -265,7 +314,7 @@ export default function ChatScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [acceptedOffer?.id]);
+  }, [acceptedOffer?.id, meId, markAsRead]);
 
   // Realtime: request status / close handshake updates
   useEffect(() => {
@@ -282,7 +331,6 @@ export default function ChatScreen() {
           filter: `id=eq.${requestId}`,
         },
         (payload) => {
-          // Keep request in sync across both users instantly
           setRequest(payload.new as any);
         },
       )
@@ -292,6 +340,49 @@ export default function ChatScreen() {
       supabase.removeChannel(channel);
     };
   }, [requestId]);
+
+  // WhatsApp-like: Presence + Typing on a channel per request
+  useEffect(() => {
+    // Only start presence/typing when we know who we are + chat is eligible
+    if (!requestId || !meId) return;
+
+    // Clean up any previous
+    if (chatChannelRef.current) {
+      supabase.removeChannel(chatChannelRef.current);
+      chatChannelRef.current = null;
+    }
+
+    const ch = supabase.channel(`chat:${requestId}`, {
+      config: { presence: { key: meId } },
+    });
+
+    // Presence sync => compute otherOnline
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState() as Record<string, any>;
+      const otherKeys = Object.keys(state).filter((k) => k !== meId);
+      setOtherOnline(otherKeys.length > 0);
+    });
+
+    // Typing broadcast
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      if (!payload) return;
+      if (payload.user_id && payload.user_id === meId) return;
+      setOtherTyping(!!payload.isTyping);
+    });
+
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        ch.track({ user_id: meId, at: new Date().toISOString() });
+      }
+    });
+
+    chatChannelRef.current = ch;
+
+    return () => {
+      supabase.removeChannel(ch);
+      if (chatChannelRef.current === ch) chatChannelRef.current = null;
+    };
+  }, [requestId, meId]);
 
   const statusLabel = useMemo(
     () => (request ? getRequestStatusLabel(request.status) : ""),
@@ -326,6 +417,7 @@ export default function ChatScreen() {
         sender_id: uid,
         text: t,
         created_at: new Date().toISOString(),
+        read_at: null,
       };
       setMessages((prev) => [optimistic, ...prev]);
       setText("");
@@ -343,17 +435,49 @@ export default function ChatScreen() {
         Alert.alert("Error", error.message);
         return;
       }
+
+      // stop typing after send
+      if (chatChannelRef.current) {
+        chatChannelRef.current.send({
+          type: "broadcast",
+          event: "typing",
+          payload: { user_id: uid, isTyping: false },
+        });
+      }
     } finally {
       setSending(false);
     }
   };
 
-  // -------- Close deal handshake --------
-  // Rules:
-  // - Only in NEGOTIATING (matched)
-  // - "Close deal" (completed) or "Cancel" (cancelled) sets close_requested_by + close_reason
-  // - Other user can either Confirm (closes request) or Dismiss (clears request)
-  // - Requester can Undo their own request (clears request)
+  // Typing: debounce broadcasts
+  const onChangeText = (v: string) => {
+    setText(v);
+    if (!meId) return;
+    if (!chatChannelRef.current) return;
+
+    const now = Date.now();
+    // throttle "typing: true" to ~1/2 second
+    if (now - lastTypingSentRef.current > 500) {
+      lastTypingSentRef.current = now;
+      chatChannelRef.current.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { user_id: meId, isTyping: true },
+      });
+    }
+
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      if (!chatChannelRef.current || !meId) return;
+      chatChannelRef.current.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { user_id: meId, isTyping: false },
+      });
+    }, 1200);
+  };
+
+  // -------- Close deal handshake (unchanged) --------
   const requestClose = async (reason: "completed" | "cancelled") => {
     if (!request) return;
     if (request.status !== "matched") {
@@ -367,7 +491,6 @@ export default function ChatScreen() {
       return;
     }
 
-    // If the other person already requested close → this action becomes CONFIRM.
     if (request.close_requested_by && request.close_requested_by !== uid) {
       await confirmClose();
       return;
@@ -390,7 +513,6 @@ export default function ChatScreen() {
         return;
       }
 
-      // request realtime will sync; but keep UI snappy
       await load();
     } finally {
       setCloseWorking(false);
@@ -437,7 +559,6 @@ export default function ChatScreen() {
     }
   };
 
-  // Initiator can undo their own close request (clears handshake)
   const undoCloseRequest = async () => {
     if (!request) return;
 
@@ -467,14 +588,12 @@ export default function ChatScreen() {
     }
   };
 
-  // Non-initiator can dismiss the request (decline closing) → clears handshake so it can be requested again
   const dismissCloseRequest = async () => {
     if (!request) return;
 
     const uid = await refreshMeId();
     if (!uid) return;
 
-    // Only the other party (not the requester) can dismiss
     if (!request.close_requested_by) return;
     if (request.close_requested_by === uid) return;
 
@@ -597,7 +716,6 @@ export default function ChatScreen() {
 
   const contextBox = useMemo(() => {
     if (!request) return null;
-
     const showPrice = typeof finalPrice === "number";
 
     return (
@@ -635,24 +753,25 @@ export default function ChatScreen() {
               <Text style={styles.metaPillText}>Closed</Text>
             </View>
           )}
-
-          {request.status === "matched" && !!request.close_requested_by && (
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillText}>
-                Close requested •{" "}
-                {(request.close_reason ?? "completed").toUpperCase()}
-              </Text>
-            </View>
-          )}
         </View>
 
         {closeCTA}
       </View>
     );
-  }, [request, acceptedOffer, finalPrice, statusLabel, closeCTA]);
+  }, [
+    request,
+    acceptedOffer,
+    finalPrice,
+    statusLabel,
+    closeCTA,
+    otherOnline,
+    otherTyping,
+  ]);
 
   const renderItem = ({ item }: { item: MessageRow }) => {
     const mine = !!meId && item.sender_id === meId;
+    const isOptimistic = item.id.startsWith("optimistic-");
+
     return (
       <View
         style={[styles.msgRow, mine ? styles.msgRowMine : styles.msgRowTheirs]}
@@ -671,14 +790,38 @@ export default function ChatScreen() {
           >
             {item.text}
           </Text>
-          <Text
-            style={[
-              styles.msgTime,
-              mine ? styles.msgTimeMine : styles.msgTimeTheirs,
-            ]}
-          >
-            {formatHM(item.created_at)}
-          </Text>
+
+          <View style={styles.msgMetaRow}>
+            <Text
+              style={[
+                styles.msgTime,
+                mine ? styles.msgTimeMine : styles.msgTimeTheirs,
+              ]}
+            >
+              {formatHM(item.created_at)}
+            </Text>
+
+            {mine && (
+              <Feather
+                name={
+                  isOptimistic
+                    ? "clock"
+                    : item.read_at
+                      ? "check-circle"
+                      : "check"
+                }
+                size={12}
+                color={
+                  isOptimistic
+                    ? "#94a3b8"
+                    : item.read_at
+                      ? "#22c55e"
+                      : "#94a3b8"
+                }
+                style={{ marginLeft: 6 }}
+              />
+            )}
+          </View>
         </View>
       </View>
     );
@@ -717,6 +860,13 @@ export default function ChatScreen() {
             </Text>
             <Text style={styles.headerSub} numberOfLines={1}>
               {request ? getRequestStatusLabel(request.status) : ""}
+              {acceptedOffer
+                ? otherTyping
+                  ? " • typing…"
+                  : otherOnline
+                    ? " • online"
+                    : " • offline"
+                : ""}
             </Text>
           </View>
 
@@ -768,6 +918,11 @@ export default function ChatScreen() {
                   </View>
                 )
               }
+              onScrollBeginDrag={() => {
+                // If user scrolls, stop typing indicator quickly
+                if (typingTimerRef.current)
+                  clearTimeout(typingTimerRef.current);
+              }}
             />
 
             <KeyboardAvoidingView
@@ -777,7 +932,7 @@ export default function ChatScreen() {
               <View style={styles.composer}>
                 <TextInput
                   value={text}
-                  onChangeText={setText}
+                  onChangeText={onChangeText}
                   placeholder={
                     canChat
                       ? "Write a message…"
@@ -979,6 +1134,12 @@ const styles = StyleSheet.create({
   msgText: { fontWeight: "800", lineHeight: 18, fontSize: 14 },
   msgTextMine: { color: "#fff" },
   msgTextTheirs: { color: theme.primaryText },
+
+  msgMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
 
   msgTime: {
     marginTop: 4,
