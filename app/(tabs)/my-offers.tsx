@@ -353,23 +353,37 @@ export default function MyOffersScreen() {
     Alert.alert("Soon", "Chat functionality will be added soon");
 
   const acceptCounter = async (counter: CounterOfferRow) => {
-    const { error: cErr } = await supabase
-      .from("counter_offers")
-      .update({ status: "accepted" })
-      .eq("id", counter.id);
+  const { error: cErr } = await supabase
+    .from("counter_offers")
+    .update({ status: "accepted" })
+    .eq("id", counter.id);
 
-    if (cErr) return Alert.alert("Error", cErr.message);
+  if (cErr) return Alert.alert("Error", cErr.message);
 
-    const { error: oErr } = await supabase
-      .from("offers")
-      .update({ status: "accepted" })
-      .eq("id", counter.offer_id);
+  const { error: oErr } = await supabase
+    .from("offers")
+    .update({ status: "accepted" }) // (and don't overwrite price if you want Vinted-style)
+    .eq("id", counter.offer_id);
 
-    if (oErr) return Alert.alert("Error", oErr.message);
+  if (oErr) return Alert.alert("Error", oErr.message);
 
-    Alert.alert("Accepted", "Counter-offer accepted. Next: chat (soon).");
-    load(false);
-  };
+  // ✅ THIS IS THE MISSING PIECE
+  const { error: rErr } = await supabase
+    .from("requests")
+    .update({ status: "matched" })
+    .eq("id", counter.request_id);
+
+  if (rErr) {
+    Alert.alert(
+      "Request not updated",
+      `Counter accepted, but request stayed OPEN.\nReason: ${rErr.message}`
+    );
+    return load(false);
+  }
+
+  Alert.alert("Accepted", "Counter-offer accepted. Request is now negotiating.");
+  load(false);
+};
 
   const rejectCounter = async (counter: CounterOfferRow) => {
     const { error } = await supabase
