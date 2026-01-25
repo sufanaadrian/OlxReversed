@@ -61,6 +61,15 @@ type MessageRow = {
   profiles?: { email: string | null } | null;
 };
 
+const theme = {
+  primary: "#1E40AF",
+  bg: "#F9FAFB",
+  surface: "#FFFFFF",
+  primaryText: "#020617",
+  secondaryText: "#64748B",
+  border: "#E5E7EB",
+};
+
 const getRequestStatusLabel = (s: RequestStatus) => {
   if (s === "active") return "OPEN";
   if (s === "matched") return "NEGOTIATING";
@@ -76,6 +85,7 @@ export default function ChatScreen() {
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [closeWorking, setCloseWorking] = useState(false);
 
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [acceptedOffer, setAcceptedOffer] = useState<OfferRow | null>(null);
@@ -86,13 +96,18 @@ export default function ChatScreen() {
 
   const listRef = useRef<FlatList<MessageRow> | null>(null);
 
+  const refreshMeId = useCallback(async () => {
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user.id ?? null;
+    setMeId(uid);
+    return uid;
+  }, []);
+
   const load = useCallback(async () => {
     if (!requestId) return;
     setLoading(true);
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id ?? null;
-    setMeId(uid);
+    const uid = await refreshMeId();
 
     const { data: req, error: reqErr } = await supabase
       .from("requests")
@@ -120,9 +135,7 @@ export default function ChatScreen() {
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (offErr) {
-      console.log("accepted offer fetch error:", offErr);
-    }
+    if (offErr) console.log("accepted offer fetch error:", offErr);
 
     const accepted = (off?.[0] ?? null) as OfferRow | null;
     setAcceptedOffer(accepted);
@@ -171,9 +184,16 @@ export default function ChatScreen() {
       () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
       30,
     );
-  }, [requestId]);
+  }, [requestId, refreshMeId]);
 
-  // Realtime: prepend incoming messages instantly (FlatList is inverted).
+  // Load on focus
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  // Realtime: messages (FlatList is inverted; newest at top)
   useEffect(() => {
     const offerId = acceptedOffer?.id;
     if (!offerId) return;
@@ -190,9 +210,21 @@ export default function ChatScreen() {
         },
         (payload) => {
           const m = payload.new as MessageRow;
-          setMessages((prev) =>
-            prev.some((x) => x.id === m.id) ? prev : [m, ...prev],
-          );
+
+          setMessages((prev) => {
+            // If we have an optimistic message that matches this insert, remove it
+            const next = prev.filter((x) => {
+              const isOptimistic = x.id.startsWith("optimistic-");
+              if (!isOptimistic) return true;
+
+              // match by same sender + same text (good enough for MVP)
+              return !(x.sender_id === m.sender_id && x.text === m.text);
+            });
+
+            // avoid duplicates by id
+            if (next.some((x) => x.id === m.id)) return next;
+            return [m, ...next];
+          });
         },
       )
       .subscribe();
@@ -202,11 +234,31 @@ export default function ChatScreen() {
     };
   }, [acceptedOffer?.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  // Realtime: request status / close handshake updates
+  useEffect(() => {
+    if (!requestId) return;
+
+    const channel = supabase
+      .channel(`request:${requestId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "requests",
+          filter: `id=eq.${requestId}`,
+        },
+        (payload) => {
+          // Keep request in sync across both users instantly
+          setRequest(payload.new as any);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [requestId]);
 
   const statusLabel = useMemo(
     () => (request ? getRequestStatusLabel(request.status) : ""),
@@ -225,9 +277,7 @@ export default function ChatScreen() {
     if (!acceptedOffer) return;
     if (!canChat) return;
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id ?? null;
-    setMeId(uid);
+    const uid = await refreshMeId();
     if (!uid) {
       Alert.alert("Sign in required", "Please sign in to chat.");
       router.push("/sign-in" as any);
@@ -236,7 +286,7 @@ export default function ChatScreen() {
 
     setSending(true);
     try {
-      // Optimistic add (so it feels instant), will be deduped by realtime/refresh.
+      // Optimistic add (instant UI), deduped by realtime.
       const optimistic: MessageRow = {
         id: `optimistic-${Date.now()}`,
         offer_id: acceptedOffer.id,
@@ -245,6 +295,7 @@ export default function ChatScreen() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [optimistic, ...prev]);
+
       setText("");
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
 
@@ -255,7 +306,6 @@ export default function ChatScreen() {
       });
 
       if (error) {
-        // rollback optimistic
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setText(t);
         Alert.alert("Error", error.message);
@@ -266,6 +316,12 @@ export default function ChatScreen() {
     }
   };
 
+  // -------- Close deal handshake --------
+  // Rules:
+  // - Only in NEGOTIATING (matched)
+  // - "Close deal" (completed) or "Cancel" (cancelled) sets close_requested_by + close_reason
+  // - Other user can either Confirm (closes request) or Dismiss (clears request)
+  // - Requester can Undo their own request (clears request)
   const requestClose = async (reason: "completed" | "cancelled") => {
     if (!request) return;
     if (request.status !== "matched") {
@@ -273,9 +329,7 @@ export default function ChatScreen() {
       return;
     }
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id ?? null;
-    setMeId(uid);
+    const uid = await refreshMeId();
     if (!uid) {
       Alert.alert("Sign in required", "Please sign in.");
       return;
@@ -287,30 +341,35 @@ export default function ChatScreen() {
       return;
     }
 
-    const { error } = await supabase
-      .from("requests")
-      .update({
-        close_requested_by: uid,
-        close_confirmed_by: null,
-        close_reason: reason,
-      })
-      .eq("id", request.id);
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_requested_by: uid,
+          close_confirmed_by: null,
+          close_reason: reason,
+          closed_at: null,
+        })
+        .eq("id", request.id);
 
-    if (error) {
-      Alert.alert("Error", error.message);
-      return;
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+
+      // request realtime will sync; but keep UI snappy
+      await load();
+    } finally {
+      setCloseWorking(false);
     }
-
-    await load();
   };
 
   const confirmClose = async () => {
     if (!request) return;
     if (request.status !== "matched") return;
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id ?? null;
-    setMeId(uid);
+    const uid = await refreshMeId();
     if (!uid) {
       Alert.alert("Sign in required", "Please sign in.");
       return;
@@ -319,50 +378,94 @@ export default function ChatScreen() {
     if (!request.close_requested_by || request.close_requested_by === uid) {
       Alert.alert(
         "Waiting",
-        "You need the other person to request closing first, or request it yourself.",
+        "The other person must request closing first (or you can request it).",
       );
       return;
     }
 
-    const { error } = await supabase
-      .from("requests")
-      .update({
-        close_confirmed_by: uid,
-        status: "closed",
-        closed_at: new Date().toISOString(),
-      })
-      .eq("id", request.id);
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_confirmed_by: uid,
+          status: "closed",
+          closed_at: new Date().toISOString(),
+        })
+        .eq("id", request.id);
 
-    if (error) {
-      Alert.alert("Error", error.message);
-      return;
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+
+      await load();
+    } finally {
+      setCloseWorking(false);
     }
-
-    await load();
   };
 
-  const cancelCloseRequest = async () => {
+  // Initiator can undo their own close request (clears handshake)
+  const undoCloseRequest = async () => {
     if (!request) return;
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id ?? null;
-    setMeId(uid);
+
+    const uid = await refreshMeId();
     if (!uid) return;
     if (request.close_requested_by !== uid) return;
 
-    const { error } = await supabase
-      .from("requests")
-      .update({
-        close_requested_by: null,
-        close_confirmed_by: null,
-        close_reason: null,
-      })
-      .eq("id", request.id);
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_requested_by: null,
+          close_confirmed_by: null,
+          close_reason: null,
+          closed_at: null,
+        })
+        .eq("id", request.id);
 
-    if (error) {
-      Alert.alert("Error", error.message);
-      return;
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+      await load();
+    } finally {
+      setCloseWorking(false);
     }
-    await load();
+  };
+
+  // Non-initiator can dismiss the request (decline closing) → clears handshake so it can be requested again
+  const dismissCloseRequest = async () => {
+    if (!request) return;
+
+    const uid = await refreshMeId();
+    if (!uid) return;
+
+    // Only the other party (not the requester) can dismiss
+    if (!request.close_requested_by) return;
+    if (request.close_requested_by === uid) return;
+
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_requested_by: null,
+          close_confirmed_by: null,
+          close_reason: null,
+          closed_at: null,
+        })
+        .eq("id", request.id);
+
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+      await load();
+    } finally {
+      setCloseWorking(false);
+    }
   };
 
   const closeCTA = useMemo(() => {
@@ -376,14 +479,21 @@ export default function ChatScreen() {
       return (
         <View style={styles.closeRow}>
           <Pressable
-            style={styles.closeBtn}
+            style={[styles.closeBtn, closeWorking && styles.btnDisabled]}
             onPress={() => requestClose("completed")}
+            disabled={closeWorking}
           >
             <Text style={styles.closeBtnText}>Close deal</Text>
           </Pressable>
+
           <Pressable
-            style={[styles.closeBtn, styles.closeBtnGhost]}
+            style={[
+              styles.closeBtn,
+              styles.closeBtnGhost,
+              closeWorking && styles.btnDisabled,
+            ]}
             onPress={() => requestClose("cancelled")}
+            disabled={closeWorking}
           >
             <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
               Cancel
@@ -396,10 +506,18 @@ export default function ChatScreen() {
     if (requestedByMe && !request.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
-          <Text style={styles.closeHint}>Waiting for confirmation…</Text>
+          <Text style={styles.closeHint}>
+            Waiting for confirmation… (
+            {(request.close_reason ?? "completed").toUpperCase()})
+          </Text>
           <Pressable
-            style={[styles.closeBtn, styles.closeBtnGhost]}
-            onPress={cancelCloseRequest}
+            style={[
+              styles.closeBtn,
+              styles.closeBtnGhost,
+              closeWorking && styles.btnDisabled,
+            ]}
+            onPress={undoCloseRequest}
+            disabled={closeWorking}
           >
             <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
               Undo
@@ -412,16 +530,38 @@ export default function ChatScreen() {
     if (requestedByOther && !request.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
-          <Text style={styles.closeHint}>Other user requested to close.</Text>
-          <Pressable style={styles.closeBtn} onPress={confirmClose}>
+          <Text style={styles.closeHint}>
+            Other user requested:{" "}
+            {(request.close_reason ?? "completed").toUpperCase()}
+          </Text>
+
+          <Pressable
+            style={[styles.closeBtn, closeWorking && styles.btnDisabled]}
+            onPress={confirmClose}
+            disabled={closeWorking}
+          >
             <Text style={styles.closeBtnText}>Confirm</Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.closeBtn,
+              styles.closeBtnGhost,
+              closeWorking && styles.btnDisabled,
+            ]}
+            onPress={dismissCloseRequest}
+            disabled={closeWorking}
+          >
+            <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
+              Dismiss
+            </Text>
           </Pressable>
         </View>
       );
     }
 
     return null;
-  }, [request, meId]);
+  }, [request, meId, closeWorking]);
 
   const contextBox = useMemo(() => {
     if (!request) return null;
@@ -434,6 +574,7 @@ export default function ChatScreen() {
           <Text style={styles.contextTitle} numberOfLines={2}>
             {request.title}
           </Text>
+
           <View
             style={[
               styles.statusPill,
@@ -452,10 +593,17 @@ export default function ChatScreen() {
           {showPrice && (
             <View style={styles.metaPill}>
               <Text style={styles.metaPillText}>
-                Price agreed: €{Number(acceptedOffer!.price).toLocaleString()}
+                €{Number(acceptedOffer!.price).toLocaleString()}
               </Text>
             </View>
           )}
+
+          {request.status === "closed" && (
+            <View style={styles.metaPill}>
+              <Text style={styles.metaPillText}>Closed</Text>
+            </View>
+          )}
+
           {request.status === "matched" && !!request.close_requested_by && (
             <View style={styles.metaPill}>
               <Text style={styles.metaPillText}>
@@ -540,7 +688,6 @@ export default function ChatScreen() {
             </Text>
           </View>
 
-          {/* Optional actions (we keep it simple; close buttons live in context card) */}
           {request?.status === "closed" ? (
             <View style={styles.headerIconBtn}>
               <Feather name="lock" size={18} color={theme.secondaryText} />
@@ -593,7 +740,7 @@ export default function ChatScreen() {
 
             <KeyboardAvoidingView
               behavior={Platform.OS === "ios" ? "padding" : undefined}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+              keyboardVerticalOffset={90}
             >
               <View style={styles.composer}>
                 <TextInput
@@ -631,15 +778,6 @@ export default function ChatScreen() {
     </Screen>
   );
 }
-
-const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
-  surface: "#FFFFFF",
-  primaryText: "#020617",
-  secondaryText: "#64748B",
-  border: "#E5E7EB",
-};
 
 const styles = StyleSheet.create({
   page: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
@@ -700,7 +838,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // OLX-like context card for the request
   contextCard: {
     backgroundColor: theme.surface,
     borderWidth: 1,
@@ -725,7 +862,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  statusPillText: { fontSize: 11, fontWeight: "900" },
+  statusPillText: { fontSize: 11, fontWeight: "900", color: theme.primaryText },
   pillOpen: { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
   pillNegotiating: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
   pillClosed: { backgroundColor: "#FEE2E2", borderColor: "#FECACA" },
@@ -765,6 +902,8 @@ const styles = StyleSheet.create({
   closeBtnTextGhost: { color: theme.primaryText },
   closeHint: { color: theme.secondaryText, fontWeight: "800", fontSize: 12 },
 
+  btnDisabled: { opacity: 0.6 },
+
   emptyBox: {
     flex: 1,
     backgroundColor: theme.surface,
@@ -783,7 +922,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Messages: compact bubbles + time (HH:MM)
   msgRow: { flexDirection: "row", marginVertical: 4 },
   msgRowMine: { justifyContent: "flex-end" },
   msgRowTheirs: { justifyContent: "flex-start" },
