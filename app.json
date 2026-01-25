@@ -25,6 +25,13 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "expo": {
+      "ios": {
+        "infoPlist": {
+          "UIViewControllerBasedStatusBarAppearance": true
+        }
+      }
+    },
     "plugins": [
       "expo-router",
       [
