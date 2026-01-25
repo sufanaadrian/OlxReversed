@@ -244,9 +244,20 @@ export default function ChatScreen() {
         },
         (payload) => {
           const m = payload.new as MessageRow;
-          setMessages((prev) =>
-            prev.some((x) => x.id === m.id) ? prev : [m, ...prev],
-          );
+          setMessages((prev) => {
+            // If we have an optimistic message that matches this insert, remove it
+            const next = prev.filter((x) => {
+              const isOptimistic = x.id.startsWith("optimistic-");
+              if (!isOptimistic) return true;
+
+              // match by same sender + same text (good enough for MVP)
+              return !(x.sender_id === m.sender_id && x.text === m.text);
+            });
+
+            // avoid duplicates by id
+            if (next.some((x) => x.id === m.id)) return next;
+            return [m, ...next];
+          });
         },
       )
       .subscribe();
