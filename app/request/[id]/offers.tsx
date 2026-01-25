@@ -297,7 +297,11 @@ export default function RequestOffersScreen() {
         </View>
 
         <View style={styles.filtersWrap}>
-          <View style={styles.filters}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}
+          >
             <FilterBtn
               label={`All (${counts.all})`}
               active={filter === "all"}
@@ -323,6 +327,9 @@ export default function RequestOffersScreen() {
               active={filter === "withdrawn"}
               onPress={() => setFilter("withdrawn")}
             />
+          </ScrollView>
+          <View pointerEvents="none" style={styles.scrollHint}>
+            <Text style={styles.scrollHintArrow}>›</Text>
           </View>
         </View>
         {counts.withdrawn > 0 && (
@@ -518,17 +525,35 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
   headerSub: { fontSize: 12, color: theme.secondaryText },
 
-  filtersWrap: { alignItems: "center", marginBottom: 12 },
-  filters: {
-    flexDirection: "row",
+  filtersWrap: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 16,
     padding: 6,
+    marginBottom: 6,
+    overflow: "hidden", // 🔑 clips scrolling content
+  },
+  filters: {
+    flexDirection: "row",
     gap: 6,
-    flexWrap: "wrap",
+    paddingRight: 20, // 👈 keeps last pill visible
+  },
+  scrollHint: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
     justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.8)", // adjust to theme
+  },
+
+  scrollHintArrow: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: theme.secondaryText,
   },
   filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },

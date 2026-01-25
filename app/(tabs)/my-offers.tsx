@@ -353,37 +353,40 @@ export default function MyOffersScreen() {
     Alert.alert("Soon", "Chat functionality will be added soon");
 
   const acceptCounter = async (counter: CounterOfferRow) => {
-  const { error: cErr } = await supabase
-    .from("counter_offers")
-    .update({ status: "accepted" })
-    .eq("id", counter.id);
+    const { error: cErr } = await supabase
+      .from("counter_offers")
+      .update({ status: "accepted" })
+      .eq("id", counter.id);
 
-  if (cErr) return Alert.alert("Error", cErr.message);
+    if (cErr) return Alert.alert("Error", cErr.message);
 
-  const { error: oErr } = await supabase
-    .from("offers")
-    .update({ status: "accepted" }) // (and don't overwrite price if you want Vinted-style)
-    .eq("id", counter.offer_id);
+    const { error: oErr } = await supabase
+      .from("offers")
+      .update({ status: "accepted" }) // (and don't overwrite price if you want Vinted-style)
+      .eq("id", counter.offer_id);
 
-  if (oErr) return Alert.alert("Error", oErr.message);
+    if (oErr) return Alert.alert("Error", oErr.message);
 
-  // ✅ THIS IS THE MISSING PIECE
-  const { error: rErr } = await supabase
-    .from("requests")
-    .update({ status: "matched" })
-    .eq("id", counter.request_id);
+    // ✅ THIS IS THE MISSING PIECE
+    const { error: rErr } = await supabase
+      .from("requests")
+      .update({ status: "matched" })
+      .eq("id", counter.request_id);
 
-  if (rErr) {
+    if (rErr) {
+      Alert.alert(
+        "Request not updated",
+        `Counter accepted, but request stayed OPEN.\nReason: ${rErr.message}`,
+      );
+      return load(false);
+    }
+
     Alert.alert(
-      "Request not updated",
-      `Counter accepted, but request stayed OPEN.\nReason: ${rErr.message}`
+      "Accepted",
+      "Counter-offer accepted. Request is now negotiating.",
     );
-    return load(false);
-  }
-
-  Alert.alert("Accepted", "Counter-offer accepted. Request is now negotiating.");
-  load(false);
-};
+    load(false);
+  };
 
   const rejectCounter = async (counter: CounterOfferRow) => {
     const { error } = await supabase
@@ -465,7 +468,11 @@ export default function MyOffersScreen() {
       </View>
       {/* ✅ single combined filter row */}
       <View style={styles.filtersWrap}>
-        <View style={styles.filters}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
           <FilterBtn
             label={`All (${counts.all})`}
             active={filter === "all"}
@@ -495,6 +502,10 @@ export default function MyOffersScreen() {
             active={filter === "withdrawn"}
             onPress={() => setFilter("withdrawn")}
           />
+        </ScrollView>
+        {/* scroll hint */}
+        <View pointerEvents="none" style={styles.scrollHint}>
+          <Text style={styles.scrollHintArrow}>›</Text>
         </View>
       </View>
 
@@ -906,18 +917,37 @@ const styles = StyleSheet.create({
   header: { marginBottom: 10 },
   h1: { fontSize: 22, fontWeight: "900", color: theme.primaryText },
 
-  filtersWrap: { alignItems: "center", marginBottom: 12 },
-  filters: {
-    flexDirection: "row",
+  filtersWrap: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 16,
     padding: 6,
-    gap: 6,
-    justifyContent: "center",
-    flexWrap: "wrap",
+    marginBottom: 6,
+    overflow: "hidden", // 🔑 clips scrolling content
   },
+  filters: {
+    flexDirection: "row",
+    gap: 6,
+    paddingRight: 20, // 👈 keeps last pill visible
+  },
+  scrollHint: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.8)", // adjust to theme
+  },
+
+  scrollHintArrow: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: theme.secondaryText,
+  },
+
   filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },
   filterText: { fontWeight: "900", color: theme.secondaryText, fontSize: 12 },

@@ -7,6 +7,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -359,7 +360,7 @@ export default function MyRequestsScreen() {
 
           <View style={styles.footerRow}>
             <Text style={styles.smallMuted}>
-              Posted {new Date(item.created_at).toLocaleDateString()}
+              Posted at {new Date(item.created_at).toLocaleString()}
             </Text>
 
             {hasAcceptedDeal ? (
@@ -440,7 +441,11 @@ export default function MyRequestsScreen() {
       </View>
 
       <View style={styles.filtersWrap}>
-        <View style={styles.filters}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
           <FilterBtn
             label={`All (${counts.all})`}
             active={filter === "all"}
@@ -464,7 +469,7 @@ export default function MyRequestsScreen() {
             active={filter === "closed"}
             onPress={() => setFilter("closed")}
           />
-        </View>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -546,7 +551,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  filtersWrap: { alignItems: "center", marginBottom: 12 },
+  filtersWrap: { alignItems: "center", marginBottom: 6 },
   filters: {
     flexDirection: "row",
     backgroundColor: theme.surface,
