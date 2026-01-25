@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -56,6 +57,7 @@ export default function RequestOffersScreen() {
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -168,6 +170,15 @@ export default function RequestOffersScreen() {
 
     return { all, pending, accepted, rejected, withdrawn };
   }, [offers, latestCounterByOfferId]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return offers;
@@ -347,14 +358,26 @@ export default function RequestOffersScreen() {
             <Text style={styles.muted}>Loading…</Text>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={styles.centerCard}>
-            <Text style={styles.titleEmpty}>No offers</Text>
-            <Text style={styles.muted}>
-              There are no offers in this filter.
-            </Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            <View style={styles.centerCard}>
+              <Text style={styles.titleEmpty}>No offers</Text>
+              <Text style={styles.muted}>
+                There are no offers in this filter.
+              </Text>
+            </View>
+          </ScrollView>
         ) : (
-          <ScrollView contentContainerStyle={{ paddingBottom: 18 }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 18 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
             {filtered.map((o) => {
               const email = o.profiles?.email ?? "user";
               const latestCounter = latestCounterByOfferId.get(o.id);
