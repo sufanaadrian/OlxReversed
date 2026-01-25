@@ -89,6 +89,7 @@ export default function ChatScreen() {
 
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [acceptedOffer, setAcceptedOffer] = useState<OfferRow | null>(null);
+  const [finalPrice, setFinalPrice] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [text, setText] = useState("");
   const [meId, setMeId] = useState<string | null>(null);
@@ -139,6 +140,39 @@ export default function ChatScreen() {
 
     const accepted = (off?.[0] ?? null) as OfferRow | null;
     setAcceptedOffer(accepted);
+    // Determine the agreed / final price:
+    // - Prefer requests.final_price if you store it
+    // - Else, if an accepted counter_offer exists for this offer, use that price
+    // - Else fallback to the accepted offer price
+    if (accepted) {
+      let agreed: number | null = null;
+
+      // 1) request.final_price (if column exists / populated)
+      const reqAny: any = req as any;
+      if (typeof reqAny?.final_price === "number") {
+        agreed = reqAny.final_price;
+      } else {
+        // 2) accepted counter offer price (if any)
+        const { data: accCounters, error: coErr } = await supabase
+          .from("counter_offers")
+          .select("price,created_at")
+          .eq("offer_id", accepted.id)
+          .eq("status", "accepted")
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (coErr) {
+          console.log("accepted counter fetch error:", coErr);
+        }
+        agreed = (accCounters?.[0]?.price ?? null) as any;
+      }
+
+      // 3) fallback
+      if (agreed == null) agreed = accepted.price;
+      setFinalPrice(Number(agreed));
+    } else {
+      setFinalPrice(null);
+    }
 
     // Fetch the counterpart profile (the person you're negotiating with).
     if (accepted && uid) {
@@ -210,21 +244,9 @@ export default function ChatScreen() {
         },
         (payload) => {
           const m = payload.new as MessageRow;
-
-          setMessages((prev) => {
-            // If we have an optimistic message that matches this insert, remove it
-            const next = prev.filter((x) => {
-              const isOptimistic = x.id.startsWith("optimistic-");
-              if (!isOptimistic) return true;
-
-              // match by same sender + same text (good enough for MVP)
-              return !(x.sender_id === m.sender_id && x.text === m.text);
-            });
-
-            // avoid duplicates by id
-            if (next.some((x) => x.id === m.id)) return next;
-            return [m, ...next];
-          });
+          setMessages((prev) =>
+            prev.some((x) => x.id === m.id) ? prev : [m, ...prev],
+          );
         },
       )
       .subscribe();
@@ -295,7 +317,6 @@ export default function ChatScreen() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [optimistic, ...prev]);
-
       setText("");
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
 
@@ -566,7 +587,7 @@ export default function ChatScreen() {
   const contextBox = useMemo(() => {
     if (!request) return null;
 
-    const showPrice = typeof acceptedOffer?.price === "number";
+    const showPrice = typeof finalPrice === "number";
 
     return (
       <View style={styles.contextCard}>
@@ -593,7 +614,7 @@ export default function ChatScreen() {
           {showPrice && (
             <View style={styles.metaPill}>
               <Text style={styles.metaPillText}>
-                €{Number(acceptedOffer!.price).toLocaleString()}
+                Agreed • €{Number(finalPrice!).toLocaleString()}
               </Text>
             </View>
           )}
@@ -617,7 +638,7 @@ export default function ChatScreen() {
         {closeCTA}
       </View>
     );
-  }, [request, acceptedOffer, statusLabel, closeCTA]);
+  }, [request, acceptedOffer, finalPrice, statusLabel, closeCTA]);
 
   const renderItem = ({ item }: { item: MessageRow }) => {
     const mine = !!meId && item.sender_id === meId;
