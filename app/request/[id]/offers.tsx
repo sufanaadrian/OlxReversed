@@ -234,8 +234,13 @@ export default function RequestOffersScreen() {
     await load();
   };
 
-  const chatSoon = () =>
-    Alert.alert("Soon", "Chat functionality will be added soon");
+  const openChat = () => {
+    if (!requestId) return;
+    router.push({
+      pathname: "/request/[id]/chat",
+      params: { id: requestId },
+    } as any);
+  };
 
   const openRejectMenu = (offer: OfferRow) => {
     const email = offer.profiles?.email ?? "user";
@@ -471,7 +476,7 @@ export default function RequestOffersScreen() {
                   {isAccepted && (
                     <View style={styles.actionsRow}>
                       <Pressable
-                        onPress={chatSoon}
+                        onPress={openChat}
                         style={[styles.btn, styles.btnPrimary]}
                       >
                         <Text style={styles.btnPrimaryText}>Chat</Text>

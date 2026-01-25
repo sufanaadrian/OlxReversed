@@ -367,7 +367,10 @@ export default function MyRequestsScreen() {
               <Pressable
                 onPress={(e) => {
                   e.stopPropagation();
-                  Alert.alert("Soon", "Chat functionality will be added soon");
+                  router.push({
+                    pathname: "/request/[id]/chat",
+                    params: { id: item.id },
+                  } as any);
                 }}
                 style={styles.reviewBtn}
               >
