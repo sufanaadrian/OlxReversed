@@ -454,25 +454,6 @@ export default function RequestOffersScreen() {
                     </View>
                   )}
 
-                  {/* ✅ Actions only if pending AND not withdrawn */}
-                  {isPending && !isWithdrawn && (
-                    <View style={styles.actionsRow}>
-                      <Pressable
-                        onPress={() => openRejectMenu(o)}
-                        style={[styles.btn, styles.btnSecondary]}
-                      >
-                        <Text style={styles.btnSecondaryText}>Reject</Text>
-                      </Pressable>
-
-                      <Pressable
-                        onPress={() => acceptOffer(o.id)}
-                        style={[styles.btn, styles.btnPrimary]}
-                      >
-                        <Text style={styles.btnPrimaryText}>Accept</Text>
-                      </Pressable>
-                    </View>
-                  )}
-
                   {isAccepted && (
                     <View style={styles.actionsRow}>
                       <Pressable
