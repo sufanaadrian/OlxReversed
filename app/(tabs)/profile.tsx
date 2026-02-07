@@ -129,6 +129,7 @@ export default function ProfileScreen() {
   };
 
   const isLoggedIn = !!email;
+  const nameFromEmail = email ? email.split("@")[0].replace(".", " ") : null;
 
   return (
     <ScrollView
@@ -148,7 +149,9 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{isLoggedIn ? "User" : "Guest"}</Text>
+          <Text style={styles.name}>
+            {isLoggedIn ? nameFromEmail : "Guest"}
+          </Text>
           <Text style={styles.email}>{email ?? "Not signed in"}</Text>
         </View>
       </View>
