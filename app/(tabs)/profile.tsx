@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -198,6 +199,30 @@ export default function ProfileScreen() {
           >
             <Feather name="briefcase" size={18} color={theme.primaryText} />
             <Text style={styles.quickBtnText}>My Offers</Text>
+          </Pressable>
+          <Pressable
+            style={styles.authBtn}
+            onPress={() =>
+              Alert.alert(
+                "About this app",
+                "Welcome! This app helps you post requests and receive offers from other users.\n\nHow it works:\n• Go to Marketplace and swipe requests.\n• Swipe right to mark Interested and send an offer.\n• Swipe left to skip.\n• Offers can be edited or withdrawn from My Offers.\n• Request owners can review offers in My Requests → Offers.\n• If a seller withdraws, you’ll see it clearly in the offers history.\n\nTips:\n• Use filters to quickly find active/withdrawn items.\n• Pull down to refresh lists.\n\nNeed help? Contact support from the next update 🙂",
+              )
+            }
+          >
+            <Feather name="info" size={18} color={theme.primaryText} />
+            <Text style={styles.authText}>About app</Text>
+          </Pressable>
+          <Pressable
+            style={styles.authBtn}
+            onPress={() =>
+              Alert.alert(
+                "Contact",
+                "For problem contact support at support@reversedolx.com \n\n For problems contat 1234567890",
+              )
+            }
+          >
+            <Feather name="info" size={18} color={theme.primaryText} />
+            <Text style={styles.authText}>Contact</Text>
           </Pressable>
         </View>
       )}
