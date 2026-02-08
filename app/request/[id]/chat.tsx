@@ -13,15 +13,24 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
 import { supabase } from "../../../src/lib/supabase";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type RequestStatus = "active" | "matched" | "closed";
 
@@ -29,6 +38,7 @@ type RequestRow = {
   id: string;
   user_id: string;
   title: string;
+  description: string;
   status: RequestStatus;
   close_requested_by?: string | null;
   close_confirmed_by?: string | null;
@@ -92,6 +102,8 @@ export default function ChatScreen() {
   const [otherOnline, setOtherOnline] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
 
+  const [contextExpanded, setContextExpanded] = useState(false);
+
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [acceptedOffer, setAcceptedOffer] = useState<OfferRow | null>(null);
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
@@ -141,7 +153,7 @@ export default function ChatScreen() {
     const { data: req, error: reqErr } = await supabase
       .from("requests")
       .select(
-        "id,user_id,title,status,close_requested_by,close_confirmed_by,close_reason,closed_at",
+        "id,user_id,title,description,status,close_requested_by,close_confirmed_by,close_reason,closed_at",
       )
       .eq("id", requestId)
       .single();
@@ -719,23 +731,41 @@ export default function ChatScreen() {
     const showPrice = typeof finalPrice === "number";
 
     return (
-      <View style={styles.contextCard}>
+      <Pressable
+        onPress={() => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setContextExpanded((v) => !v);
+        }}
+        style={styles.contextCard}
+      >
         <View style={styles.contextTopRow}>
-          <Text style={styles.contextTitle} numberOfLines={2}>
+          <Text
+            style={styles.contextTitle}
+            numberOfLines={contextExpanded ? 0 : 2}
+          >
             {request.title}
           </Text>
 
-          <View
-            style={[
-              styles.statusPill,
-              statusLabel === "OPEN"
-                ? styles.pillOpen
-                : statusLabel === "NEGOTIATING"
-                  ? styles.pillNegotiating
-                  : styles.pillClosed,
-            ]}
-          >
-            <Text style={styles.statusPillText}>{statusLabel}</Text>
+          <View style={styles.contextRightInline}>
+            <View
+              style={[
+                styles.statusPill,
+                statusLabel === "OPEN"
+                  ? styles.pillOpen
+                  : statusLabel === "NEGOTIATING"
+                    ? styles.pillNegotiating
+                    : styles.pillClosed,
+              ]}
+            >
+              <Text style={styles.statusPillText}>{statusLabel}</Text>
+            </View>
+
+            <Feather
+              name={contextExpanded ? "chevron-up" : "chevron-down"}
+              size={18}
+              color="#6B7280"
+              style={{ marginLeft: 6 }}
+            />
           </View>
         </View>
 
@@ -747,16 +777,53 @@ export default function ChatScreen() {
               </Text>
             </View>
           )}
-
-          {request.status === "closed" && (
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillText}>Closed</Text>
-            </View>
-          )}
         </View>
 
+        {contextExpanded && !!request.description && (
+          <View style={styles.contextExpanded}>
+            <Text style={styles.contextDescription}>{request.description}</Text>
+
+            <View style={styles.contextActionsRow}>
+              <Pressable
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  router.push(`/request/${request.id}`);
+                }}
+                style={styles.contextActionBtn}
+              >
+                <Text style={styles.contextActionBtnText}>
+                  Open request page
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  LayoutAnimation.configureNext(
+                    LayoutAnimation.Presets.easeInEaseOut,
+                  );
+                  setContextExpanded(false);
+                }}
+                style={[
+                  styles.contextActionBtn,
+                  styles.contextActionBtnSecondary,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.contextActionBtnText,
+                    styles.contextActionBtnSecondaryText,
+                  ]}
+                >
+                  Collapse
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         {closeCTA}
-      </View>
+      </Pressable>
     );
   }, [
     request,
@@ -766,6 +833,7 @@ export default function ChatScreen() {
     closeCTA,
     otherOnline,
     otherTyping,
+    contextExpanded,
   ]);
 
   const renderItem = ({ item }: { item: MessageRow }) => {
@@ -1042,6 +1110,12 @@ const styles = StyleSheet.create({
     color: theme.primaryText,
     lineHeight: 18,
   },
+  contextDescription: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: theme.secondaryText,
+    lineHeight: 18,
+  },
 
   statusPill: {
     paddingVertical: 5,
@@ -1170,6 +1244,46 @@ const styles = StyleSheet.create({
     color: theme.primaryText,
     fontWeight: "800",
   },
+  contextExpanded: {
+    marginTop: 8,
+    gap: 10,
+  },
+
+  contextActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  contextActionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#111827",
+  },
+
+  contextActionBtnText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  contextActionBtnSecondary: {
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+
+  contextActionBtnSecondaryText: {
+    color: "#111827",
+  },
+
+  contextRightInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
   sendBtn: {
     height: 44,
     width: 44,
