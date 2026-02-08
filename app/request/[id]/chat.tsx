@@ -80,6 +80,77 @@ const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
 };
+type DateRow = { type: "date"; id: string; label: string; ts: number };
+type ListRow<T> = T | DateRow;
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function startOfDay(ts: number) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function formatDateLabel(ts: number) {
+  const now = Date.now();
+  const day = startOfDay(ts);
+  const today = startOfDay(now);
+  const yesterday = today - DAY;
+
+  if (day === today) return "Today";
+  if (day === yesterday) return "Yesterday";
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(ts));
+}
+
+/**
+ * messages should be oldest -> newest
+ * returns an array with date rows inserted
+ */
+function withDateSeparators<T extends { created_at?: string | number | null }>(
+  messages: T[],
+): ListRow<T>[] {
+  const out: ListRow<T>[] = [];
+  let lastDay: number | null = null;
+
+  for (const m of messages) {
+    const raw = m.created_at ?? null;
+    const ts =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? new Date(raw).getTime()
+          : NaN;
+
+    if (!Number.isFinite(ts)) {
+      out.push(m);
+      continue;
+    }
+
+    const day = startOfDay(ts);
+    if (lastDay === null || day !== lastDay) {
+      out.push({
+        type: "date",
+        id: `date-${day}`,
+        label: formatDateLabel(ts),
+        ts,
+      });
+      lastDay = day;
+    }
+
+    out.push(m);
+  }
+
+  return out;
+}
+
+function isDateRow(row: any): row is DateRow {
+  return row?.type === "date";
+}
 
 const getRequestStatusLabel = (s: RequestStatus) => {
   if (s === "active") return "OPEN";
@@ -258,6 +329,14 @@ export default function ChatScreen() {
       30,
     );
   }, [requestId, refreshMeId, markAsRead]);
+
+  const listWithDates = useMemo(() => {
+    // IMPORTANT: because FlatList is inverted, we want data array to be newest -> oldest.
+    // So we first build separators in oldest -> newest, then reverse.
+    const chronological = [...messages].reverse(); // now oldest -> newest (assuming list is newest -> oldest)
+    const withDates = withDateSeparators(chronological);
+    return withDates.reverse(); // back to newest -> oldest for inverted FlatList
+  }, [messages]);
 
   // Load on focus
   useFocusEffect(
@@ -969,9 +1048,26 @@ export default function ChatScreen() {
               ref={(r) => {
                 listRef.current = r;
               }}
-              data={messages}
-              keyExtractor={(m) => m.id}
-              renderItem={renderItem}
+              data={listWithDates}
+              keyExtractor={(row: any) => (isDateRow(row) ? row.id : row.id)}
+              renderItem={(info: any) => {
+                const row = info.item;
+
+                if (isDateRow(row)) {
+                  return (
+                    <View style={styles.dateSeparatorWrap}>
+                      <View style={styles.dateSeparatorPill}>
+                        <Text style={styles.dateSeparatorText}>
+                          {row.label}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }
+
+                // your original message renderer
+                return renderItem(info);
+              }}
               inverted
               contentContainerStyle={{ paddingVertical: 10 }}
               ListEmptyComponent={
@@ -987,7 +1083,6 @@ export default function ChatScreen() {
                 )
               }
               onScrollBeginDrag={() => {
-                // If user scrolls, stop typing indicator quickly
                 if (typingTimerRef.current)
                   clearTimeout(typingTimerRef.current);
               }}
@@ -1292,5 +1387,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  dateSeparatorWrap: {
+    alignItems: "center",
+    marginVertical: 10,
+  },
+
+  dateSeparatorPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#EEF2F7",
+  },
+
+  dateSeparatorText: {
+    fontSize: 12,
+    fontWeight: "700",
+    opacity: 0.7,
+  },
+
   sendBtnDisabled: { opacity: 0.5 },
 });
