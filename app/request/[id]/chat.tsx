@@ -1,5 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, {
   useCallback,
@@ -12,8 +14,11 @@ import {
   Alert,
   FlatList,
   Image,
+  InteractionManager,
   KeyboardAvoidingView,
   LayoutAnimation,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -180,8 +185,39 @@ export default function ChatScreen() {
   const [finalPrice, setFinalPrice] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [text, setText] = useState("");
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [meId, setMeId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<ProfileRow | null>(null);
+  const pendingPickerAction = useRef<null | (() => Promise<void>)>(null);
+
+  const runPendingPicker = useCallback(async () => {
+    const fn = pendingPickerAction.current;
+    pendingPickerAction.current = null;
+    if (fn) {
+      try {
+        await fn();
+      } catch (e: any) {
+        Alert.alert("Picker failed", e?.message ?? String(e));
+      }
+    }
+  }, []);
+
+  // Android: Modal.onDismiss is unreliable, so run pending action when modal closes
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    if (attachOpen) return;
+    if (!pendingPickerAction.current) return;
+
+    InteractionManager.runAfterInteractions(() => {
+      // Let the modal fully close before opening native picker
+      setTimeout(() => {
+        runPendingPicker();
+      }, 250);
+    });
+  }, [attachOpen, runPendingPicker]);
 
   const listRef = useRef<FlatList<MessageRow> | null>(null);
 
@@ -609,6 +645,275 @@ export default function ChatScreen() {
       setCloseWorking(false);
     }
   };
+  const closeSheetThen = useCallback(async (fn: () => Promise<void>) => {
+    setAttachOpen(false);
+    // Give time for the modal to close; required on iOS (and sometimes Android) or pickers may no-op.
+    await new Promise((r) => setTimeout(r, 250));
+    await new Promise<void>((resolve) =>
+      InteractionManager.runAfterInteractions(() => resolve()),
+    );
+    await fn();
+  }, []);
+
+  const getImageMediaTypes = () => {
+    const mt = (ImagePicker as any)?.MediaType?.Image;
+    if (mt) return [mt];
+    // If you're seeing this, your expo-image-picker is probably old.
+    // We intentionally avoid deprecated MediaTypeOptions to keep the warning away.
+    return null;
+  };
+
+  const ensureLibraryPermission = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow Photos access in Settings to pick images.",
+        [
+          { text: "Cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ],
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const ensureCameraPermission = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow Camera access in Settings to take photos.",
+        [
+          { text: "Cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ],
+      );
+      return false;
+    }
+    return true;
+  };
+  function base64ToUint8Array(base64: string) {
+    const binary = globalThis.atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  const toReadableFileUri = async (uri: string) => {
+    // Already a local file
+    if (uri.startsWith("file://")) return uri;
+
+    // If this is a remote URL (or a Supabase storage path), this is a bug.
+    if (uri.startsWith("http") || uri.includes("/storage/v1/")) {
+      throw new Error(
+        "Upload received a remote URL instead of a local file URI. Please pick an image from device.",
+      );
+    }
+
+    // For iOS 'ph://' and Android 'content://', copy into cache first so we can read it.
+    const dest = `${FileSystem.cacheDirectory}upload-${Date.now()}-${Math.random()
+      .toString(16)
+      .slice(2)}.bin`;
+
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return dest;
+  };
+
+  const uploadImageToSupabase = useCallback(
+    async (fileUri: string, mime: string, folder: string) => {
+      const ext = (mime?.split("/")?.[1] || "jpg").toLowerCase();
+      const fileName = `${folder}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+
+      const readableUri = await toReadableFileUri(fileUri);
+
+      const base64 = await FileSystem.readAsStringAsync(readableUri, {
+        encoding: "base64",
+      });
+
+      const bytes = base64ToUint8Array(base64);
+
+      const { data, error } = await supabase.storage
+        .from("chat-attachments")
+        .upload(fileName, bytes, {
+          contentType: mime || "image/jpeg",
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: pub } = supabase.storage
+        .from("chat-attachments")
+        .getPublicUrl(data.path);
+
+      return pub.publicUrl;
+    },
+    [],
+  );
+
+  const uploadToSupabase = useCallback(
+    async (uri: string, mime: string, folder: string) => {
+      const ext = (mime?.split("/")?.[1] || "jpg").toLowerCase();
+      const filename = `${folder}/${Date.now()}-${Math.random()
+        .toString(16)
+        .slice(2)}.${ext}`;
+
+      const res = await fetch(uri);
+      const blob = await res.blob();
+
+      const { data, error } = await supabase.storage
+        .from("chat-attachments")
+        .upload(filename, blob, { contentType: mime, upsert: false });
+
+      if (error) throw error;
+
+      const { data: pub } = supabase.storage
+        .from("chat-attachments")
+        .getPublicUrl(data.path);
+
+      return pub.publicUrl;
+    },
+    [],
+  );
+
+  const sendPayloadText = useCallback(
+    async (payloadText: string) => {
+      if (!acceptedOffer) return;
+      if (!canChat) return;
+
+      const uid = await refreshMeId();
+      if (!uid) {
+        Alert.alert("Sign in required", "Please sign in to chat.");
+        router.push("/sign-in" as any);
+        return;
+      }
+
+      // Optimistic add (instant UI), deduped by realtime.
+      const optimistic: MessageRow = {
+        id: `optimistic-${Date.now()}`,
+        offer_id: acceptedOffer.id,
+        sender_id: uid,
+        text: payloadText,
+        created_at: new Date().toISOString(),
+        read_at: null,
+      };
+      setMessages((prev) => [optimistic, ...prev]);
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+
+      const { error } = await supabase.from("messages").insert({
+        offer_id: acceptedOffer.id,
+        sender_id: uid,
+        text: payloadText,
+      });
+
+      if (error) {
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+        Alert.alert("Send failed", error.message);
+      }
+    },
+    [acceptedOffer, canChat],
+  );
+
+  const sendImage = useCallback(
+    async (uri: string, mime: string, source: "camera" | "gallery") => {
+      if (!request || !acceptedOffer) return;
+
+      setUploadingMedia(true);
+      try {
+        const safeMime = mime || "image/jpeg";
+
+        // Upload the LOCAL picked URI (file://, ph://, content://) to Supabase
+        const publicUrl = await uploadImageToSupabase(
+          uri,
+          safeMime,
+          `requests/${request.id}/images`,
+        );
+
+        // Store as JSON in messages.text
+        const payloadText = JSON.stringify({
+          type: "image",
+          url: publicUrl,
+          mime: safeMime,
+          source,
+        });
+
+        await sendPayloadText(payloadText);
+      } catch (e: any) {
+        Alert.alert("Upload failed", e?.message ?? String(e));
+      } finally {
+        setUploadingMedia(false);
+      }
+    },
+    [request, acceptedOffer, uploadImageToSupabase, sendPayloadText],
+  );
+
+  const pickFromGallery = async () => {
+    console.log("[pickFromGallery] pressed");
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log("[pickFromGallery] perm:", perm);
+      if (!perm.granted) {
+        Alert.alert("Photos permission", "Please allow Photos access.");
+        return;
+      }
+
+      pendingPickerAction.current = async () => {
+        try {
+          console.log("[pickFromGallery] launching (after modal close) …");
+          const result = await ImagePicker.launchImageLibraryAsync({
+            quality: 0.85,
+            allowsMultipleSelection: false,
+          });
+
+          console.log("[pickFromGallery] result:", result);
+          if (result.canceled) return;
+
+          const picked = result.assets?.[0];
+          if (!picked?.uri) return;
+
+          const mime = picked.mimeType ?? "image/jpeg";
+          await sendImage(picked.uri, mime, "gallery");
+        } catch (e: any) {
+          Alert.alert("Upload failed", e?.message ?? String(e));
+        }
+      };
+
+      setAttachOpen(false);
+    } catch (e: any) {
+      Alert.alert("Gallery failed", e?.message ?? String(e));
+    }
+  };
+
+  const takePhoto = async () => {
+    console.log("[takePhoto] pressed");
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    console.log("[takePhoto] perm:", perm);
+    if (!perm.granted) {
+      Alert.alert("Camera permission", "Please allow Camera access.");
+      return;
+    }
+
+    pendingPickerAction.current = async () => {
+      console.log("[takePhoto] launching (after modal close) …");
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+      });
+
+      if (result.canceled) return;
+
+      const picked = result.assets?.[0];
+      if (!picked?.uri) return;
+
+      const mime = picked.mimeType ?? "image/jpeg";
+
+      // Send using the local captured URI; sendImage() will upload then send a message payload.
+      await sendImage(picked.uri, mime, "camera");
+    };
+
+    setAttachOpen(false);
+  };
 
   const confirmClose = async () => {
     if (!request) return;
@@ -919,6 +1224,15 @@ export default function ChatScreen() {
     const mine = !!meId && item.sender_id === meId;
     const isOptimistic = item.id.startsWith("optimistic-");
 
+    let parsed: any = null;
+    if (typeof item.text === "string" && item.text.trim().startsWith("{")) {
+      try {
+        parsed = JSON.parse(item.text);
+      } catch {}
+    }
+    const isImageMsg =
+      parsed?.type === "image" && typeof parsed?.url === "string";
+
     return (
       <View
         style={[styles.msgRow, mine ? styles.msgRowMine : styles.msgRowTheirs]}
@@ -929,14 +1243,26 @@ export default function ChatScreen() {
             mine ? styles.msgBubbleMine : styles.msgBubbleTheirs,
           ]}
         >
-          <Text
-            style={[
-              styles.msgText,
-              mine ? styles.msgTextMine : styles.msgTextTheirs,
-            ]}
-          >
-            {item.text}
-          </Text>
+          {isImageMsg ? (
+            <Pressable
+              style={styles.mediaWrap}
+              onPress={() => {
+                setImageViewerUrl(parsed.url);
+                setImageViewerOpen(true);
+              }}
+            >
+              <Image source={{ uri: parsed.url }} style={styles.msgImage} />
+            </Pressable>
+          ) : (
+            <Text
+              style={[
+                styles.msgText,
+                mine ? styles.msgTextMine : styles.msgTextTheirs,
+              ]}
+            >
+              {item.text}
+            </Text>
+          )}
 
           <View style={styles.msgMetaRow}>
             <Text
@@ -1093,6 +1419,20 @@ export default function ChatScreen() {
               keyboardVerticalOffset={90}
             >
               <View style={styles.composer}>
+                <Pressable
+                  onPress={() => setAttachOpen(true)}
+                  disabled={!canChat || sending || uploadingMedia}
+                  style={({ pressed }) => [
+                    styles.attachBtn,
+                    (!canChat || sending || uploadingMedia) && {
+                      opacity: 0.5,
+                    },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Feather name="plus" size={20} color={theme.primaryText} />
+                </Pressable>
+
                 <TextInput
                   value={text}
                   onChangeText={onChangeText}
@@ -1122,6 +1462,76 @@ export default function ChatScreen() {
                 </Pressable>
               </View>
             </KeyboardAvoidingView>
+
+            <Modal
+              visible={attachOpen}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setAttachOpen(false)}
+              onDismiss={() => {
+                runPendingPicker();
+              }}
+            >
+              <Pressable
+                style={styles.sheetBackdrop}
+                onPress={() => setAttachOpen(false)}
+              >
+                <Pressable
+                  style={styles.sheet}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <Text style={styles.sheetTitle}>Send</Text>
+
+                  <Pressable style={styles.sheetItem} onPress={pickFromGallery}>
+                    <Text style={styles.sheetItemText}>🖼 Gallery</Text>
+                  </Pressable>
+
+                  <Pressable style={styles.sheetItem} onPress={takePhoto}>
+                    <Text style={styles.sheetItemText}>📷 Camera</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.sheetItem, styles.sheetCancel]}
+                    onPress={() => setAttachOpen(false)}
+                  >
+                    <Text
+                      style={[styles.sheetItemText, styles.sheetCancelText]}
+                    >
+                      Cancel
+                    </Text>
+                  </Pressable>
+                </Pressable>
+              </Pressable>
+            </Modal>
+
+            <Modal
+              visible={imageViewerOpen}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setImageViewerOpen(false)}
+            >
+              <Pressable
+                style={styles.viewerBackdrop}
+                onPress={() => setImageViewerOpen(false)}
+              >
+                <View style={styles.viewerTopBar}>
+                  <Pressable
+                    onPress={() => setImageViewerOpen(false)}
+                    style={styles.viewerCloseBtn}
+                  >
+                    <Text style={styles.viewerCloseText}>Close</Text>
+                  </Pressable>
+                </View>
+
+                {imageViewerUrl ? (
+                  <Image
+                    source={{ uri: imageViewerUrl }}
+                    style={styles.viewerImage}
+                    resizeMode="contain"
+                  />
+                ) : null}
+              </Pressable>
+            </Modal>
           </>
         )}
       </View>
@@ -1406,4 +1816,89 @@ const styles = StyleSheet.create({
   },
 
   sendBtnDisabled: { opacity: 0.5 },
+
+  attachBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEF2F7",
+    marginRight: 8,
+  },
+
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "white",
+    padding: 14,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    gap: 10,
+  },
+  sheetTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    opacity: 0.7,
+  },
+  sheetItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#F7F8FA",
+  },
+  sheetItemText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  sheetCancel: {
+    backgroundColor: "#111827",
+  },
+  sheetCancelText: {
+    color: "white",
+    textAlign: "center",
+  },
+
+  mediaWrap: {
+    overflow: "hidden",
+    borderRadius: 14,
+  },
+  msgImage: {
+    width: 240,
+    height: 170,
+    borderRadius: 14,
+  },
+
+  viewerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+  },
+  viewerTopBar: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    zIndex: 2,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  viewerCloseBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  viewerCloseText: {
+    color: "white",
+    fontWeight: "700",
+  },
+  viewerImage: {
+    width: "100%",
+    height: "100%",
+  },
 });
