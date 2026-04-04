@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
+import { useCurrency } from "../../src/context/CurrencyContext";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 type SwipeDirection = "left" | "right";
@@ -56,6 +58,8 @@ type CounterOfferRow = {
 };
 
 export default function MyOffersScreen() {
+  const t = useTranslation();
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -362,14 +366,14 @@ export default function MyOffersScreen() {
       .update({ status: "accepted" })
       .eq("id", counter.id);
 
-    if (cErr) return Alert.alert("Error", cErr.message);
+    if (cErr) return Alert.alert(t("error"), cErr.message);
 
     const { error: oErr } = await supabase
       .from("offers")
       .update({ status: "accepted" }) // (and don't overwrite price if you want Vinted-style)
       .eq("id", counter.offer_id);
 
-    if (oErr) return Alert.alert("Error", oErr.message);
+    if (oErr) return Alert.alert(t("error"), oErr.message);
 
     // ✅ THIS IS THE MISSING PIECE
     const { error: rErr } = await supabase
@@ -379,16 +383,13 @@ export default function MyOffersScreen() {
 
     if (rErr) {
       Alert.alert(
-        "Request not updated",
+        t("requestNotUpdated"),
         `Counter accepted, but request stayed OPEN.\nReason: ${rErr.message}`,
       );
       return load(false);
     }
 
-    Alert.alert(
-      "Accepted",
-      "Counter-offer accepted. Request is now negotiating.",
-    );
+    Alert.alert(t("accepted"), t("counterAcceptedText"));
     load(false);
   };
 
@@ -404,10 +405,10 @@ export default function MyOffersScreen() {
   };
 
   const confirmWithdraw = (offerId: string) => {
-    Alert.alert("Withdraw offer?", "This will withdraw your offer.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("withdrawOfferConfirm"), t("withdrawOfferMsg"), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Withdraw",
+        text: t("withdrawOffer"),
         style: "destructive",
         onPress: () => withdrawOffer(offerId),
       },
@@ -428,14 +429,11 @@ export default function MyOffersScreen() {
     if (error) return Alert.alert("Error", error.message);
 
     if (!data || data.length === 0) {
-      Alert.alert(
-        "Not updated",
-        "No rows were updated. This usually means RLS blocked it OR the offerId was wrong.",
-      );
+      Alert.alert(t("notUpdated"), t("noRowsUpdated"));
       return;
     }
 
-    Alert.alert("Withdrawn", "Your offer was withdrawn.");
+    Alert.alert(t("offerWithdrawn"), t("yourOfferWithdrawn"));
     load(false);
   };
 
@@ -448,7 +446,7 @@ export default function MyOffersScreen() {
           style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.9 }]}
         >
           <Feather name="edit-2" size={18} color="white" />
-          <Text style={styles.actionText}>Edit</Text>
+          <Text style={styles.actionText}>{t("edit")}</Text>
         </Pressable>
 
         <Pressable
@@ -459,7 +457,7 @@ export default function MyOffersScreen() {
           ]}
         >
           <Feather name="trash-2" size={18} color="white" />
-          <Text style={styles.actionText}>Withdraw</Text>
+          <Text style={styles.actionText}>{t("withdrawOffer")}</Text>
         </Pressable>
       </View>
     );
@@ -468,7 +466,7 @@ export default function MyOffersScreen() {
   return (
     <View style={styles.page}>
       <View style={styles.header}>
-        <Text style={styles.h1}>My Offers</Text>
+        <Text style={styles.h1}>{t("myOffers")}</Text>
       </View>
       {/* ✅ single combined filter row */}
       <View style={styles.filtersWrap}>
@@ -478,31 +476,31 @@ export default function MyOffersScreen() {
           contentContainerStyle={styles.filters}
         >
           <FilterBtn
-            label={`All (${counts.all})`}
+            label={`${t("all")} (${counts.all})`}
             active={filter === "all"}
             onPress={() => setFilter("all")}
           />
 
           <FilterBtn
-            label={`Interested (${counts.interested})`}
+            label={`${t("interested")} (${counts.interested})`}
             active={filter === "interested"}
             onPress={() => setFilter("interested")}
           />
 
           <FilterBtn
-            label={`Active (${offerViewCounts.active})`}
+            label={`${t("active")} (${offerViewCounts.active})`}
             active={filter === "active"}
             onPress={() => setFilter("active")}
           />
 
           <FilterBtn
-            label={`Skipped (${counts.skipped})`}
+            label={`${t("skipped")} (${counts.skipped})`}
             active={filter === "skipped"}
             onPress={() => setFilter("skipped")}
           />
 
           <FilterBtn
-            label={`Withdrawn (${offerViewCounts.withdrawn})`}
+            label={`${t("offerWithdrawn")} (${offerViewCounts.withdrawn})`}
             active={filter === "withdrawn"}
             onPress={() => setFilter("withdrawn")}
           />
@@ -515,8 +513,8 @@ export default function MyOffersScreen() {
 
       {loading ? (
         <View style={styles.centerCard}>
-          <Text style={styles.centerTitle}>Loading…</Text>
-          <Text style={styles.centerSub}>Fetching swipes & offers</Text>
+          <Text style={styles.centerTitle}>{t("loading")}</Text>
+          <Text style={styles.centerSub}>{t("fetchingSwipesOffers")}</Text>
         </View>
       ) : visible.length === 0 ? (
         <ScrollView
@@ -526,13 +524,13 @@ export default function MyOffersScreen() {
           }
         >
           <View style={styles.centerCard}>
-            <Text style={styles.centerTitle}>No items</Text>
-            <Text style={styles.centerSub}>No items in this filter.</Text>
+            <Text style={styles.centerTitle}>{t("noOffers")}</Text>
+            <Text style={styles.centerSub}>{t("noItemsInFilter")}</Text>
             <Pressable
               style={styles.btnPrimary}
               onPress={() => router.push("/(tabs)/marketplace" as any)}
             >
-              <Text style={styles.btnPrimaryText}>Go to Marketplace</Text>
+              <Text style={styles.btnPrimaryText}>{t("goToMarketplace")}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -625,8 +623,8 @@ export default function MyOffersScreen() {
                   <View style={styles.metaRow}>
                     <View style={styles.pill}>
                       <Text style={styles.pillText}>
-                        €{request.budget_min.toLocaleString()} - €
-                        {request.budget_max.toLocaleString()}
+                        {formatPrice(request.budget_min)} -{" "}
+                        {formatPrice(request.budget_max)}
                       </Text>
                     </View>
 
@@ -639,7 +637,7 @@ export default function MyOffersScreen() {
                       ]}
                     >
                       <Text style={styles.pillText}>
-                        {direction === "right" ? "Interested" : "Skipped"}
+                        {direction === "right" ? t("interested") : t("skipped")}
                       </Text>
                     </View>
                   </View>
@@ -651,8 +649,8 @@ export default function MyOffersScreen() {
                       >
                         <Text style={styles.threadToggleText}>
                           {isThreadOpen
-                            ? "Hide negotiation"
-                            : `Show negotiation (${requestOffers.length})`}
+                            ? t("hideNegotiation")
+                            : `${t("showNegotiation")} (${requestOffers.length})`}
                         </Text>
                       </Pressable>
                     </View>
@@ -660,7 +658,7 @@ export default function MyOffersScreen() {
 
                   {isThreadOpen && requestOffers.length > 0 && (
                     <View style={styles.threadWrap}>
-                      <Text style={styles.threadTitle}>Negotiation</Text>
+                      <Text style={styles.threadTitle}>{t("negotiation")}</Text>
 
                       {requestOffers.map((o, idx) => {
                         const counters = countersByOfferId.get(o.id) ?? [];
@@ -680,7 +678,7 @@ export default function MyOffersScreen() {
                             {isLatest && (
                               <View style={styles.currentBadge}>
                                 <Text style={styles.currentBadgeText}>
-                                  CURRENT
+                                  {t("current")}
                                 </Text>
                               </View>
                             )}
@@ -690,18 +688,15 @@ export default function MyOffersScreen() {
                                 // Vinted style (only when counter accepted)
                                 <View style={styles.offerCompareRow}>
                                   <Text style={styles.oldOfferText}>
-                                    €{Number(o.price).toLocaleString()} •
-                                    REJECTED
+                                    {formatPrice(Number(o.price))} •
+                                    {t("rejected")}
                                   </Text>
 
                                   <Text style={styles.arrowText}>→</Text>
 
                                   <Text style={styles.newOfferText}>
-                                    €
-                                    {Number(
-                                      acceptedCounter.price,
-                                    ).toLocaleString()}{" "}
-                                    • ACCEPTED
+                                    {formatPrice(Number(acceptedCounter.price))}{" "}
+                                    • {t("accepted")}
                                   </Text>
                                 </View>
                               ) : (
@@ -716,8 +711,16 @@ export default function MyOffersScreen() {
                                       styles.offerMainGood,
                                   ]}
                                 >
-                                  €{Number(o.price).toLocaleString()} •{" "}
-                                  {o.status.toUpperCase()}
+                                  {formatPrice(Number(o.price))} •{" "}
+                                  {t(
+                                    o.status === "pending"
+                                      ? "pendingStatus"
+                                      : o.status === "accepted"
+                                        ? "acceptedStatus"
+                                        : o.status === "rejected"
+                                          ? "rejectedStatus"
+                                          : "withdrawnStatus",
+                                  )}
                                 </Text>
                               )}
 
@@ -732,9 +735,9 @@ export default function MyOffersScreen() {
                               return (
                                 <View key={c.id} style={styles.counterNode}>
                                   <Text style={styles.counterMain}>
-                                    ↳ {request.profiles?.email ?? "unknown"} 's
-                                    counter offer: €
-                                    {Number(c.price).toLocaleString()}
+                                    ↳ {request.profiles?.email ?? "unknown"}{" "}
+                                    {t("counterOfferFrom")}:{" "}
+                                    {formatPrice(Number(c.price))}
                                   </Text>
 
                                   {!!c.message && (
@@ -758,7 +761,16 @@ export default function MyOffersScreen() {
                                               : "#16a34a", // green for accepted / pending
                                       }}
                                     >
-                                      {c.status.toUpperCase()} •{" "}
+                                      {t(
+                                        c.status === "pending"
+                                          ? "pendingStatus"
+                                          : c.status === "accepted"
+                                            ? "acceptedStatus"
+                                            : c.status === "rejected"
+                                              ? "rejectedStatus"
+                                              : "withdrawnStatus",
+                                      )}{" "}
+                                      •{" "}
                                     </Text>
                                     {new Date(c.created_at).toLocaleString()}
                                   </Text>
@@ -770,7 +782,7 @@ export default function MyOffersScreen() {
                                         onPress={() => acceptCounter(c)}
                                       >
                                         <Text style={styles.btnPrimaryText}>
-                                          Accept counter
+                                          {t("acceptCounter")}
                                         </Text>
                                       </Pressable>
                                       <Pressable
@@ -778,7 +790,7 @@ export default function MyOffersScreen() {
                                         onPress={() => rejectCounter(c)}
                                       >
                                         <Text style={styles.btnSecondaryText}>
-                                          Reject
+                                          {t("reject")}
                                         </Text>
                                       </Pressable>
                                     </View>
@@ -795,43 +807,47 @@ export default function MyOffersScreen() {
                   <View style={styles.statusRow}>
                     {effectiveState === "none" && (
                       <View style={[styles.statusPill, styles.statusNone]}>
-                        <Text style={styles.statusText}>NO OFFER YET</Text>
+                        <Text style={styles.statusText}>{t("noOfferYet")}</Text>
                       </View>
                     )}
                     {effectiveState === "pending" && (
                       <View style={[styles.statusPill, styles.statusPending]}>
-                        <Text style={styles.statusText}>OFFER PENDING</Text>
+                        <Text style={styles.statusText}>
+                          {t("offerPending")}
+                        </Text>
                       </View>
                     )}
                     {effectiveState === "accepted" && (
                       <View style={[styles.statusPill, styles.statusAccepted]}>
-                        <Text style={styles.statusText}>ACCEPTED</Text>
+                        <Text style={styles.statusText}>{t("accepted")}</Text>
                       </View>
                     )}
                     {effectiveState === "rejected" && (
                       <View style={[styles.statusPill, styles.statusRejected]}>
                         <Text style={styles.statusText}>
-                          REJECTED — YOU CAN RESEND
+                          {t("rejectedCanResend")}
                         </Text>
                       </View>
                     )}
                     {effectiveState === "counter_pending" && (
                       <View style={[styles.statusPill, styles.statusPending]}>
                         <Text style={styles.statusText}>
-                          COUNTER-OFFER PENDING
+                          {t("counterOfferPending")}
                         </Text>
                       </View>
                     )}
                     {effectiveState === "counter_accepted" && (
                       <View style={[styles.statusPill, styles.statusAccepted]}>
                         <Text style={styles.statusText}>
-                          COUNTER-OFFER ACCEPTED
+                          {t("counterOfferAccepted")}
                         </Text>
                       </View>
                     )}
-                    {effectiveState === "withdrawn" && (
+                    {(effectiveState as string) === "withdrawn" && (
                       <View style={[styles.statusPill, styles.statusWithdrawn]}>
-                        <Text style={styles.statusText}>WITHDRAWN</Text>
+                        <Text style={styles.statusText}>
+                          {t("offerWithdrawn")}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -844,15 +860,15 @@ export default function MyOffersScreen() {
                       >
                         <Text style={styles.btnPrimaryText}>
                           {offerState === "rejected"
-                            ? "Send new offer"
-                            : "Send offer"}
+                            ? t("sendNewOffer")
+                            : t("sendOffer")}
                         </Text>
                       </Pressable>
                     )}
 
                     {counterPending && (
                       <Text style={styles.skippedHint}>
-                        A counter-offer is pending. Respond to it above.
+                        {t("counterOfferPendingHint")}
                       </Text>
                     )}
 
@@ -861,13 +877,13 @@ export default function MyOffersScreen() {
                         style={styles.btnPrimary}
                         onPress={() => openChat(request.id)}
                       >
-                        <Text style={styles.btnPrimaryText}>Chat</Text>
+                        <Text style={styles.btnPrimaryText}>{t("chat")}</Text>
                       </Pressable>
                     )}
 
                     {direction === "left" && (
                       <Text style={styles.skippedHint}>
-                        Skipped items are read-only.
+                        {t("skippedItemsReadOnly")}
                       </Text>
                     )}
                   </View>

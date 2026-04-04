@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 type OfferStatus = "pending" | "accepted" | "rejected" | "withdrawn";
@@ -24,6 +25,7 @@ type OfferRow = {
 };
 
 export default function CreateOfferModal() {
+  const t = useTranslation();
   const params = useLocalSearchParams();
   const requestId = (params?.requestId as string) ?? "";
 
@@ -90,28 +92,26 @@ export default function CreateOfferModal() {
 
   const disabledReason = useMemo(() => {
     if (!latestOffer) return "";
-    if (latestOffer.status === "pending")
-      return "You already have a pending offer for this request.";
-    if (latestOffer.status === "accepted")
-      return "Your offer was accepted. Chat will be available soon.";
+    if (latestOffer.status === "pending") return t("offerAlreadyPending");
+    if (latestOffer.status === "accepted") return t("offerAccepted");
     return "";
-  }, [latestOffer]);
+  }, [latestOffer, t]);
 
   const onSubmit = async () => {
     const p = Number(price);
 
     if (!requestId) {
-      Alert.alert("Error", "Missing requestId");
+      Alert.alert(t("error"), t("missingRequestId"));
       return;
     }
 
     if (!Number.isFinite(p) || p <= 0) {
-      Alert.alert("Invalid price", "Please enter a valid numeric price.");
+      Alert.alert(t("invalidPrice"), t("invalidPrice"));
       return;
     }
 
     if (description.trim().length < 3) {
-      Alert.alert("Invalid description", "Please write a short description.");
+      Alert.alert(t("invalidDescription"), t("invalidDescription"));
       return;
     }
 
@@ -119,14 +119,14 @@ export default function CreateOfferModal() {
     const uid = sess.session?.user.id;
 
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in to send an offer.");
+      Alert.alert(t("signInRequired"), t("pleaseSignIn"));
       router.push("/sign-in" as any);
       return;
     }
 
     // Block only if latest is pending/accepted
     if (!canSend) {
-      Alert.alert("Offer not allowed", disabledReason || "Cannot send offer.");
+      Alert.alert(t("offerNotAllowed"), disabledReason || t("cannotSendOffer"));
       return;
     }
 
@@ -146,19 +146,16 @@ export default function CreateOfferModal() {
     if (error) {
       // Unique pending index will throw 23505 if a pending exists
       if ((error as any).code === "23505") {
-        Alert.alert(
-          "Offer already pending",
-          "You already have a pending offer for this request.",
-        );
+        Alert.alert(t("offerSent"), t("offerAlreadyPending"));
         loadLatestOffer();
         return;
       }
 
-      Alert.alert("Error", error.message);
+      Alert.alert(t("error"), error.message);
       return;
     }
 
-    Alert.alert("Sent", "Your offer was sent.");
+    Alert.alert(t("sent"), t("offerSent"));
     router.back();
   };
 
@@ -167,20 +164,20 @@ export default function CreateOfferModal() {
       <View style={styles.page}>
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t("back")}</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Send offer</Text>
+          <Text style={styles.headerTitle}>{t("sendOffer")}</Text>
           <View style={{ width: 56 }} />
         </View>
 
         {checking ? (
           <View style={styles.infoBox}>
-            <Text style={styles.infoText}>Checking existing offers…</Text>
+            <Text style={styles.infoText}>{t("checkingOffers")}</Text>
           </View>
         ) : latestOffer ? (
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              Latest offer status:{" "}
+              {t("latestOfferStatus")}{" "}
               <Text style={{ fontWeight: "900" }}>
                 {latestOffer.status.toUpperCase()}
               </Text>
@@ -194,27 +191,29 @@ export default function CreateOfferModal() {
 
             {latestOffer.status === "rejected" && (
               <Text style={[styles.infoText, { marginTop: 6 }]}>
-                Your last offer was rejected — you can send a new one.
+                {t("lastOfferRejected")}
               </Text>
             )}
           </View>
         ) : null}
 
-        <Text style={styles.label}>Price</Text>
+        <Text style={styles.label}>{t("price")}</Text>
         <TextInput
           value={price}
           onChangeText={setPrice}
           keyboardType="numeric"
-          placeholder="e.g. 1200"
+          placeholder={t("examplePrice")}
           placeholderTextColor={theme.secondaryText}
           style={styles.input}
         />
 
-        <Text style={[styles.label, { marginTop: 12 }]}>Description</Text>
+        <Text style={[styles.label, { marginTop: 12 }]}>
+          {t("description")}
+        </Text>
         <TextInput
           value={description}
           onChangeText={setDescription}
-          placeholder="Short message for the requester"
+          placeholder={t("shortMessagePlaceholder")}
           placeholderTextColor={theme.secondaryText}
           style={[styles.input, styles.textArea]}
           multiline
@@ -230,7 +229,7 @@ export default function CreateOfferModal() {
           disabled={!canSend || loading}
         >
           <Text style={styles.ctaText}>
-            {loading ? "Sending..." : "Send offer"}
+            {loading ? t("sending") : t("sendOffer")}
           </Text>
         </Pressable>
       </View>

@@ -8,6 +8,7 @@ export const translations = {
 
     // Common
     loading: "Loading...",
+    loadingEllipsis: "Loading…",
     error: "Error",
     cancel: "Cancel",
     delete: "Delete",
@@ -17,17 +18,25 @@ export const translations = {
     close: "Close",
     back: "Back",
     language: "Language",
+    nothingHere: "Nothing here",
+    createARequest: "Create a request to see it here.",
+    postedAt: "Posted at",
+    review: "Review",
+    offer: "offer",
+    offers: "offers",
 
     // Marketplace / Discovery
     searchPlaceholder: "Search services...",
     filterBy: "Filter by",
-    allCategories: "All",
     vehicles: "Vehicles",
     realEstate: "Real Estate",
     services: "Services",
     electronics: "Electronics & Tech",
     fashion: "Fashion & Personal",
     other: "Other",
+    postedBy: "Posted by",
+    posted: "Posted",
+    remaining_left: "remaining",
 
     // Request / Offer Flow
     sendOffer: "Send offer",
@@ -58,12 +67,48 @@ export const translations = {
     typingIndicator: "typing...",
     online: "online",
     offline: "offline",
+    chatNotAvailable: "Chat not available yet",
+    chatOpensOnAccept:
+      "The chat opens once an offer or counter-offer is accepted.",
+    writeMessage: "Write a message…",
+    dealClosed: "This deal is closed",
+    chatOnlyNegotiating: "Chat available only while negotiating",
+    sayHi: "Say hi 👋",
+    agreed: "Agreed",
+    openRequestPage: "Open request page",
+    collapse: "Collapse",
+    closeDeal: "Close deal",
+    waitingConfirmation: "Waiting for confirmation…",
+    undo: "Undo",
+    otherUserRequested: "Other user requested",
+    confirm: "Confirm",
+    dismiss: "Dismiss",
+
+    // Offers Screen
+    offersHeader: "Offers",
+    offerWithdrawnTitle: "Offer withdrawn",
+    offerWithdrawnMsg: "The seller withdrew this offer.",
+    counterOfferLabel: "Counter-offer",
+    counterStatus: "Counter status",
+    counterAlreadySent: "Counter-offer already sent",
+    counterAlreadySentMsg:
+      "You already sent a counter-offer for this seller. Wait for them to accept/reject it.",
+    viewCounter: "View counter",
+    rejectOfferTitle: "Reject offer",
+    chooseOption: "Choose an option:",
+    offersWithdrawnWarning_one: "offer was withdrawn by sellers.",
+    offersWithdrawnWarning_other: "offers were withdrawn by sellers.",
+    noOffersInFilter: "There are no offers in this filter.",
 
     // Offer Status
     pending: "Pending",
+    pendingStatus: "PENDING",
     accepted: "Accepted",
+    acceptedStatus: "ACCEPTED",
     rejected: "Rejected",
+    rejectedStatus: "REJECTED",
     withdrawn: "Withdrawn",
+    withdrawnStatus: "WITHDRAWN",
     interested: "Interested",
     skipped: "Skipped",
     open: "OPEN",
@@ -73,6 +118,9 @@ export const translations = {
     // Request Detail
     requestNotFound: "Request not found",
     deleteRequest: "Delete request",
+    deleteRequestConfirm: "Delete request?",
+    deleteRequestMsg:
+      "This will permanently delete your request (and its offers).",
     deleteConfirm: "Are you sure you want to delete this request?",
     title: "Title",
     category: "Category",
@@ -81,13 +129,40 @@ export const translations = {
     location: "Location",
     yourRequests: "Your Requests",
     noRequests: "No requests yet",
+    noOffersYet: "No offers yet",
+    noPendingOffers: "No pending offers",
+    withdrawnOffers: "Withdrawn",
     viewOffers: "View Offers",
 
     // My Offers
     yourOffers: "Your Offers",
     allOffers: "All Offers",
     noOffers: "No offers yet",
-    offers: "Offers",
+    hideNegotiation: "Hide negotiation",
+    showNegotiation: "Show negotiation",
+    negotiation: "Negotiation",
+    current: "CURRENT",
+    noOfferYet: "NO OFFER YET",
+    offerPending: "OFFER PENDING",
+    rejectedCanResend: "REJECTED — YOU CAN RESEND",
+    counterOfferPending: "COUNTER-OFFER PENDING",
+    counterOfferAccepted: "COUNTER-OFFER ACCEPTED",
+    acceptCounter: "Accept counter",
+    reject: "Reject",
+    accept: "Accept",
+    sendNewOffer: "Send new offer",
+    counterOfferPendingHint: "A counter-offer is pending. Respond to it above.",
+    skippedItemsReadOnly: "Skipped items are read-only.",
+    withdrawOfferConfirm: "Withdraw offer?",
+    withdrawOfferMsg: "This will withdraw your offer.",
+    offerWithdrawn: "Withdrawn",
+    yourOfferWithdrawn: "Your offer was withdrawn.",
+    requestNotUpdated: "Request not updated",
+    counterAcceptedText: "Counter-offer accepted. Request is now negotiating.",
+    fetchingSwipesOffers: "Fetching swipes & offers",
+    noItemsInFilter: "No items in this filter.",
+    goToMarketplace: "Go to Marketplace",
+    counterOfferFrom: "'s counter offer",
 
     // Settings & Profile
     logIn: "Log in",
@@ -100,6 +175,9 @@ export const translations = {
     deals: "Deals",
     noAccount: "No account",
     version: "Version",
+    currency: "Currency",
+    ron: "RON (Lei)",
+    eur: "EUR (Euro)",
 
     // Status Labels
     requestsCount: "Requests",
@@ -133,6 +211,83 @@ export const translations = {
     iWantToBuyOrRequest: "I want to buy or request a service",
     viewActiveRequests: "View active requests",
     iWantToRespond: "I want to respond to existing requests",
+
+    // Sign In Screen
+    accountCreatedConfirm:
+      "Account created. Check your email to confirm, then sign in.",
+    signinHeader: "Sign in",
+    emailPlaceholder: "Email",
+    passwordPlaceholder: "Password",
+    working: "Working...",
+    post: "Post",
+    posting: "Posting...",
+
+    // Create Request Modal
+    requestTitle: "Request title",
+    exampleRequestTitle: "e.g. iPhone 14 Pro, used",
+    descriptionPlaceholder: "Describe what you need, condition, details...",
+    type: "Type",
+    product: "Product",
+    service: "Service",
+    budgetRange: "Budget range",
+    min: "Min",
+    max: "Max",
+    locationOptional: "Location (optional)",
+    exampleLocation: "e.g. Bucharest / Remote",
+    couldNotPostRequest: "Could not post request",
+
+    // Marketplace Screen
+    searchRequests: "Search requests",
+    fetchingRequests: "Fetching requests",
+    noMoreRequests: "No more requests",
+    tryCategoryOrSearch: "Try another category or search.",
+    refresh: "Refresh",
+    marketplaceError: "Marketplace error",
+
+    // Create Offer Modal
+    missingRequestId: "Missing requestId",
+    cannotSendOffer: "Cannot send offer.",
+    sent: "Sent",
+    yourCounterPrice: "Your counter price",
+    examplePrice: "e.g. 1200",
+    shortMessagePlaceholder: "Short message for the requester",
+
+    // Counter Offer Modal
+    missingInfo: "Missing info",
+    enterValidCounterPrice: "Please enter a valid counter price and message.",
+    pleaseSignInCounterOffer: "Please sign in to send a counter-offer.",
+    counterOfferSent: "Counter-offer sent",
+    rejectWithOffer: "Reject with offer",
+    rejectingWithCounterPrice:
+      "You are rejecting the seller's offer and sending a counter price.",
+    exampleCounterPrice: "e.g. 2100",
+    exampleCounterMessage: "e.g. I can do 2100€ if you can deliver this week.",
+    message: "Message",
+    sendCounterOffer: "Send counter-offer",
+
+    // Edit Offer Modal
+    missingOfferId: "Missing offerId",
+    enterValidPrice: "Please enter a valid price.",
+    notAllowed: "Not allowed",
+    cantEditAcceptedOffer: "You can't edit an accepted offer.",
+    cantEditWithdrawnOffer: "You can't edit a withdrawn offer.",
+    notUpdated: "Not updated",
+    noRowsUpdated: "No rows were updated (RLS or invalid offer).",
+    editOffer: "Edit offer",
+    priceLabel: "Price (€)",
+    updateOfferPlaceholder: "Update your offer description…",
+    saving: "Saving…",
+
+    // Filters Modal
+    filters: "Filters",
+    comingSoon: "Coming soon…",
+
+    // Request Detail Screen
+    postedTemplate: "Posted {{date}}",
+    requestClosed: "Request closed",
+    withdrawOffer: "Withdraw offer",
+    notFound: "Not found",
+    offerNotFound: "Offer not found",
   },
   ro: {
     // Navigation & Tabs
@@ -143,6 +298,7 @@ export const translations = {
 
     // Common
     loading: "Se încarcă...",
+    loadingEllipsis: "Se încarcă…",
     error: "Eroare",
     cancel: "Anulează",
     delete: "Șterge",
@@ -152,17 +308,25 @@ export const translations = {
     close: "Închide",
     back: "Înapoi",
     language: "Limbă",
+    nothingHere: "Nimic aici",
+    createARequest: "Creează o cerere pentru a o vedea aici.",
+    postedAt: "Postat la",
+    review: "Revizuire",
+    offer: "ofertă",
+    offers: "oferte",
 
     // Marketplace / Discovery
     searchPlaceholder: "Caută servicii...",
     filterBy: "Filtrează după",
-    allCategories: "Toate",
     vehicles: "Vehicule",
     realEstate: "Imobiliare",
     services: "Servicii",
     electronics: "Electronice & IT",
     fashion: "Modă & Personal",
     other: "Altele",
+    postedBy: "Postat de",
+    posted: "Postat",
+    remaining_left: "rămase",
 
     // Request / Offer Flow
     sendOffer: "Trimite ofertă",
@@ -189,27 +353,66 @@ export const translations = {
     messages: "Mesaje",
     typeMessage: "Tastează un mesaj...",
     noMessages: "Niciun mesaj încă",
-    today: "Astazi",
+    today: "Astăzi",
     yesterday: "Ieri",
     youTyped: "Tu",
     typingIndicator: "scrie...",
     online: "online",
     offline: "offline",
+    chatNotAvailable: "Chat indisponibil încă",
+    chatOpensOnAccept:
+      "Chat-ul se deschide când o ofertă sau contraofertă este acceptată.",
+    writeMessage: "Scrie un mesaj…",
+    dealClosed: "Această tranzacție este închisă",
+    chatOnlyNegotiating: "Chat-ul este disponibil doar în negociere",
+    sayHi: "Salută 👋",
+    agreed: "Agreat",
+    openRequestPage: "Deschide cererea",
+    collapse: "Restrânge",
+    closeDeal: "Închide tranzacția",
+    waitingConfirmation: "Se așteaptă confirmare…",
+    undo: "Anulează",
+    otherUserRequested: "Celălalt utilizator a solicitat",
+    confirm: "Confirmă",
+    dismiss: "Respinge",
+
+    // Offers Screen
+    offersHeader: "Oferte",
+    offerWithdrawnTitle: "Ofertă retrasă",
+    offerWithdrawnMsg: "Vânzătorul a retras această ofertă.",
+    counterOfferLabel: "Contraofertă",
+    counterStatus: "Status contraofertă",
+    counterAlreadySent: "Contraofertă deja trimisă",
+    counterAlreadySentMsg:
+      "Ai trimis deja o contraofertă pentru acest vânzător. Așteaptă răspunsul lor.",
+    viewCounter: "Vezi contraoferta",
+    rejectOfferTitle: "Respinge oferta",
+    chooseOption: "Alege o opțiune:",
+    offersWithdrawnWarning_one: "ofertă a fost retrasă de vânzători.",
+    offersWithdrawnWarning_other: "oferte au fost retrase de vânzători.",
+    noOffersInFilter: "Nu există oferte în acest filtru.",
 
     // Offer Status
     pending: "În așteptare",
+    pendingStatus: "ÎN AȘTEPTARE",
     accepted: "Acceptat",
+    acceptedStatus: "ACCEPTAT",
     rejected: "Respins",
+    rejectedStatus: "RESPINS",
     withdrawn: "Retras",
+    withdrawnStatus: "RETRAS",
     interested: "Interesat",
     skipped: "Sărit",
     open: "DESCHIS",
-    negotiating: "NEGOCIEZ",
+    negotiating: "SE NEGOCIAZA",
     closed: "ÎNCHIS",
 
     // Request Detail
     requestNotFound: "Cerere nu a fost găsită",
     deleteRequest: "Șterge cererea",
+    deleteRequestConfirm: "Șterge cererea?",
+    deleteRequestMsg:
+      "Aceasta va șterge permanent cererea ta (și ofertele acesteia).",
     deleteConfirm: "Ești sigur că vrei să ștergi această cerere?",
     title: "Titlu",
     category: "Categorie",
@@ -218,13 +421,42 @@ export const translations = {
     location: "Locație",
     yourRequests: "Cererile tale",
     noRequests: "Nicio cerere încă",
+    noOffersYet: "Nicio ofertă încă",
+    noPendingOffers: "Nicio ofertă în așteptare",
+    withdrawnOffers: "Retrase",
     viewOffers: "Vezi ofertele",
 
     // My Offers
     yourOffers: "Ofertele tale",
     allOffers: "Toate ofertele",
     noOffers: "Nicio ofertă încă",
-    offers: "Oferte",
+    hideNegotiation: "Ascunde negocierea",
+    showNegotiation: "Arată negocierea",
+    negotiation: "Negociere",
+    current: "ACTUAL",
+    noOfferYet: "NICIO OFERTĂ ÎNCĂ",
+    offerPending: "OFERTĂ ÎN AŞTEPTARE",
+    rejectedCanResend: "RESPINS — POȚI RETRIMITE",
+    counterOfferPending: "CONTRAOFERTĂ ÎN AŞTEPTARE",
+    counterOfferAccepted: "CONTRAOFERTĂ ACCEPTATĂ",
+    acceptCounter: "Acceptă contraofertă",
+    reject: "Respinge",
+    accept: "Acceptă",
+    sendNewOffer: "Trimite ofertă nouă",
+    counterOfferPendingHint:
+      "O contraofertă este în aşteptare. Răspunde mai sus.",
+    skippedItemsReadOnly: "Elementele sărite sunt doar pentru citire.",
+    withdrawOfferConfirm: "Retrage oferta?",
+    withdrawOfferMsg: "Aceasta va retrage oferta ta.",
+    offerWithdrawn: "Retras",
+    yourOfferWithdrawn: "Oferta ta a fost retrasă.",
+    requestNotUpdated: "Cererea nu a fost actualizată",
+    counterAcceptedText:
+      "Contraofertă acceptată. Cererea este acum în negociere.",
+    fetchingSwipesOffers: "Se aduc swipuri și oferte",
+    noItemsInFilter: "Nicio ofertă în acest filtru.",
+    goToMarketplace: "Du-te pe Piață",
+    counterOfferFrom: "contraofertă de la",
 
     // Settings & Profile
     logIn: "Conectare",
@@ -237,6 +469,9 @@ export const translations = {
     deals: "Tranzacții",
     noAccount: "Fără cont",
     version: "Versiune",
+    currency: "Monedă",
+    ron: "RON (Lei)",
+    eur: "EUR (Euro)",
 
     // Status Labels
     requestsCount: "Cereri",
@@ -270,5 +505,85 @@ export const translations = {
     iWantToBuyOrRequest: "Vreau să cumpăr sau să solicit un serviciu",
     viewActiveRequests: "Vezi cererile active",
     iWantToRespond: "Vreau să răspund la cererile existente",
+
+    // Sign In Screen
+    accountCreatedConfirm:
+      "Cont creat. Verifică email-ul pentru confirmare, apoi conectează-te.",
+    signinHeader: "Conectare",
+    emailPlaceholder: "Email",
+    passwordPlaceholder: "Parolă",
+    working: "Se lucrează...",
+    post: "Postează",
+    posting: "Se postează...",
+
+    // Create Request Modal
+    requestTitle: "Titlul cererii",
+    exampleRequestTitle: "ex. iPhone 14 Pro, folosit",
+    descriptionPlaceholder: "Descrie ce ai nevoie, stare, detalii...",
+    type: "Tip",
+    product: "Produs",
+    service: "Serviciu",
+    budgetRange: "Interval buget",
+    min: "Min",
+    max: "Max",
+    locationOptional: "Locație (opțional)",
+    exampleLocation: "ex. București / Remote",
+    couldNotPostRequest: "Nu s-a putut posta cererea",
+
+    // Marketplace Screen
+    searchRequests: "Caută cereri",
+    fetchingRequests: "Se aduc cererile",
+    noMoreRequests: "Nu mai sunt cereri",
+    tryCategoryOrSearch: "Încearcă o altă categorie sau caut.",
+    refresh: "Reîncarcă",
+    marketplaceError: "Eroare piață",
+
+    // Create Offer Modal
+    missingRequestId: "RequestId lipsă",
+    cannotSendOffer: "Nu se poate trimite ofertă.",
+    sent: "Trimis",
+    yourCounterPrice: "Prețul tău contraofertă",
+    examplePrice: "ex. 1200",
+    shortMessagePlaceholder: "Mesaj scurt pentru solicitant",
+
+    // Counter Offer Modal
+    missingInfo: "Informații lipsă",
+    enterValidCounterPrice: "Te rog introdu un preț valid și un mesaj.",
+    pleaseSignInCounterOffer:
+      "Te rog conectează-te pentru a trimite o contraofertă.",
+    counterOfferSent: "Contraofertă trimisă",
+    rejectWithOffer: "Respinge cu ofertă",
+    rejectingWithCounterPrice:
+      "Respingi oferta vânzătorului și trimiți un preț contraofertă.",
+    exampleCounterPrice: "ex. 2100",
+    exampleCounterMessage:
+      "ex. Pot face 2100€ dacă poți livra săptămâna aceasta.",
+    message: "Mesaj",
+    sendCounterOffer: "Trimite contraofertă",
+
+    // Edit Offer Modal
+    missingOfferId: "OfferId lipsă",
+    enterValidPrice: "Te rog introdu un preț valid.",
+    notAllowed: "Nu este permis",
+    cantEditAcceptedOffer: "Nu poți edita o ofertă acceptată.",
+    cantEditWithdrawnOffer: "Nu poți edita o ofertă retrasă.",
+    notUpdated: "Nu a fost actualizat",
+    noRowsUpdated:
+      "Nicio linie nu a fost actualizată (RLS sau ofertă invalidă).",
+    editOffer: "Editează ofertă",
+    priceLabel: "Preț (€)",
+    updateOfferPlaceholder: "Actualizează descrierea ofertei…",
+    saving: "Se salvează…",
+
+    // Filters Modal
+    filters: "Filtre",
+    comingSoon: "Curând…",
+
+    // Request Detail Screen
+    postedTemplate: "Postat {{date}}",
+    requestClosed: "Cerere închisă",
+    withdrawOffer: "Retrage ofertă",
+    notFound: "Nu a fost găsit",
+    offerNotFound: "Ofertă nu a fost găsită",
   },
 };

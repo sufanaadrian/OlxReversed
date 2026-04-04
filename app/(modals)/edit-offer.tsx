@@ -10,9 +10,11 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 export default function EditOfferModal() {
+  const t = useTranslation();
   const params = useLocalSearchParams();
 
   const offerId = (params?.offerId as string) ?? "";
@@ -89,7 +91,7 @@ export default function EditOfferModal() {
           </Pressable>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.h1}>Edit offer</Text>
+            <Text style={styles.h1}>{t("editOffer")}</Text>
             {!!requestId && (
               <Text style={styles.sub} numberOfLines={1}>
                 Request: {requestId}
@@ -99,20 +101,22 @@ export default function EditOfferModal() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Price (€)</Text>
+          <Text style={styles.label}>{t("priceLabel")}</Text>
           <TextInput
             value={price}
             onChangeText={setPrice}
             keyboardType="numeric"
-            placeholder="e.g. 100"
+            placeholder={t("examplePrice")}
             style={styles.input}
           />
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Description</Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>
+            {t("description")}
+          </Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Update your offer description…"
+            placeholder={t("updateOfferPlaceholder")}
             style={[styles.input, styles.textArea]}
             multiline
           />
@@ -123,7 +127,7 @@ export default function EditOfferModal() {
             style={[styles.btnPrimary, saving && { opacity: 0.7 }]}
           >
             <Text style={styles.btnPrimaryText}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? t("saving") : t("save")}
             </Text>
           </Pressable>
         </View>

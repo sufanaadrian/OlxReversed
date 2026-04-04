@@ -3,10 +3,11 @@ import { Tabs, router } from "expo-router";
 import React, { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTranslation } from "../../src/context/LanguageContext";
+import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
 
 export default function TabsLayout() {
   const [open, setOpen] = useState(false);
+  const { language } = useLanguage();
   const t = useTranslation();
 
   const close = () => setOpen(false);
@@ -28,6 +29,7 @@ export default function TabsLayout() {
     >
       <>
         <Tabs
+          key={language}
           initialRouteName="marketplace"
           screenOptions={{
             headerShown: false,

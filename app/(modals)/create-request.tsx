@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 const categories = [
@@ -23,9 +24,19 @@ const categories = [
   "Other",
 ] as const;
 
+const categoryTranslationKeys: Record<string, string> = {
+  Vehicles: "vehicles",
+  "Real Estate": "realEstate",
+  Services: "services",
+  "Electronics & Tech": "electronics",
+  "Fashion & Personal": "fashion",
+  Other: "other",
+};
+
 type RequestType = "product" | "service";
 
 export default function CreateRequestModal() {
+  const t = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] =
@@ -81,7 +92,7 @@ export default function CreateRequestModal() {
 
       router.back(); // close modal and return to previous screen
     } catch (e: any) {
-      Alert.alert("Could not post request", e?.message ?? "Unknown error");
+      Alert.alert(t("couldNotPostRequest"), e?.message ?? "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -96,10 +107,10 @@ export default function CreateRequestModal() {
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>Cancel</Text>
+            <Text style={styles.headerBtnText}>{t("cancel")}</Text>
           </Pressable>
 
-          <Text style={styles.headerTitle}>Create Request</Text>
+          <Text style={styles.headerTitle}>{t("postARequest")}</Text>
 
           <Pressable
             onPress={submit}
@@ -110,7 +121,7 @@ export default function CreateRequestModal() {
             ]}
           >
             <Text style={styles.headerBtnPrimaryText}>
-              {loading ? "Posting..." : "Post"}
+              {loading ? t("posting") : t("post")}
             </Text>
           </Pressable>
         </View>
@@ -120,28 +131,28 @@ export default function CreateRequestModal() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Title */}
-          <Text style={styles.label}>Request title</Text>
+          <Text style={styles.label}>{t("requestTitle")}</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. iPhone 14 Pro, used"
+            placeholder={t("exampleRequestTitle")}
             placeholderTextColor={theme.secondaryText}
             style={styles.input}
           />
 
           {/* Description */}
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>{t("description")}</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Describe what you need, condition, details..."
+            placeholder={t("descriptionPlaceholder")}
             placeholderTextColor={theme.secondaryText}
             style={[styles.input, styles.textarea]}
             multiline
           />
 
           {/* Type */}
-          <Text style={styles.label}>Type</Text>
+          <Text style={styles.label}>{t("type")}</Text>
           <View style={styles.segment}>
             <Pressable
               onPress={() => setType("product")}
@@ -156,7 +167,7 @@ export default function CreateRequestModal() {
                   type === "product" && styles.segmentTextActive,
                 ]}
               >
-                Product
+                {t("product")}
               </Text>
             </Pressable>
             <Pressable
@@ -172,13 +183,13 @@ export default function CreateRequestModal() {
                   type === "service" && styles.segmentTextActive,
                 ]}
               >
-                Service
+                {t("service")}
               </Text>
             </Pressable>
           </View>
 
           {/* Category */}
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>{t("category")}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -198,7 +209,7 @@ export default function CreateRequestModal() {
                       selected && styles.chipTextSelected,
                     ]}
                   >
-                    {c}
+                    {t(categoryTranslationKeys[c] || "other")}
                   </Text>
                 </Pressable>
               );
@@ -206,13 +217,13 @@ export default function CreateRequestModal() {
           </ScrollView>
 
           {/* Budget */}
-          <Text style={styles.label}>Budget range</Text>
+          <Text style={styles.label}>{t("budgetRange")}</Text>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <TextInput
                 value={budgetMin}
                 onChangeText={setBudgetMin}
-                placeholder="Min"
+                placeholder={t("min")}
                 placeholderTextColor={theme.secondaryText}
                 keyboardType="number-pad"
                 style={styles.input}
@@ -223,7 +234,7 @@ export default function CreateRequestModal() {
               <TextInput
                 value={budgetMax}
                 onChangeText={setBudgetMax}
-                placeholder="Max"
+                placeholder={t("max")}
                 placeholderTextColor={theme.secondaryText}
                 keyboardType="number-pad"
                 style={styles.input}
@@ -232,11 +243,11 @@ export default function CreateRequestModal() {
           </View>
 
           {/* Location */}
-          <Text style={styles.label}>Location (optional)</Text>
+          <Text style={styles.label}>{t("locationOptional")}</Text>
           <TextInput
             value={location}
             onChangeText={setLocation}
-            placeholder="e.g. Bucharest / Remote"
+            placeholder={t("exampleLocation")}
             placeholderTextColor={theme.secondaryText}
             style={styles.input}
           />

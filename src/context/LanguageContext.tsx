@@ -14,7 +14,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 );
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en");
+  const [language, setLanguageState] = useState<Language>("ro");
 
   // Load saved language preference on mount
   useEffect(() => {
@@ -59,6 +59,7 @@ export function useLanguage() {
 }
 
 export function useTranslation() {
+  const { language } = useLanguage(); // Make hook reactive to language changes
   return (key: string): string => {
     return (i18n as any).t(key);
   };
