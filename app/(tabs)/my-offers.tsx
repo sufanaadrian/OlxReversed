@@ -349,8 +349,12 @@ export default function MyOffersScreen() {
     } as any);
   };
 
-  const chatSoon = () =>
-    Alert.alert("Soon", "Chat functionality will be added soon");
+  const openChat = (requestId: string) => {
+    router.push({
+      pathname: "/request/[id]/chat",
+      params: { id: requestId },
+    } as any);
+  };
 
   const acceptCounter = async (counter: CounterOfferRow) => {
     const { error: cErr } = await supabase
@@ -853,7 +857,10 @@ export default function MyOffersScreen() {
                     )}
 
                     {(offerState === "accepted" || counterAccepted) && (
-                      <Pressable style={styles.btnPrimary} onPress={chatSoon}>
+                      <Pressable
+                        style={styles.btnPrimary}
+                        onPress={() => openChat(request.id)}
+                      >
                         <Text style={styles.btnPrimaryText}>Chat</Text>
                       </Pressable>
                     )}
