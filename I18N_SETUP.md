@@ -2,15 +2,15 @@
 
 ## Overview
 
-This app now supports both English (`en`) and Romanian (`ro`) languages with automatic device language detection and persistence.
+This app supports both English (`en`) and Romanian (`ro`) languages with persistence across sessions.
 
 ## How to Use
 
 ### For Users
 
-1. **Automatic Detection**: The app automatically detects your device's language and loads English or Romanian accordingly.
-2. **Manual Language Switch**: Go to **Profile → Language** to toggle between English 🇬🇧 and Română 🇷🇴
-3. **Persistence**: Your language choice is saved and will be remembered when you reopen the app.
+1. **Manual Language Switch**: Go to **Profile → Language** to toggle between English 🇬🇧 and Română 🇷🇴
+2. **Persistence**: Your language choice is saved and will be remembered when you reopen the app.
+3. **Default Language**: Romanian (`ro`) is the default on first launch.
 
 ### For Developers
 
@@ -44,11 +44,19 @@ function MyComponent() {
 #### Supported Screens (Already Updated)
 
 - ✅ Profile Screen
-- ✅ Tabs Navigation
-- ⏳ Marketplace (next)
-- ⏳ My Requests (next)
-- ⏳ Create Request (next)
-- ⏳ Chat (next)
+- ✅ Tabs Navigation (`_layout.tsx`)
+- ✅ Marketplace
+- ✅ My Requests
+- ✅ My Offers
+- ✅ Create Request
+- ✅ Create Offer
+- ✅ Counter Offer
+- ✅ Edit Offer
+- ✅ Chat
+- ✅ Request Detail
+- ✅ Offers List
+- ✅ Filters
+- ✅ Sign In
 
 #### To Update More Screens
 
@@ -68,17 +76,21 @@ const t = useTranslation();
 ## Architecture
 
 - **`src/i18n/translations.ts`** - All translation strings (English & Romanian)
-- **`src/i18n/index.ts`** - i18n configuration & device language detection
+- **`src/i18n/index.ts`** - i18n configuration (singleton, defaults to `"ro"`)
 - **`src/context/LanguageContext.tsx`** - React Context for language state & switching
-- **`app/_layout.tsx`** - Wraps entire app with LanguageProvider
+- **`src/context/CurrencyContext.tsx`** - React Context for currency state (RON/EUR)
+- **`app/_layout.tsx`** - Wraps entire app with `LanguageProvider` and `CurrencyProvider`
 
 ## Current Translations Supported
 
 - Navigation tabs
-- Profile settings
+- Profile settings and auth
 - Common UI elements (buttons, labels, status messages)
 - Months and dates
-- Offer/request workflow
+- Offer/request workflow (create, edit, counter-offer)
+- Marketplace (swipe cards, categories, filters)
+- Chat screen
+- All alert dialogs
 
 ## Testing
 
@@ -87,14 +99,4 @@ const t = useTranslation();
 1. Run the app
 2. Go to Profile
 3. Click 🇷🇴 Română or 🇬🇧 English
-4. Observe all hardcoded strings update instantly
-
-**Device Language Detection:**
-
-- If device is set to Romanian → Shows Romanian
-- If device is set to any other language → Shows English
-- User can override in settings
-
-## Next Steps
-
-Gradually update all remaining screens to use `t("key")` instead of hardcoded strings.
+4. Observe all strings update instantly

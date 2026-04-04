@@ -128,7 +128,7 @@ export default function MyOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (swipeErr) {
-      Alert.alert("Error", swipeErr.message);
+      Alert.alert(t("error"), swipeErr.message);
       if (showSpinner) setLoading(false);
       return;
     }
@@ -166,7 +166,7 @@ export default function MyOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (offerErr) {
-      Alert.alert("Error", offerErr.message);
+      Alert.alert(t("error"), offerErr.message);
       setOffers([]);
       if (showSpinner) setLoading(false);
       return;
@@ -184,7 +184,7 @@ export default function MyOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (counterErr) {
-      Alert.alert("Error", counterErr.message);
+      Alert.alert(t("error"), counterErr.message);
       setCounterOffers([]);
       if (showSpinner) setLoading(false);
       return;
@@ -399,7 +399,7 @@ export default function MyOffersScreen() {
       .update({ status: "rejected" })
       .eq("id", counter.id);
 
-    if (error) return Alert.alert("Error", error.message);
+    if (error) return Alert.alert(t("error"), error.message);
 
     load(false);
   };
@@ -426,7 +426,7 @@ export default function MyOffersScreen() {
       .eq("id", offerId)
       .select("id,status");
 
-    if (error) return Alert.alert("Error", error.message);
+    if (error) return Alert.alert(t("error"), error.message);
 
     if (!data || data.length === 0) {
       Alert.alert(t("notUpdated"), t("noRowsUpdated"));

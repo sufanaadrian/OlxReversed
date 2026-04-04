@@ -106,12 +106,12 @@ export default function CreateOfferModal() {
     }
 
     if (!Number.isFinite(p) || p <= 0) {
-      Alert.alert(t("invalidPrice"), t("invalidPrice"));
+      Alert.alert(t("invalidPriceTitle"), t("invalidPrice"));
       return;
     }
 
     if (description.trim().length < 3) {
-      Alert.alert(t("invalidDescription"), t("invalidDescription"));
+      Alert.alert(t("invalidDescriptionTitle"), t("invalidDescription"));
       return;
     }
 
@@ -146,7 +146,7 @@ export default function CreateOfferModal() {
     if (error) {
       // Unique pending index will throw 23505 if a pending exists
       if ((error as any).code === "23505") {
-        Alert.alert(t("offerSent"), t("offerAlreadyPending"));
+        Alert.alert(t("offerAlreadyPendingTitle"), t("offerAlreadyPending"));
         loadLatestOffer();
         return;
       }

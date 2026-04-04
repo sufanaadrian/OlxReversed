@@ -83,6 +83,19 @@ export const translations = {
     otherUserRequested: "Other user requested",
     confirm: "Confirm",
     dismiss: "Dismiss",
+    pickerFailed: "Picker failed",
+    sendFailed: "Send failed",
+    uploadFailed: "Upload failed",
+    photosPermission: "Photos permission",
+    allowPhotosAccess: "Please allow Photos access.",
+    galleryFailed: "Gallery failed",
+    cameraPermission: "Camera permission",
+    allowCameraAccess: "Please allow Camera access.",
+    pleaseSignInGeneric: "Please sign in.",
+    pleaseSignInToChat: "Please sign in to chat.",
+    waitingForClose: "Waiting",
+    waitingForCloseMsg:
+      "The other person must request closing first (or you can request it).",
 
     // Offers Screen
     offersHeader: "Offers",
@@ -243,6 +256,8 @@ export const translations = {
     tryCategoryOrSearch: "Try another category or search.",
     refresh: "Refresh",
     marketplaceError: "Marketplace error",
+    skip: "SKIP",
+    interested: "INTERESTED",
 
     // Create Offer Modal
     missingRequestId: "Missing requestId",
@@ -251,6 +266,10 @@ export const translations = {
     yourCounterPrice: "Your counter price",
     examplePrice: "e.g. 1200",
     shortMessagePlaceholder: "Short message for the requester",
+    invalidPriceTitle: "Invalid price",
+    invalidDescriptionTitle: "Invalid description",
+    offerAlreadyPendingTitle: "Offer already pending",
+    counterPending: "Counter pending",
 
     // Counter Offer Modal
     missingInfo: "Missing info",
@@ -277,6 +296,9 @@ export const translations = {
     priceLabel: "Price (€)",
     updateOfferPlaceholder: "Update your offer description…",
     saving: "Saving…",
+    saved: "Saved",
+    offerUpdated: "Your offer was updated.",
+    requestLabel: "Request",
 
     // Filters Modal
     filters: "Filters",
@@ -375,6 +397,19 @@ export const translations = {
     otherUserRequested: "Celălalt utilizator a solicitat",
     confirm: "Confirmă",
     dismiss: "Respinge",
+    pickerFailed: "Eroare selector",
+    sendFailed: "Trimitere eșuată",
+    uploadFailed: "Încărcare eșuată",
+    photosPermission: "Permisiune fotografii",
+    allowPhotosAccess: "Te rog permite accesul la fotografii.",
+    galleryFailed: "Eroare galerie",
+    cameraPermission: "Permisiune cameră",
+    allowCameraAccess: "Te rog permite accesul la cameră.",
+    pleaseSignInGeneric: "Te rog conectează-te.",
+    pleaseSignInToChat: "Te rog conectează-te pentru a chata.",
+    waitingForClose: "Se așteaptă",
+    waitingForCloseMsg:
+      "Celălalt utilizator trebuie să solicite închiderea mai întâi (sau poți solicita tu).",
 
     // Offers Screen
     offersHeader: "Oferte",
@@ -404,7 +439,7 @@ export const translations = {
     interested: "Interesat",
     skipped: "Sărit",
     open: "DESCHIS",
-    negotiating: "SE NEGOCIAZA",
+    negotiating: "SE NEGOCIAZĂ",
     closed: "ÎNCHIS",
 
     // Request Detail
@@ -537,6 +572,8 @@ export const translations = {
     tryCategoryOrSearch: "Încearcă o altă categorie sau caut.",
     refresh: "Reîncarcă",
     marketplaceError: "Eroare piață",
+    skip: "IGNORĂ",
+    interested: "INTERESAT",
 
     // Create Offer Modal
     missingRequestId: "RequestId lipsă",
@@ -545,6 +582,10 @@ export const translations = {
     yourCounterPrice: "Prețul tău contraofertă",
     examplePrice: "ex. 1200",
     shortMessagePlaceholder: "Mesaj scurt pentru solicitant",
+    invalidPriceTitle: "Preț invalid",
+    invalidDescriptionTitle: "Descriere invalidă",
+    offerAlreadyPendingTitle: "Ofertă deja în așteptare",
+    counterPending: "Contraofertă în așteptare",
 
     // Counter Offer Modal
     missingInfo: "Informații lipsă",
@@ -574,6 +615,9 @@ export const translations = {
     priceLabel: "Preț (€)",
     updateOfferPlaceholder: "Actualizează descrierea ofertei…",
     saving: "Se salvează…",
+    saved: "Salvat",
+    offerUpdated: "Oferta ta a fost actualizată.",
+    requestLabel: "Cerere",
 
     // Filters Modal
     filters: "Filtre",

@@ -414,7 +414,7 @@ export default function MyRequestsScreen() {
                 style={styles.viewBtn}
               >
                 <Text style={styles.viewBtnText}>
-                  Counter pending ({counterCounts.pending})
+                  {t("counterPending")} ({counterCounts.pending})
                 </Text>
               </Pressable>
             ) : hasWithdrawnOffers ? (

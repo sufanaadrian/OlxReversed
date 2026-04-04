@@ -480,13 +480,13 @@ function RequestCard({
           <Animated.View
             style={[styles.indicatorLeft, { opacity: leftOpacity }]}
           >
-            <Text style={styles.indicatorText}>SKIP</Text>
+            <Text style={styles.indicatorText}>{t("skip")}</Text>
           </Animated.View>
 
           <Animated.View
             style={[styles.indicatorRight, { opacity: rightOpacity }]}
           >
-            <Text style={styles.indicatorText}>INTERESTED</Text>
+            <Text style={styles.indicatorText}>{t("interested")}</Text>
           </Animated.View>
         </Animated.View>
       </View>

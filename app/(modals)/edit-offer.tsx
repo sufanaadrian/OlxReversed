@@ -33,10 +33,10 @@ export default function EditOfferModal() {
   const [saving, setSaving] = useState(false);
 
   const onSave = async () => {
-    if (!offerId) return Alert.alert("Error", "Missing offerId");
+    if (!offerId) return Alert.alert(t("error"), t("missingOfferId"));
     const p = Number(price);
     if (!Number.isFinite(p) || p <= 0) {
-      return Alert.alert("Invalid price", "Please enter a valid price.");
+      return Alert.alert(t("invalidPriceTitle"), t("enterValidPrice"));
     }
 
     setSaving(true);
@@ -48,14 +48,14 @@ export default function EditOfferModal() {
         .eq("id", offerId)
         .maybeSingle();
 
-      if (fetchErr) return Alert.alert("Error", fetchErr.message);
-      if (!offerRow) return Alert.alert("Error", "Offer not found.");
+      if (fetchErr) return Alert.alert(t("error"), fetchErr.message);
+      if (!offerRow) return Alert.alert(t("error"), t("offerNotFound"));
 
       if (offerRow.status === "accepted") {
-        return Alert.alert("Not allowed", "You can't edit an accepted offer.");
+        return Alert.alert(t("notAllowed"), t("cantEditAcceptedOffer"));
       }
       if (offerRow.status === "withdrawn") {
-        return Alert.alert("Not allowed", "You can't edit a withdrawn offer.");
+        return Alert.alert(t("notAllowed"), t("cantEditWithdrawnOffer"));
       }
 
       const { data, error } = await supabase
@@ -67,15 +67,12 @@ export default function EditOfferModal() {
         .eq("id", offerId)
         .select("id");
 
-      if (error) return Alert.alert("Error", error.message);
+      if (error) return Alert.alert(t("error"), error.message);
       if (!data || data.length === 0) {
-        return Alert.alert(
-          "Not updated",
-          "No rows were updated (RLS or invalid offer).",
-        );
+        return Alert.alert(t("notUpdated"), t("noRowsUpdated"));
       }
 
-      Alert.alert("Saved", "Your offer was updated.");
+      Alert.alert(t("saved"), t("offerUpdated"));
       router.back();
     } finally {
       setSaving(false);
@@ -94,7 +91,7 @@ export default function EditOfferModal() {
             <Text style={styles.h1}>{t("editOffer")}</Text>
             {!!requestId && (
               <Text style={styles.sub} numberOfLines={1}>
-                Request: {requestId}
+                {t("requestLabel")}: {requestId}
               </Text>
             )}
           </View>

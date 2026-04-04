@@ -74,7 +74,7 @@ export default function RequestOffersScreen() {
       .maybeSingle();
 
     if (reqErr) {
-      Alert.alert("Error", reqErr.message);
+      Alert.alert(t("error"), reqErr.message);
       setRequest(null);
       setOffers([]);
       setCounters([]);
@@ -104,7 +104,7 @@ export default function RequestOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (offErr) {
-      Alert.alert("Error", offErr.message);
+      Alert.alert(t("error"), offErr.message);
       setOffers([]);
       setCounters([]);
       setLoading(false);
@@ -122,7 +122,7 @@ export default function RequestOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (coErr) {
-      Alert.alert("Error", coErr.message);
+      Alert.alert(t("error"), coErr.message);
       setCounters([]);
       setLoading(false);
       return;
@@ -209,7 +209,7 @@ export default function RequestOffersScreen() {
       .update({ status: "accepted" })
       .eq("id", offerId);
 
-    if (accErr) return Alert.alert("Error", accErr.message);
+    if (accErr) return Alert.alert(t("error"), accErr.message);
 
     const { error: rejErr } = await supabase
       .from("offers")
@@ -218,7 +218,7 @@ export default function RequestOffersScreen() {
       .neq("id", offerId)
       .eq("status", "pending");
 
-    if (rejErr) return Alert.alert("Error", rejErr.message);
+    if (rejErr) return Alert.alert(t("error"), rejErr.message);
 
     await supabase
       .from("requests")
@@ -234,7 +234,7 @@ export default function RequestOffersScreen() {
       .update({ status: "rejected" })
       .eq("id", offerId);
 
-    if (error) return Alert.alert("Error", error.message);
+    if (error) return Alert.alert(t("error"), error.message);
     await load();
   };
 

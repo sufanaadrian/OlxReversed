@@ -208,7 +208,7 @@ export default function ChatScreen() {
       try {
         await fn();
       } catch (e: any) {
-        Alert.alert("Picker failed", e?.message ?? String(e));
+        Alert.alert(t("pickerFailed"), e?.message ?? String(e));
       }
     }
   }, []);
@@ -275,7 +275,7 @@ export default function ChatScreen() {
 
     if (reqErr || !req) {
       setLoading(false);
-      Alert.alert("Not found", "Request not found.");
+      Alert.alert(t("notFound"), t("requestNotFound"));
       router.back();
       return;
     }
@@ -622,7 +622,7 @@ export default function ChatScreen() {
 
     const uid = await refreshMeId();
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in.");
+      Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
       return;
     }
 
@@ -644,7 +644,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
 
@@ -793,7 +793,7 @@ export default function ChatScreen() {
 
       const uid = await refreshMeId();
       if (!uid) {
-        Alert.alert("Sign in required", "Please sign in to chat.");
+        Alert.alert(t("signInRequired"), t("pleaseSignInToChat"));
         router.push("/sign-in" as any);
         return;
       }
@@ -818,7 +818,7 @@ export default function ChatScreen() {
 
       if (error) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-        Alert.alert("Send failed", error.message);
+        Alert.alert(t("sendFailed"), error.message);
       }
     },
     [acceptedOffer, canChat],
@@ -849,7 +849,7 @@ export default function ChatScreen() {
 
         await sendPayloadText(payloadText);
       } catch (e: any) {
-        Alert.alert("Upload failed", e?.message ?? String(e));
+        Alert.alert(t("uploadFailed"), e?.message ?? String(e));
       } finally {
         setUploadingMedia(false);
       }
@@ -863,7 +863,7 @@ export default function ChatScreen() {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       console.log("[pickFromGallery] perm:", perm);
       if (!perm.granted) {
-        Alert.alert("Photos permission", "Please allow Photos access.");
+        Alert.alert(t("photosPermission"), t("allowPhotosAccess"));
         return;
       }
 
@@ -884,13 +884,13 @@ export default function ChatScreen() {
           const mime = picked.mimeType ?? "image/jpeg";
           await sendImage(picked.uri, mime, "gallery");
         } catch (e: any) {
-          Alert.alert("Upload failed", e?.message ?? String(e));
+          Alert.alert(t("uploadFailed"), e?.message ?? String(e));
         }
       };
 
       setAttachOpen(false);
     } catch (e: any) {
-      Alert.alert("Gallery failed", e?.message ?? String(e));
+      Alert.alert(t("galleryFailed"), e?.message ?? String(e));
     }
   };
 
@@ -899,7 +899,7 @@ export default function ChatScreen() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     console.log("[takePhoto] perm:", perm);
     if (!perm.granted) {
-      Alert.alert("Camera permission", "Please allow Camera access.");
+      Alert.alert(t("cameraPermission"), t("allowCameraAccess"));
       return;
     }
 
@@ -929,15 +929,12 @@ export default function ChatScreen() {
 
     const uid = await refreshMeId();
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in.");
+      Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
       return;
     }
 
     if (!request.close_requested_by || request.close_requested_by === uid) {
-      Alert.alert(
-        "Waiting",
-        "The other person must request closing first (or you can request it).",
-      );
+      Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
       return;
     }
 
@@ -953,7 +950,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
 
@@ -983,7 +980,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
       await load();
@@ -1014,7 +1011,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
       await load();

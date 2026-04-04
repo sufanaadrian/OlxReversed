@@ -2,7 +2,7 @@ import { translations } from "./translations";
 
 // Simple i18n wrapper - no external dependencies
 class I18n {
-  locale: string = "en";
+  locale: string = "ro";
   translations = translations;
 
   t(key: string): string {
