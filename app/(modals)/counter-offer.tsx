@@ -9,9 +9,11 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 export default function CounterOfferModal() {
+  const t = useTranslation();
   const params = useLocalSearchParams();
 
   const offerId = String(params.offerId ?? "");
@@ -37,20 +39,14 @@ export default function CounterOfferModal() {
 
   const submit = async () => {
     if (!valid) {
-      Alert.alert(
-        "Missing info",
-        "Please enter a valid counter price and message.",
-      );
+      Alert.alert(t("missingInfo"), t("enterValidCounterPrice"));
       return;
     }
 
     const { data: sess } = await supabase.auth.getSession();
     const uid = sess.session?.user.id;
     if (!uid) {
-      Alert.alert(
-        "Sign in required",
-        "Please sign in to send a counter-offer.",
-      );
+      Alert.alert(t("signInRequired"), t("pleaseSignInCounterOffer"));
       router.push("/sign-in" as any);
       return;
     }
@@ -65,7 +61,7 @@ export default function CounterOfferModal() {
 
     if (rejectErr) {
       setLoading(false);
-      Alert.alert("Error", rejectErr.message);
+      Alert.alert(t("error"), rejectErr.message);
       return;
     }
 
@@ -83,11 +79,11 @@ export default function CounterOfferModal() {
     setLoading(false);
 
     if (counterErr) {
-      Alert.alert("Error", counterErr.message);
+      Alert.alert(t("error"), counterErr.message);
       return;
     }
 
-    Alert.alert("Sent", `Counter-offer sent to ${sellerEmail}`);
+    Alert.alert(t("sent"), t("counterOfferSent"));
     router.back();
   };
 
@@ -96,33 +92,31 @@ export default function CounterOfferModal() {
       <View style={styles.page}>
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t("back")}</Text>
           </Pressable>
-          <Text style={styles.title}>Reject with offer</Text>
+          <Text style={styles.title}>{t("rejectWithOffer")}</Text>
           <View style={{ width: 56 }} />
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            You are rejecting the seller’s offer and sending a counter price.
-          </Text>
+          <Text style={styles.infoText}>{t("rejectingWithCounterPrice")}</Text>
         </View>
 
-        <Text style={styles.label}>Your counter price</Text>
+        <Text style={styles.label}>{t("yourCounterPrice")}</Text>
         <TextInput
           value={price}
           onChangeText={setPrice}
-          placeholder="e.g. 2100"
+          placeholder={t("exampleCounterPrice")}
           placeholderTextColor={theme.secondaryText}
           keyboardType="numeric"
           style={styles.input}
         />
 
-        <Text style={[styles.label, { marginTop: 12 }]}>Message</Text>
+        <Text style={[styles.label, { marginTop: 12 }]}>{t("message")}</Text>
         <TextInput
           value={message}
           onChangeText={setMessage}
-          placeholder="e.g. I can do 2100€ if you can deliver this week."
+          placeholder={t("exampleCounterMessage")}
           placeholderTextColor={theme.secondaryText}
           style={[styles.input, styles.textArea]}
           multiline
@@ -138,7 +132,7 @@ export default function CounterOfferModal() {
           ]}
         >
           <Text style={styles.ctaText}>
-            {loading ? "Sending..." : "Send counter-offer"}
+            {loading ? t("sending") : t("sendCounterOffer")}
           </Text>
         </Pressable>
       </View>

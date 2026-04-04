@@ -15,9 +15,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useCurrency } from "../../src/context/CurrencyContext";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { useApp } from "../../src/context/useApp";
 import { supabase } from "../../src/lib/supabase";
 
+// Category display names (kept in English for database filtering)
 const categories = [
   "All",
   "Vehicles",
@@ -27,6 +30,17 @@ const categories = [
   "Fashion & Personal",
   "Other",
 ] as const;
+
+// Map English names to translation keys
+const categoryTranslationKeys: Record<string, string> = {
+  All: "all",
+  Vehicles: "vehicles",
+  "Real Estate": "realEstate",
+  Services: "services",
+  "Electronics & Tech": "electronics",
+  "Fashion & Personal": "fashion",
+  Other: "other",
+};
 
 type Category = (typeof categories)[number];
 
@@ -48,6 +62,7 @@ const { width } = Dimensions.get("window");
 const SWIPE_THRESHOLD = Math.min(120, width * 0.28);
 
 export default function MarketplaceScreen() {
+  const t = useTranslation();
   // keep your app-context action for now
   const { addInterestedRequest } = useApp();
 
@@ -121,7 +136,7 @@ export default function MarketplaceScreen() {
 
     if (error) {
       console.log("Marketplace query error:", error);
-      Alert.alert("Marketplace error", error.message);
+      Alert.alert(t("marketplaceError"), error.message);
       setRequests([]);
       setCurrentIndex(0);
       setLoading(false);
@@ -202,7 +217,7 @@ export default function MarketplaceScreen() {
                 setSearchQuery(t);
                 setCurrentIndex(0);
               }}
-              placeholder="Search requests"
+              placeholder={t("searchRequests")}
               placeholderTextColor={theme.secondaryText}
               style={styles.searchInput}
             />
@@ -239,7 +254,7 @@ export default function MarketplaceScreen() {
                 <Text
                   style={[styles.chipText, selected && styles.chipTextSelected]}
                 >
-                  {c}
+                  {t(categoryTranslationKeys[c])}
                 </Text>
               </Pressable>
             );
@@ -251,18 +266,16 @@ export default function MarketplaceScreen() {
       <View style={styles.swipeArea}>
         {loading ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Loading…</Text>
-            <Text style={styles.emptySubtitle}>Fetching requests</Text>
+            <Text style={styles.emptyTitle}>{t("loading")}</Text>
+            <Text style={styles.emptySubtitle}>{t("fetchingRequests")}</Text>
           </View>
         ) : currentIndex >= filteredRequests.length || !currentRequest ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No more requests</Text>
-            <Text style={styles.emptySubtitle}>
-              Try another category or search.
-            </Text>
+            <Text style={styles.emptyTitle}>{t("noMoreRequests")}</Text>
+            <Text style={styles.emptySubtitle}>{t("tryCategoryOrSearch")}</Text>
 
             <Pressable style={styles.refreshBtn} onPress={loadRequests}>
-              <Text style={styles.refreshBtnText}>Refresh</Text>
+              <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -271,6 +284,7 @@ export default function MarketplaceScreen() {
             remaining={filteredRequests.length - currentIndex}
             total={filteredRequests.length}
             onSwipe={handleSwipe}
+            t={t}
           />
         )}
       </View>
@@ -308,12 +322,15 @@ function RequestCard({
   remaining,
   total,
   onSwipe,
+  t,
 }: {
   request: RequestRow;
   remaining: number;
   total: number;
   onSwipe: (direction: "left" | "right") => void;
+  t: (key: string) => string;
 }) {
+  const { formatPrice } = useCurrency();
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const rotate = translate.x.interpolate({
@@ -384,7 +401,9 @@ function RequestCard({
       {/* Progress */}
       <View style={styles.progressRow}>
         <View style={styles.progressPill}>
-          <Text style={styles.progressPillText}>{remaining} left</Text>
+          <Text style={styles.progressPillText}>
+            {remaining} {t("remaining_left")}
+          </Text>
         </View>
 
         <View style={styles.progressBar}>
@@ -412,13 +431,17 @@ function RequestCard({
         >
           <View style={styles.cardContent}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{request.category}</Text>
+              <Text style={styles.badgeText}>
+                {t(categoryTranslationKeys[request.category] || "other")}
+              </Text>
             </View>
 
             <Text style={styles.title}>{request.title}</Text>
 
             {/* ✅ Posted by email */}
-            <Text style={styles.postedBy}>Posted by {email}</Text>
+            <Text style={styles.postedBy}>
+              {t("postedBy")} {email}
+            </Text>
 
             <Text style={styles.desc}>{request.description}</Text>
 
@@ -430,8 +453,8 @@ function RequestCard({
                   color={theme.secondaryText}
                 />
                 <Text style={styles.detailText}>
-                  ${request.budget_min.toLocaleString()} - $
-                  {request.budget_max.toLocaleString()}
+                  {formatPrice(request.budget_min)} –{" "}
+                  {formatPrice(request.budget_max)}
                 </Text>
               </View>
 
@@ -447,7 +470,8 @@ function RequestCard({
               )}
 
               <Text style={styles.posted}>
-                Posted {new Date(request.created_at).toLocaleDateString()}
+                {t("posted")}{" "}
+                {new Date(request.created_at).toLocaleDateString()}
               </Text>
             </View>
           </View>
@@ -456,13 +480,13 @@ function RequestCard({
           <Animated.View
             style={[styles.indicatorLeft, { opacity: leftOpacity }]}
           >
-            <Text style={styles.indicatorText}>SKIP</Text>
+            <Text style={styles.indicatorText}>{t("skip")}</Text>
           </Animated.View>
 
           <Animated.View
             style={[styles.indicatorRight, { opacity: rightOpacity }]}
           >
-            <Text style={styles.indicatorText}>INTERESTED</Text>
+            <Text style={styles.indicatorText}>{t("interested")}</Text>
           </Animated.View>
         </Animated.View>
       </View>

@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
+import { useCurrency } from "../../../src/context/CurrencyContext";
+import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
 
 type OfferStatus = "pending" | "accepted" | "rejected" | "withdrawn";
@@ -51,6 +53,8 @@ type RequestRow = {
 export default function RequestOffersScreen() {
   const params = useLocalSearchParams();
   const requestId = (params?.id as string) ?? "";
+  const t = useTranslation();
+  const { formatPrice } = useCurrency();
 
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState<RequestRow | null>(null);
@@ -70,7 +74,7 @@ export default function RequestOffersScreen() {
       .maybeSingle();
 
     if (reqErr) {
-      Alert.alert("Error", reqErr.message);
+      Alert.alert(t("error"), reqErr.message);
       setRequest(null);
       setOffers([]);
       setCounters([]);
@@ -100,7 +104,7 @@ export default function RequestOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (offErr) {
-      Alert.alert("Error", offErr.message);
+      Alert.alert(t("error"), offErr.message);
       setOffers([]);
       setCounters([]);
       setLoading(false);
@@ -118,7 +122,7 @@ export default function RequestOffersScreen() {
       .order("created_at", { ascending: false });
 
     if (coErr) {
-      Alert.alert("Error", coErr.message);
+      Alert.alert(t("error"), coErr.message);
       setCounters([]);
       setLoading(false);
       return;
@@ -205,7 +209,7 @@ export default function RequestOffersScreen() {
       .update({ status: "accepted" })
       .eq("id", offerId);
 
-    if (accErr) return Alert.alert("Error", accErr.message);
+    if (accErr) return Alert.alert(t("error"), accErr.message);
 
     const { error: rejErr } = await supabase
       .from("offers")
@@ -214,7 +218,7 @@ export default function RequestOffersScreen() {
       .neq("id", offerId)
       .eq("status", "pending");
 
-    if (rejErr) return Alert.alert("Error", rejErr.message);
+    if (rejErr) return Alert.alert(t("error"), rejErr.message);
 
     await supabase
       .from("requests")
@@ -230,7 +234,7 @@ export default function RequestOffersScreen() {
       .update({ status: "rejected" })
       .eq("id", offerId);
 
-    if (error) return Alert.alert("Error", error.message);
+    if (error) return Alert.alert(t("error"), error.message);
     await load();
   };
 
@@ -247,39 +251,35 @@ export default function RequestOffersScreen() {
     const existingCounter = latestCounterByOfferId.get(offer.id);
 
     if (existingCounter?.status === "pending") {
-      Alert.alert(
-        "Counter-offer already sent",
-        "You already sent a counter-offer for this seller. Wait for them to accept/reject it.",
-        [
-          { text: "OK" },
-          {
-            text: "View counter",
-            onPress: () =>
-              router.push({
-                pathname: "/(modals)/counter-offer",
-                params: {
-                  offerId: offer.id,
-                  requestId: offer.request_id,
-                  sellerId: offer.user_id,
-                  sellerEmail: email,
-                  originalPrice: String(offer.price),
-                },
-              } as any),
-          },
-        ],
-      );
+      Alert.alert(t("counterAlreadySent"), t("counterAlreadySentMsg"), [
+        { text: t("cancel") },
+        {
+          text: t("viewCounter"),
+          onPress: () =>
+            router.push({
+              pathname: "/(modals)/counter-offer",
+              params: {
+                offerId: offer.id,
+                requestId: offer.request_id,
+                sellerId: offer.user_id,
+                sellerEmail: email,
+                originalPrice: String(offer.price),
+              },
+            } as any),
+        },
+      ]);
       return;
     }
 
-    Alert.alert("Reject offer", "Choose an option:", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("rejectOfferTitle"), t("chooseOption"), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Reject",
+        text: t("reject"),
         style: "destructive",
         onPress: () => rejectOffer(offer.id),
       },
       {
-        text: "Reject with offer",
+        text: t("rejectWithOffer"),
         onPress: () => {
           router.push({
             pathname: "/(modals)/counter-offer",
@@ -305,9 +305,9 @@ export default function RequestOffersScreen() {
           </Pressable>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Offers</Text>
+            <Text style={styles.headerTitle}>{t("offersHeader")}</Text>
             <Text style={styles.headerSub} numberOfLines={1}>
-              {request?.title ?? "Request"}
+              {request?.title ?? ""}
             </Text>
           </View>
         </View>
@@ -319,27 +319,27 @@ export default function RequestOffersScreen() {
             contentContainerStyle={styles.filters}
           >
             <FilterBtn
-              label={`All (${counts.all})`}
+              label={`${t("all")} (${counts.all})`}
               active={filter === "all"}
               onPress={() => setFilter("all")}
             />
             <FilterBtn
-              label={`Pending (${counts.pending})`}
+              label={`${t("pending")} (${counts.pending})`}
               active={filter === "pending"}
               onPress={() => setFilter("pending")}
             />
             <FilterBtn
-              label={`Accepted (${counts.accepted})`}
+              label={`${t("accepted")} (${counts.accepted})`}
               active={filter === "accepted"}
               onPress={() => setFilter("accepted")}
             />
             <FilterBtn
-              label={`Rejected (${counts.rejected})`}
+              label={`${t("rejected")} (${counts.rejected})`}
               active={filter === "rejected"}
               onPress={() => setFilter("rejected")}
             />
             <FilterBtn
-              label={`Withdrawn (${counts.withdrawn})`}
+              label={`${t("withdrawn")} (${counts.withdrawn})`}
               active={filter === "withdrawn"}
               onPress={() => setFilter("withdrawn")}
             />
@@ -352,15 +352,17 @@ export default function RequestOffersScreen() {
           <View style={styles.warnBox}>
             <Feather name="alert-triangle" size={16} color={theme.danger} />
             <Text style={styles.warnText}>
-              {counts.withdrawn} offer{counts.withdrawn === 1 ? "" : "s"} were
-              withdrawn by sellers.
+              {counts.withdrawn}{" "}
+              {counts.withdrawn === 1
+                ? t("offersWithdrawnWarning_one")
+                : t("offersWithdrawnWarning_other")}
             </Text>
           </View>
         )}
 
         {loading ? (
           <View style={styles.centerCard}>
-            <Text style={styles.muted}>Loading…</Text>
+            <Text style={styles.muted}>{t("loading")}</Text>
           </View>
         ) : filtered.length === 0 ? (
           <ScrollView
@@ -370,10 +372,8 @@ export default function RequestOffersScreen() {
             }
           >
             <View style={styles.centerCard}>
-              <Text style={styles.titleEmpty}>No offers</Text>
-              <Text style={styles.muted}>
-                There are no offers in this filter.
-              </Text>
+              <Text style={styles.titleEmpty}>{t("noOffers")}</Text>
+              <Text style={styles.muted}>{t("noOffersInFilter")}</Text>
             </View>
           </ScrollView>
         ) : (
@@ -418,21 +418,31 @@ export default function RequestOffersScreen() {
                       ]}
                     >
                       <Text style={styles.statusText}>
-                        {effectiveStatus.toUpperCase()}
+                        {t(
+                          effectiveStatus === "pending"
+                            ? "pendingStatus"
+                            : effectiveStatus === "accepted"
+                              ? "acceptedStatus"
+                              : effectiveStatus === "rejected"
+                                ? "rejectedStatus"
+                                : "withdrawnStatus",
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <Text style={styles.price}>
-                    €{Number(o.price).toLocaleString()}
+                    {formatPrice(Number(o.price))}
                   </Text>
                   <Text style={styles.desc}>{o.description}</Text>
 
                   {o.status === "withdrawn" && (
                     <View style={styles.counterBox}>
-                      <Text style={styles.counterTitle}>Offer withdrawn</Text>
+                      <Text style={styles.counterTitle}>
+                        {t("offerWithdrawnTitle")}
+                      </Text>
                       <Text style={styles.counterMsg}>
-                        The seller withdrew this offer.
+                        {t("offerWithdrawnMsg")}
                       </Text>
                     </View>
                   )}
@@ -440,8 +450,8 @@ export default function RequestOffersScreen() {
                   {latestCounter && (
                     <View style={styles.counterBox}>
                       <Text style={styles.counterTitle}>
-                        Counter-offer: €
-                        {Number(latestCounter.price).toLocaleString()}
+                        {t("counterOfferLabel")}:{" "}
+                        {formatPrice(Number(latestCounter.price))}
                       </Text>
                       {!!latestCounter.message && (
                         <Text style={styles.counterMsg}>
@@ -449,7 +459,16 @@ export default function RequestOffersScreen() {
                         </Text>
                       )}
                       <Text style={styles.counterStatus}>
-                        Counter status: {latestCounter.status.toUpperCase()}
+                        {t("counterStatus")}:{" "}
+                        {t(
+                          latestCounter.status === "pending"
+                            ? "pendingStatus"
+                            : latestCounter.status === "accepted"
+                              ? "acceptedStatus"
+                              : latestCounter.status === "rejected"
+                                ? "rejectedStatus"
+                                : "withdrawnStatus",
+                        )}
                       </Text>
                     </View>
                   )}
@@ -461,14 +480,16 @@ export default function RequestOffersScreen() {
                         onPress={() => openRejectMenu(o)}
                         style={[styles.btn, styles.btnSecondary]}
                       >
-                        <Text style={styles.btnSecondaryText}>Reject</Text>
+                        <Text style={styles.btnSecondaryText}>
+                          {t("reject")}
+                        </Text>
                       </Pressable>
 
                       <Pressable
                         onPress={() => acceptOffer(o.id)}
                         style={[styles.btn, styles.btnPrimary]}
                       >
-                        <Text style={styles.btnPrimaryText}>Accept</Text>
+                        <Text style={styles.btnPrimaryText}>{t("accept")}</Text>
                       </Pressable>
                     </View>
                   )}
@@ -479,7 +500,7 @@ export default function RequestOffersScreen() {
                         onPress={openChat}
                         style={[styles.btn, styles.btnPrimary]}
                       >
-                        <Text style={styles.btnPrimaryText}>Chat</Text>
+                        <Text style={styles.btnPrimaryText}>{t("chat")}</Text>
                       </Pressable>
                     </View>
                   )}

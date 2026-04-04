@@ -13,18 +13,30 @@ import {
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
+import { useCurrency } from "../../src/context/CurrencyContext";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 type Filter = "all" | "active" | "matched" | "closed";
 
-function getStatusLabel(status: "active" | "matched" | "closed") {
+const categoryTranslationKeys: Record<string, string> = {
+  Vehicles: "vehicles",
+  "Real Estate": "realEstate",
+  Services: "services",
+  "Electronics & Tech": "electronics",
+  "Fashion & Personal": "fashion",
+  Other: "other",
+  All: "all",
+};
+
+function getStatusLabel(t: any, status: "active" | "matched" | "closed") {
   switch (status) {
     case "active":
-      return "OPEN";
+      return t("open");
     case "matched":
-      return "NEGOTIATING";
+      return t("negotiating");
     case "closed":
-      return "CLOSED";
+      return t("closed");
   }
 }
 
@@ -65,6 +77,8 @@ type CounterOfferMini = {
 type CounterCounts = { pending: number; accepted: number };
 
 export default function MyRequestsScreen() {
+  const t = useTranslation();
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -102,7 +116,7 @@ export default function MyRequestsScreen() {
       .order("created_at", { ascending: false });
 
     if (reqErr) {
-      Alert.alert("Error", reqErr.message);
+      Alert.alert(t("error"), reqErr.message);
       setRequests([]);
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
@@ -212,18 +226,14 @@ export default function MyRequestsScreen() {
   }, [requests, filter]);
 
   const confirmDelete = (req: RequestRow) => {
-    Alert.alert(
-      "Delete request?",
-      "This will permanently delete your request (and its offers).",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteRequest(req),
-        },
-      ],
-    );
+    Alert.alert(t("deleteRequestConfirm"), t("deleteRequestMsg"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: () => deleteRequest(req),
+      },
+    ]);
   };
 
   const deleteRequest = async (req: RequestRow) => {
@@ -252,7 +262,7 @@ export default function MyRequestsScreen() {
       setRequests(prevRequests);
       setCountsByRequestId(prevCounts);
       setCounterCountsByRequestId(prevCounterCounts);
-      Alert.alert("Error", error.message);
+      Alert.alert(t("error"), error.message);
       return;
     }
   };
@@ -268,7 +278,7 @@ export default function MyRequestsScreen() {
           ]}
         >
           <Feather name="trash-2" size={18} color="white" />
-          <Text style={styles.deleteText}>Delete</Text>
+          <Text style={styles.deleteText}>{t("delete")}</Text>
         </Pressable>
       </View>
     );
@@ -314,14 +324,16 @@ export default function MyRequestsScreen() {
           style={styles.card}
         >
           <View style={styles.topRow}>
-            <Text style={styles.categoryPill}>{item.category}</Text>
+            <Text style={styles.categoryPill}>
+              {t(categoryTranslationKeys[item.category] || "other")}
+            </Text>
 
             <View style={styles.rightBadges}>
               {offerCounts.total > 0 && (
                 <View style={styles.offerPill}>
                   <Text style={styles.offerPillText}>
-                    {offerCounts.total} offer
-                    {offerCounts.total === 1 ? "" : "s"}
+                    {offerCounts.total}{" "}
+                    {offerCounts.total === 1 ? t("offer") : t("offers")}
                   </Text>
                 </View>
               )}
@@ -337,7 +349,7 @@ export default function MyRequestsScreen() {
                 ]}
               >
                 <Text style={styles.statusText}>
-                  {getStatusLabel(item.status)}
+                  {getStatusLabel(t, item.status)}
                 </Text>
               </View>
             </View>
@@ -350,8 +362,7 @@ export default function MyRequestsScreen() {
 
           <View style={styles.metaRow}>
             <Text style={styles.metaStrong}>
-              ${item.budget_min.toLocaleString()} – $
-              {item.budget_max.toLocaleString()}
+              {formatPrice(item.budget_min)} – {formatPrice(item.budget_max)}
             </Text>
             {!!item.location && (
               <Text style={styles.metaMuted}>• {item.location}</Text>
@@ -360,7 +371,7 @@ export default function MyRequestsScreen() {
 
           <View style={styles.footerRow}>
             <Text style={styles.smallMuted}>
-              Posted at {new Date(item.created_at).toLocaleString()}
+              {t("postedAt")} {new Date(item.created_at).toLocaleString()}
             </Text>
 
             {hasAcceptedDeal ? (
@@ -374,7 +385,7 @@ export default function MyRequestsScreen() {
                 }}
                 style={styles.reviewBtn}
               >
-                <Text style={styles.reviewBtnText}>Chat</Text>
+                <Text style={styles.reviewBtnText}>{t("chat")}</Text>
               </Pressable>
             ) : offerCounts.pending > 0 ? (
               <Pressable
@@ -388,7 +399,7 @@ export default function MyRequestsScreen() {
                 style={styles.reviewBtn}
               >
                 <Text style={styles.reviewBtnText}>
-                  Review ({offerCounts.pending})
+                  {t("review")} ({offerCounts.pending})
                 </Text>
               </Pressable>
             ) : hasPendingCounters ? (
@@ -403,18 +414,18 @@ export default function MyRequestsScreen() {
                 style={styles.viewBtn}
               >
                 <Text style={styles.viewBtnText}>
-                  Counter pending ({counterCounts.pending})
+                  {t("counterPending")} ({counterCounts.pending})
                 </Text>
               </Pressable>
             ) : hasWithdrawnOffers ? (
               <Text style={styles.smallMuted}>
-                Withdrawn ({offerCounts.withdrawn})
+                {t("withdrawnOffers")} ({offerCounts.withdrawn})
               </Text>
             ) : (
               <Text style={styles.smallMuted}>
                 {offerCounts.total === 0
-                  ? "No offers yet"
-                  : "No pending offers"}
+                  ? t("noOffersYet")
+                  : t("noPendingOffers")}
               </Text>
             )}
           </View>
@@ -425,15 +436,15 @@ export default function MyRequestsScreen() {
 
   const ListEmpty = (
     <View style={styles.centerCard}>
-      <Text style={styles.titleEmpty}>Nothing here</Text>
-      <Text style={styles.muted}>Create a request to see it here.</Text>
+      <Text style={styles.titleEmpty}>{t("nothingHere")}</Text>
+      <Text style={styles.muted}>{t("createARequest")}</Text>
     </View>
   );
 
   return (
     <View style={styles.page}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>My Requests</Text>
+        <Text style={styles.header}>{t("myRequests")}</Text>
 
         <Pressable
           onPress={() => router.push("/create-request")}
@@ -450,25 +461,25 @@ export default function MyRequestsScreen() {
           contentContainerStyle={styles.filters}
         >
           <FilterBtn
-            label={`All (${counts.all})`}
+            label={`${t("all")} (${counts.all})`}
             active={filter === "all"}
             onPress={() => setFilter("all")}
           />
 
           <FilterBtn
-            label={`Open (${counts.active})`}
+            label={`${t("open")} (${counts.active})`}
             active={filter === "active"}
             onPress={() => setFilter("active")}
           />
 
           <FilterBtn
-            label={`Negotiating (${counts.matched})`}
+            label={`${t("negotiating")} (${counts.matched})`}
             active={filter === "matched"}
             onPress={() => setFilter("matched")}
           />
 
           <FilterBtn
-            label={`Closed (${counts.closed})`}
+            label={`${t("closed")} (${counts.closed})`}
             active={filter === "closed"}
             onPress={() => setFilter("closed")}
           />
@@ -477,7 +488,7 @@ export default function MyRequestsScreen() {
 
       {loading ? (
         <View style={styles.centerCard}>
-          <Text style={styles.muted}>Loading…</Text>
+          <Text style={styles.muted}>{t("loadingEllipsis")}</Text>
         </View>
       ) : (
         <FlatList

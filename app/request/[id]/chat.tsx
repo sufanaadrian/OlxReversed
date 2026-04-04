@@ -28,6 +28,8 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
+import { useCurrency } from "../../../src/context/CurrencyContext";
+import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
 
 if (
@@ -96,14 +98,14 @@ function startOfDay(ts: number) {
   return d.getTime();
 }
 
-function formatDateLabel(ts: number) {
+function formatDateLabel(ts: number, t: (key: string) => string) {
   const now = Date.now();
   const day = startOfDay(ts);
   const today = startOfDay(now);
   const yesterday = today - DAY;
 
-  if (day === today) return "Today";
-  if (day === yesterday) return "Yesterday";
+  if (day === today) return t("today");
+  if (day === yesterday) return t("yesterday");
 
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -118,6 +120,7 @@ function formatDateLabel(ts: number) {
  */
 function withDateSeparators<T extends { created_at?: string | number | null }>(
   messages: T[],
+  t: (key: string) => string,
 ): ListRow<T>[] {
   const out: ListRow<T>[] = [];
   let lastDay: number | null = null;
@@ -141,7 +144,7 @@ function withDateSeparators<T extends { created_at?: string | number | null }>(
       out.push({
         type: "date",
         id: `date-${day}`,
-        label: formatDateLabel(ts),
+        label: formatDateLabel(ts, t),
         ts,
       });
       lastDay = day;
@@ -157,10 +160,13 @@ function isDateRow(row: any): row is DateRow {
   return row?.type === "date";
 }
 
-const getRequestStatusLabel = (s: RequestStatus) => {
-  if (s === "active") return "OPEN";
-  if (s === "matched") return "NEGOTIATING";
-  return "CLOSED";
+const getRequestStatusLabel = (
+  s: RequestStatus,
+  t: (key: string) => string,
+) => {
+  if (s === "active") return t("open");
+  if (s === "matched") return t("negotiating");
+  return t("closed");
 };
 
 const formatHM = (iso: string) =>
@@ -169,6 +175,8 @@ const formatHM = (iso: string) =>
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const requestId = id ?? "";
+  const t = useTranslation();
+  const { formatPrice } = useCurrency();
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -200,7 +208,7 @@ export default function ChatScreen() {
       try {
         await fn();
       } catch (e: any) {
-        Alert.alert("Picker failed", e?.message ?? String(e));
+        Alert.alert(t("pickerFailed"), e?.message ?? String(e));
       }
     }
   }, []);
@@ -219,7 +227,7 @@ export default function ChatScreen() {
     });
   }, [attachOpen, runPendingPicker]);
 
-  const listRef = useRef<FlatList<MessageRow> | null>(null);
+  const listRef = useRef<FlatList<ListRow<MessageRow>> | null>(null);
 
   // Presence + typing channel (one per request)
   const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(
@@ -267,7 +275,7 @@ export default function ChatScreen() {
 
     if (reqErr || !req) {
       setLoading(false);
-      Alert.alert("Not found", "Request not found.");
+      Alert.alert(t("notFound"), t("requestNotFound"));
       router.back();
       return;
     }
@@ -370,9 +378,9 @@ export default function ChatScreen() {
     // IMPORTANT: because FlatList is inverted, we want data array to be newest -> oldest.
     // So we first build separators in oldest -> newest, then reverse.
     const chronological = [...messages].reverse(); // now oldest -> newest (assuming list is newest -> oldest)
-    const withDates = withDateSeparators(chronological);
+    const withDates = withDateSeparators(chronological, t);
     return withDates.reverse(); // back to newest -> oldest for inverted FlatList
-  }, [messages]);
+  }, [messages, t]);
 
   // Load on focus
   useFocusEffect(
@@ -512,8 +520,8 @@ export default function ChatScreen() {
   }, [requestId, meId]);
 
   const statusLabel = useMemo(
-    () => (request ? getRequestStatusLabel(request.status) : ""),
-    [request],
+    () => (request ? getRequestStatusLabel(request.status, t) : ""),
+    [request, t],
   );
 
   const canChat = useMemo(() => {
@@ -523,14 +531,14 @@ export default function ChatScreen() {
   }, [request, acceptedOffer]);
 
   const send = async () => {
-    const t = text.trim();
-    if (!t) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
     if (!acceptedOffer) return;
     if (!canChat) return;
 
     const uid = await refreshMeId();
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in to chat.");
+      Alert.alert(t("signInRequired"), t("pleaseSignIn"));
       router.push("/sign-in" as any);
       return;
     }
@@ -542,7 +550,7 @@ export default function ChatScreen() {
         id: `optimistic-${Date.now()}`,
         offer_id: acceptedOffer.id,
         sender_id: uid,
-        text: t,
+        text: trimmed,
         created_at: new Date().toISOString(),
         read_at: null,
       };
@@ -553,13 +561,13 @@ export default function ChatScreen() {
       const { error } = await supabase.from("messages").insert({
         offer_id: acceptedOffer.id,
         sender_id: uid,
-        text: t,
+        text: trimmed,
       });
 
       if (error) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-        setText(t);
-        Alert.alert("Error", error.message);
+        setText(trimmed);
+        Alert.alert(t("error"), error.message);
         return;
       }
 
@@ -608,13 +616,13 @@ export default function ChatScreen() {
   const requestClose = async (reason: "completed" | "cancelled") => {
     if (!request) return;
     if (request.status !== "matched") {
-      Alert.alert("Not allowed", "You can close only while NEGOTIATING.");
+      Alert.alert(t("notAllowed"), t("chatOnlyNegotiating"));
       return;
     }
 
     const uid = await refreshMeId();
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in.");
+      Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
       return;
     }
 
@@ -636,7 +644,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
 
@@ -785,7 +793,7 @@ export default function ChatScreen() {
 
       const uid = await refreshMeId();
       if (!uid) {
-        Alert.alert("Sign in required", "Please sign in to chat.");
+        Alert.alert(t("signInRequired"), t("pleaseSignInToChat"));
         router.push("/sign-in" as any);
         return;
       }
@@ -810,7 +818,7 @@ export default function ChatScreen() {
 
       if (error) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-        Alert.alert("Send failed", error.message);
+        Alert.alert(t("sendFailed"), error.message);
       }
     },
     [acceptedOffer, canChat],
@@ -841,7 +849,7 @@ export default function ChatScreen() {
 
         await sendPayloadText(payloadText);
       } catch (e: any) {
-        Alert.alert("Upload failed", e?.message ?? String(e));
+        Alert.alert(t("uploadFailed"), e?.message ?? String(e));
       } finally {
         setUploadingMedia(false);
       }
@@ -855,7 +863,7 @@ export default function ChatScreen() {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       console.log("[pickFromGallery] perm:", perm);
       if (!perm.granted) {
-        Alert.alert("Photos permission", "Please allow Photos access.");
+        Alert.alert(t("photosPermission"), t("allowPhotosAccess"));
         return;
       }
 
@@ -876,13 +884,13 @@ export default function ChatScreen() {
           const mime = picked.mimeType ?? "image/jpeg";
           await sendImage(picked.uri, mime, "gallery");
         } catch (e: any) {
-          Alert.alert("Upload failed", e?.message ?? String(e));
+          Alert.alert(t("uploadFailed"), e?.message ?? String(e));
         }
       };
 
       setAttachOpen(false);
     } catch (e: any) {
-      Alert.alert("Gallery failed", e?.message ?? String(e));
+      Alert.alert(t("galleryFailed"), e?.message ?? String(e));
     }
   };
 
@@ -891,7 +899,7 @@ export default function ChatScreen() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     console.log("[takePhoto] perm:", perm);
     if (!perm.granted) {
-      Alert.alert("Camera permission", "Please allow Camera access.");
+      Alert.alert(t("cameraPermission"), t("allowCameraAccess"));
       return;
     }
 
@@ -921,15 +929,12 @@ export default function ChatScreen() {
 
     const uid = await refreshMeId();
     if (!uid) {
-      Alert.alert("Sign in required", "Please sign in.");
+      Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
       return;
     }
 
     if (!request.close_requested_by || request.close_requested_by === uid) {
-      Alert.alert(
-        "Waiting",
-        "The other person must request closing first (or you can request it).",
-      );
+      Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
       return;
     }
 
@@ -945,7 +950,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
 
@@ -975,7 +980,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
       await load();
@@ -1006,7 +1011,7 @@ export default function ChatScreen() {
         .eq("id", request.id);
 
       if (error) {
-        Alert.alert("Error", error.message);
+        Alert.alert(t("error"), error.message);
         return;
       }
       await load();
@@ -1030,7 +1035,7 @@ export default function ChatScreen() {
             onPress={() => requestClose("completed")}
             disabled={closeWorking}
           >
-            <Text style={styles.closeBtnText}>Close deal</Text>
+            <Text style={styles.closeBtnText}>{t("closeDeal")}</Text>
           </Pressable>
 
           <Pressable
@@ -1043,7 +1048,7 @@ export default function ChatScreen() {
             disabled={closeWorking}
           >
             <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
-              Cancel
+              {t("cancel")}
             </Text>
           </Pressable>
         </View>
@@ -1054,8 +1059,13 @@ export default function ChatScreen() {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
-            Waiting for confirmation… (
-            {(request.close_reason ?? "completed").toUpperCase()})
+            {t("waitingConfirmation")} (
+            {t(
+              (request.close_reason ?? "completed") === "completed"
+                ? "completed"
+                : "cancelled",
+            ).toUpperCase()}
+            )
           </Text>
           <Pressable
             style={[
@@ -1067,7 +1077,7 @@ export default function ChatScreen() {
             disabled={closeWorking}
           >
             <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
-              Undo
+              {t("undo")}
             </Text>
           </Pressable>
         </View>
@@ -1078,8 +1088,12 @@ export default function ChatScreen() {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
-            Other user requested:{" "}
-            {(request.close_reason ?? "completed").toUpperCase()}
+            {t("otherUserRequested")}:{" "}
+            {t(
+              (request.close_reason ?? "completed") === "completed"
+                ? "completed"
+                : "cancelled",
+            ).toUpperCase()}
           </Text>
 
           <Pressable
@@ -1087,7 +1101,7 @@ export default function ChatScreen() {
             onPress={confirmClose}
             disabled={closeWorking}
           >
-            <Text style={styles.closeBtnText}>Confirm</Text>
+            <Text style={styles.closeBtnText}>{t("confirm")}</Text>
           </Pressable>
 
           <Pressable
@@ -1100,7 +1114,7 @@ export default function ChatScreen() {
             disabled={closeWorking}
           >
             <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
-              Dismiss
+              {t("dismiss")}
             </Text>
           </Pressable>
         </View>
@@ -1134,9 +1148,9 @@ export default function ChatScreen() {
             <View
               style={[
                 styles.statusPill,
-                statusLabel === "OPEN"
+                request.status === "active"
                   ? styles.pillOpen
-                  : statusLabel === "NEGOTIATING"
+                  : request.status === "matched"
                     ? styles.pillNegotiating
                     : styles.pillClosed,
               ]}
@@ -1157,7 +1171,7 @@ export default function ChatScreen() {
           {showPrice && (
             <View style={styles.metaPill}>
               <Text style={styles.metaPillText}>
-                Agreed • €{Number(finalPrice!).toLocaleString()}
+                {t("agreed")} • {formatPrice(Number(finalPrice!))}
               </Text>
             </View>
           )}
@@ -1176,7 +1190,7 @@ export default function ChatScreen() {
                 style={styles.contextActionBtn}
               >
                 <Text style={styles.contextActionBtnText}>
-                  Open request page
+                  {t("openRequestPage")}
                 </Text>
               </Pressable>
 
@@ -1199,7 +1213,7 @@ export default function ChatScreen() {
                     styles.contextActionBtnSecondaryText,
                   ]}
                 >
-                  Collapse
+                  {t("collapse")}
                 </Text>
               </Pressable>
             </View>
@@ -1332,13 +1346,13 @@ export default function ChatScreen() {
               {otherUser?.name || otherUser?.email || "Chat"}
             </Text>
             <Text style={styles.headerSub} numberOfLines={1}>
-              {request ? getRequestStatusLabel(request.status) : ""}
+              {request ? getRequestStatusLabel(request.status, t) : ""}
               {acceptedOffer
                 ? otherTyping
-                  ? " • typing…"
+                  ? ` • ${t("typingIndicator")}`
                   : otherOnline
-                    ? " • online"
-                    : " • offline"
+                    ? ` • ${t("online")}`
+                    : ` • ${t("offline")}`
                 : ""}
             </Text>
           </View>
@@ -1363,10 +1377,8 @@ export default function ChatScreen() {
 
         {!acceptedOffer ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>Chat not available yet</Text>
-            <Text style={styles.emptySub}>
-              The chat opens once an offer or counter-offer is accepted.
-            </Text>
+            <Text style={styles.emptyTitle}>{t("chatNotAvailable")}</Text>
+            <Text style={styles.emptySub}>{t("chatOpensOnAccept")}</Text>
           </View>
         ) : (
           <>
@@ -1399,12 +1411,12 @@ export default function ChatScreen() {
               ListEmptyComponent={
                 loading ? (
                   <View style={styles.emptyBox}>
-                    <Text style={styles.emptyTitle}>Loading…</Text>
+                    <Text style={styles.emptyTitle}>{t("loading")}</Text>
                   </View>
                 ) : (
                   <View style={styles.emptyBox}>
-                    <Text style={styles.emptyTitle}>No messages yet</Text>
-                    <Text style={styles.emptySub}>Say hi 👋</Text>
+                    <Text style={styles.emptyTitle}>{t("noMessages")}</Text>
+                    <Text style={styles.emptySub}>{t("sayHi")}</Text>
                   </View>
                 )
               }
@@ -1438,10 +1450,10 @@ export default function ChatScreen() {
                   onChangeText={onChangeText}
                   placeholder={
                     canChat
-                      ? "Write a message…"
+                      ? t("writeMessage")
                       : request?.status === "closed"
-                        ? "This deal is closed"
-                        : "Chat available only in NEGOTIATING"
+                        ? t("dealClosed")
+                        : t("chatOnlyNegotiating")
                   }
                   placeholderTextColor={theme.secondaryText}
                   style={[styles.input, !canChat && { opacity: 0.6 }]}

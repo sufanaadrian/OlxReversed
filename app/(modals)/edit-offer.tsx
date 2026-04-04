@@ -10,9 +10,11 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 export default function EditOfferModal() {
+  const t = useTranslation();
   const params = useLocalSearchParams();
 
   const offerId = (params?.offerId as string) ?? "";
@@ -31,10 +33,10 @@ export default function EditOfferModal() {
   const [saving, setSaving] = useState(false);
 
   const onSave = async () => {
-    if (!offerId) return Alert.alert("Error", "Missing offerId");
+    if (!offerId) return Alert.alert(t("error"), t("missingOfferId"));
     const p = Number(price);
     if (!Number.isFinite(p) || p <= 0) {
-      return Alert.alert("Invalid price", "Please enter a valid price.");
+      return Alert.alert(t("invalidPriceTitle"), t("enterValidPrice"));
     }
 
     setSaving(true);
@@ -46,14 +48,14 @@ export default function EditOfferModal() {
         .eq("id", offerId)
         .maybeSingle();
 
-      if (fetchErr) return Alert.alert("Error", fetchErr.message);
-      if (!offerRow) return Alert.alert("Error", "Offer not found.");
+      if (fetchErr) return Alert.alert(t("error"), fetchErr.message);
+      if (!offerRow) return Alert.alert(t("error"), t("offerNotFound"));
 
       if (offerRow.status === "accepted") {
-        return Alert.alert("Not allowed", "You can't edit an accepted offer.");
+        return Alert.alert(t("notAllowed"), t("cantEditAcceptedOffer"));
       }
       if (offerRow.status === "withdrawn") {
-        return Alert.alert("Not allowed", "You can't edit a withdrawn offer.");
+        return Alert.alert(t("notAllowed"), t("cantEditWithdrawnOffer"));
       }
 
       const { data, error } = await supabase
@@ -65,15 +67,12 @@ export default function EditOfferModal() {
         .eq("id", offerId)
         .select("id");
 
-      if (error) return Alert.alert("Error", error.message);
+      if (error) return Alert.alert(t("error"), error.message);
       if (!data || data.length === 0) {
-        return Alert.alert(
-          "Not updated",
-          "No rows were updated (RLS or invalid offer).",
-        );
+        return Alert.alert(t("notUpdated"), t("noRowsUpdated"));
       }
 
-      Alert.alert("Saved", "Your offer was updated.");
+      Alert.alert(t("saved"), t("offerUpdated"));
       router.back();
     } finally {
       setSaving(false);
@@ -89,30 +88,32 @@ export default function EditOfferModal() {
           </Pressable>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.h1}>Edit offer</Text>
+            <Text style={styles.h1}>{t("editOffer")}</Text>
             {!!requestId && (
               <Text style={styles.sub} numberOfLines={1}>
-                Request: {requestId}
+                {t("requestLabel")}: {requestId}
               </Text>
             )}
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Price (€)</Text>
+          <Text style={styles.label}>{t("priceLabel")}</Text>
           <TextInput
             value={price}
             onChangeText={setPrice}
             keyboardType="numeric"
-            placeholder="e.g. 100"
+            placeholder={t("examplePrice")}
             style={styles.input}
           />
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Description</Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>
+            {t("description")}
+          </Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Update your offer description…"
+            placeholder={t("updateOfferPlaceholder")}
             style={[styles.input, styles.textArea]}
             multiline
           />
@@ -123,7 +124,7 @@ export default function EditOfferModal() {
             style={[styles.btnPrimary, saving && { opacity: 0.7 }]}
           >
             <Text style={styles.btnPrimaryText}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? t("saving") : t("save")}
             </Text>
           </Pressable>
         </View>

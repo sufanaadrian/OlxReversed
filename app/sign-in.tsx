@@ -2,9 +2,11 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "../src/context/LanguageContext";
 import { supabase } from "../src/lib/supabase";
 
 export default function SignInScreen() {
+  const t = useTranslation();
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
 
   const [email, setEmail] = useState("");
@@ -41,7 +43,7 @@ export default function SignInScreen() {
     }
 
     // If confirm email is ON -> session is null, user must confirm
-    setMsg("Account created. Check your email to confirm, then sign in.");
+    setMsg(t("accountCreatedConfirm"));
   };
 
   const onSignIn = async () => {
@@ -65,10 +67,12 @@ export default function SignInScreen() {
 
   return (
     <View style={{ flex: 1, padding: 20, justifyContent: "center", gap: 12 }}>
-      <Text style={{ fontSize: 22, fontWeight: "800" }}>Sign in</Text>
+      <Text style={{ fontSize: 22, fontWeight: "800" }}>
+        {t("signinHeader")}
+      </Text>
 
       <TextInput
-        placeholder="Email"
+        placeholder={t("emailPlaceholder")}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
@@ -77,7 +81,7 @@ export default function SignInScreen() {
       />
 
       <TextInput
-        placeholder="Password"
+        placeholder={t("passwordPlaceholder")}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -99,7 +103,7 @@ export default function SignInScreen() {
         <Text
           style={{ color: "white", textAlign: "center", fontWeight: "800" }}
         >
-          {loading ? "Working..." : "Sign In"}
+          {loading ? t("working") : t("signIn")}
         </Text>
       </Pressable>
 
@@ -114,7 +118,7 @@ export default function SignInScreen() {
         }}
       >
         <Text style={{ textAlign: "center", fontWeight: "800" }}>
-          {loading ? "Working..." : "Create account"}
+          {loading ? t("working") : t("createAccount")}
         </Text>
       </Pressable>
     </View>

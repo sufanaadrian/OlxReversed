@@ -4,6 +4,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/components/Screen";
+import { useCurrency } from "../../../src/context/CurrencyContext";
+import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
 
 type RequestRow = {
@@ -20,6 +22,8 @@ type RequestRow = {
 };
 
 export default function RequestDetailScreen() {
+  const t = useTranslation();
+  const { formatPrice } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [request, setRequest] = useState<RequestRow | null>(null);
@@ -45,7 +49,7 @@ export default function RequestDetailScreen() {
       .single();
 
     if (error || !data) {
-      Alert.alert("Request not found");
+      Alert.alert(t("error"), t("requestNotFound"));
       router.back();
       return;
     }
@@ -75,29 +79,25 @@ export default function RequestDetailScreen() {
   const deleteRequest = async () => {
     if (!request) return;
 
-    Alert.alert(
-      "Delete request",
-      "Are you sure you want to delete this request?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await supabase.from("requests").delete().eq("id", request.id);
+    Alert.alert(t("deleteRequest"), t("deleteConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: async () => {
+          await supabase.from("requests").delete().eq("id", request.id);
 
-            router.back();
-          },
+          router.back();
         },
-      ],
-    );
+      },
+    ]);
   };
 
   if (loading || !request) {
     return (
       <Screen>
         <View style={styles.center}>
-          <Text>Loading…</Text>
+          <Text>{t("loading")}</Text>
         </View>
       </Screen>
     );
@@ -112,8 +112,8 @@ export default function RequestDetailScreen() {
 
         <View style={styles.meta}>
           <Text style={styles.metaText}>
-            ${request.budget_min.toLocaleString()} – $
-            {request.budget_max.toLocaleString()}
+            {formatPrice(request.budget_min)} –{" "}
+            {formatPrice(request.budget_max)}
           </Text>
 
           {request.location && (
@@ -121,7 +121,7 @@ export default function RequestDetailScreen() {
           )}
 
           <Text style={styles.metaText}>
-            Posted {new Date(request.created_at).toLocaleDateString()}
+            {t("posted")} {new Date(request.created_at).toLocaleDateString()}
           </Text>
         </View>
 
@@ -132,11 +132,11 @@ export default function RequestDetailScreen() {
               style={styles.primaryBtn}
               onPress={() => router.push(`/request/${id}/offers`)}
             >
-              <Text style={styles.primaryText}>View offers</Text>
+              <Text style={styles.primaryText}>{t("viewOffers")}</Text>
             </Pressable>
 
             <Pressable style={styles.dangerBtn} onPress={deleteRequest}>
-              <Text style={styles.dangerText}>Delete request</Text>
+              <Text style={styles.dangerText}>{t("deleteRequest")}</Text>
             </Pressable>
           </View>
         )}
@@ -154,7 +154,7 @@ export default function RequestDetailScreen() {
                   } as any)
                 }
               >
-                <Text style={styles.primaryText}>Send offer</Text>
+                <Text style={styles.primaryText}>{t("sendOffer")}</Text>
               </Pressable>
             ) : (
               <>
@@ -167,7 +167,7 @@ export default function RequestDetailScreen() {
                     } as any)
                   }
                 >
-                  <Text style={styles.primaryText}>Edit offer</Text>
+                  <Text style={styles.primaryText}>{t("editOffer")}</Text>
                 </Pressable>
 
                 <Pressable
@@ -177,7 +177,7 @@ export default function RequestDetailScreen() {
                     setMyOfferId(null);
                   }}
                 >
-                  <Text style={styles.dangerText}>Withdraw offer</Text>
+                  <Text style={styles.dangerText}>{t("withdrawOffer")}</Text>
                 </Pressable>
               </>
             )}
@@ -188,7 +188,7 @@ export default function RequestDetailScreen() {
         {request.status === "closed" && (
           <View style={styles.closed}>
             <Feather name="lock" size={18} />
-            <Text style={styles.closedText}>Request closed</Text>
+            <Text style={styles.closedText}>{t("requestClosed")}</Text>
           </View>
         )}
       </View>
