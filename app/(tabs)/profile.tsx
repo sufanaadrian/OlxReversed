@@ -2,10 +2,13 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 
 export default function ProfileScreen() {
   const [email, setEmail] = useState<string | null>(null);
+  const { language, setLanguage } = useLanguage();
+  const t = useTranslation();
 
   useEffect(() => {
     let mounted = true;
@@ -47,7 +50,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.h1}>Profile</Text>
+      <Text style={styles.h1}>{t("profile")}</Text>
 
       <View style={styles.card}>
         <View style={styles.avatar}>
@@ -57,20 +60,59 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{isLoggedIn ? "User" : "Guest"}</Text>
-          <Text style={styles.email}>{email ?? "Not signed in"}</Text>
+          <Text style={styles.name}>{isLoggedIn ? t("user") : t("guest")}</Text>
+          <Text style={styles.email}>{email ?? t("notSignedIn")}</Text>
         </View>
       </View>
 
-      {/* Mock stats for now */}
+      {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Requests</Text>
+          <Text style={styles.statLabel}>{t("requests")}</Text>
           <Text style={styles.statValue}>0</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Deals</Text>
+          <Text style={styles.statLabel}>{t("deals")}</Text>
           <Text style={styles.statValue}>0</Text>
+        </View>
+      </View>
+
+      {/* Language Selection */}
+      <View style={styles.settingSection}>
+        <Text style={styles.sectionTitle}>{t("language")}</Text>
+        <View style={styles.languageButtons}>
+          <Pressable
+            style={[
+              styles.languageBtn,
+              language === "en" && styles.languageBtnActive,
+            ]}
+            onPress={() => setLanguage("en")}
+          >
+            <Text
+              style={[
+                styles.languageBtnText,
+                language === "en" && styles.languageBtnTextActive,
+              ]}
+            >
+              🇬🇧 English
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.languageBtn,
+              language === "ro" && styles.languageBtnActive,
+            ]}
+            onPress={() => setLanguage("ro")}
+          >
+            <Text
+              style={[
+                styles.languageBtnText,
+                language === "ro" && styles.languageBtnTextActive,
+              ]}
+            >
+              🇷🇴 Română
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -81,11 +123,11 @@ export default function ProfileScreen() {
           color={theme.primaryText}
         />
         <Text style={styles.authText}>
-          {isLoggedIn ? "Log out" : "Sign in"}
+          {isLoggedIn ? t("logOut") : t("signIn")}
         </Text>
       </Pressable>
 
-      <Text style={styles.version}>Version 1.0.0</Text>
+      <Text style={styles.version}>{t("version")} 1.0.0</Text>
     </View>
   );
 }
@@ -148,6 +190,45 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
+  },
+
+  settingSection: {
+    marginTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: theme.primaryText,
+    marginBottom: 10,
+  },
+  languageButtons: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  languageBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  languageBtnActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+  },
+  languageBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+  languageBtnTextActive: {
+    color: "white",
   },
 
   authBtn: {

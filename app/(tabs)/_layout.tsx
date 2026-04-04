@@ -3,9 +3,11 @@ import { Tabs, router } from "expo-router";
 import React, { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../src/context/LanguageContext";
 
 export default function TabsLayout() {
   const [open, setOpen] = useState(false);
+  const t = useTranslation();
 
   const close = () => setOpen(false);
 
@@ -45,7 +47,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="marketplace"
             options={{
-              title: "Home",
+              title: t("home"),
               tabBarIcon: ({ color, size }) => (
                 <Feather name="home" color={color} size={size} />
               ),
@@ -55,7 +57,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="my-requests"
             options={{
-              title: "My Requests",
+              title: t("myRequests"),
               tabBarIcon: ({ color, size }) => (
                 <Feather name="file-text" color={color} size={size} />
               ),
@@ -94,7 +96,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="my-offers"
             options={{
-              title: "My Offers",
+              title: t("myOffers"),
               tabBarIcon: ({ color, size }) => (
                 <Feather name="briefcase" color={color} size={size} />
               ),
@@ -104,7 +106,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="profile"
             options={{
-              title: "Profile",
+              title: t("profile"),
               tabBarIcon: ({ color, size }) => (
                 <Feather name="user" color={color} size={size} />
               ),
@@ -122,17 +124,17 @@ export default function TabsLayout() {
           <Pressable style={styles.backdrop} onPress={close} />
 
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>What do you want to do?</Text>
-            <Text style={styles.sheetSubtitle}>Choose your action below</Text>
+            <Text style={styles.sheetTitle}>{t("createRequest")}</Text>
+            <Text style={styles.sheetSubtitle}>{t("chooseYourAction")}</Text>
 
             <Pressable style={styles.actionCard} onPress={goCreateRequest}>
               <View style={styles.actionIcon}>
                 <Feather name="plus-circle" size={20} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.actionTitle}>Post a Request</Text>
+                <Text style={styles.actionTitle}>{t("postARequest")}</Text>
                 <Text style={styles.actionDesc}>
-                  I want to buy or request a service
+                  {t("iWantToBuyOrRequest")}
                 </Text>
               </View>
             </Pressable>
@@ -142,15 +144,15 @@ export default function TabsLayout() {
                 <Feather name="search" size={20} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.actionTitle}>View active requests</Text>
-                <Text style={styles.actionDesc}>
-                  I want to respond to existing requests
+                <Text style={styles.actionTitle}>
+                  {t("viewActiveRequests")}
                 </Text>
+                <Text style={styles.actionDesc}>{t("iWantToRespond")}</Text>
               </View>
             </Pressable>
 
             <Pressable style={styles.closeBtn} onPress={close}>
-              <Text style={styles.closeBtnText}>Close</Text>
+              <Text style={styles.closeBtnText}>{t("close")}</Text>
             </Pressable>
           </View>
         </Modal>
