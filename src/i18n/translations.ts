@@ -258,6 +258,8 @@ export const translations = {
     marketplaceError: "Marketplace error",
     skip: "SKIP",
     interestedBtn: "INTERESTED",
+    showMore: "Show more",
+    showLess: "Show less",
 
     // Create Offer Modal
     missingRequestId: "Missing requestId",
@@ -491,7 +493,7 @@ export const translations = {
     fetchingSwipesOffers: "Se aduc swipuri și oferte",
     noItemsInFilter: "Nicio ofertă în acest filtru.",
     goToMarketplace: "Du-te pe Piață",
-    counterOfferFrom: "contraofertă de la",
+    counterOfferFrom: "a făcut o contraofertă in valoare de",
 
     // Settings & Profile
     logIn: "Conectare",
@@ -574,6 +576,8 @@ export const translations = {
     marketplaceError: "Eroare piață",
     skip: "IGNORĂ",
     interestedBtn: "INTERESAT",
+    showMore: "Arată mai mult",
+    showLess: "Arată mai puțin",
 
     // Create Offer Modal
     missingRequestId: "RequestId lipsă",

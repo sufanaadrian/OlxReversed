@@ -291,7 +291,9 @@ export const styles = StyleSheet.create({
   arrowText: { fontWeight: "900", color: theme.secondaryText },
   newOfferText: { fontWeight: "900", color: "#16a34a" },
 
-  counterMain: { fontWeight: "900", color: theme.primaryText },
+  counterMain: { fontWeight: "600", color: theme.secondaryText },
+  counterEmail: { fontWeight: "800", color: theme.primaryText, fontSize: 13 },
+  counterPrice: { fontWeight: "900", color: theme.primaryText, fontSize: 14 },
   counterMsg: { color: theme.secondaryText, lineHeight: 18 },
   counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
   counterActions: { flexDirection: "row", gap: 10, marginTop: 8 },

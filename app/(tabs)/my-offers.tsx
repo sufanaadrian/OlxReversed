@@ -93,6 +93,14 @@ export default function MyOffersScreen() {
     setOpenDetails((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
   };
 
+  const [expandedOfferDesc, setExpandedOfferDesc] = useState<
+    Record<string, boolean>
+  >({});
+  const toggleOfferDesc = (offerId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedOfferDesc((prev) => ({ ...prev, [offerId]: !prev[offerId] }));
+  };
+
   const [swipes, setSwipes] = useState<
     { request: RequestRow; direction: SwipeDirection; swipedAt: string }[]
   >([]);
@@ -797,15 +805,42 @@ export default function MyOffersScreen() {
                               </Text>
                             </View>
 
+                            {!!o.description && (
+                              <>
+                                <Text
+                                  style={styles.offerDesc}
+                                  numberOfLines={
+                                    expandedOfferDesc[o.id] ? 0 : 3
+                                  }
+                                >
+                                  {o.description}
+                                </Text>
+                                <Pressable
+                                  onPress={() => toggleOfferDesc(o.id)}
+                                >
+                                  <Text style={styles.offerMeta}>
+                                    {expandedOfferDesc[o.id]
+                                      ? t("showLess")
+                                      : t("showMore")}
+                                  </Text>
+                                </Pressable>
+                              </>
+                            )}
+
                             {counters.map((c) => {
                               const counterPending = c.status === "pending";
 
                               return (
                                 <View key={c.id} style={styles.counterNode}>
                                   <Text style={styles.counterMain}>
-                                    ↳ {request.profiles?.email ?? "unknown"}{" "}
+                                    ↳{" "}
+                                    <Text style={styles.counterEmail}>
+                                      {request.profiles?.email ?? "unknown"}
+                                    </Text>{" "}
                                     {t("counterOfferFrom")}:{" "}
-                                    {formatPrice(Number(c.price))}
+                                    <Text style={styles.counterPrice}>
+                                      {formatPrice(Number(c.price))}
+                                    </Text>
                                   </Text>
 
                                   {!!c.message && (
