@@ -1,0 +1,203 @@
+import { StyleSheet } from "react-native";
+
+export const theme = {
+  primary: "#1E40AF",
+  bg: "#F9FAFB",
+  surface: "#FFFFFF",
+  primaryText: "#020617",
+  secondaryText: "#64748B",
+  border: "#E5E7EB",
+  accentSoft: "#DBEAFE",
+};
+
+export const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    backgroundColor: theme.bg,
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  header: { fontSize: 20, fontWeight: "900", color: theme.primaryText },
+
+  createBtn: {
+    height: 40,
+    width: 40,
+    borderRadius: 14,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  filtersWrap: { alignItems: "center", marginBottom: 6 },
+  filters: {
+    flexDirection: "row",
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
+    padding: 6,
+    gap: 6,
+  },
+  filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
+  filterBtnActive: { backgroundColor: theme.accentSoft },
+  filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
+  filterTextActive: { color: theme.primaryText },
+
+  listContent: { paddingBottom: 18 },
+
+  centerCard: {
+    flex: 1,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  titleEmpty: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
+  muted: { color: theme.secondaryText, textAlign: "center" },
+
+  card: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 12,
+  },
+
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  rightBadges: { flexDirection: "row", gap: 8, alignItems: "center" },
+
+  categoryPill: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+
+  offerPill: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  offerPillText: { fontSize: 12, fontWeight: "900", color: theme.primary },
+
+  // ✅ NEW withdrawn badge styles
+  withdrawnPill: {
+    backgroundColor: theme.border,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  withdrawnPillText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+
+  dealPill: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  dealPillText: { fontSize: 12, fontWeight: "900", color: "#166534" },
+
+  statusPill: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  statusActive: {
+    backgroundColor: theme.accentSoft,
+    borderColor: theme.primary,
+  },
+  statusMatched: { backgroundColor: "#FEF9C3", borderColor: "#F59E0B" },
+  statusClosed: { backgroundColor: theme.border, borderColor: theme.border },
+  statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+  statusOpen: {
+    backgroundColor: "#2f855a",
+  },
+  statusNegotiating: {
+    backgroundColor: "#805ad5",
+  },
+
+  title: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+  desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+
+  metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  metaStrong: { fontWeight: "900", color: theme.primaryText },
+  metaMuted: { color: theme.secondaryText },
+
+  footerRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  smallMuted: { fontSize: 12, color: theme.secondaryText },
+
+  reviewBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  viewBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewBtnText: { color: theme.primaryText, fontWeight: "900", fontSize: 12 },
+
+  rightActionsWrap: {
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginTop: 12,
+  },
+  deleteBtn: {
+    width: 92,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  deleteText: { color: "white", fontWeight: "900", fontSize: 12 },
+});
