@@ -634,7 +634,7 @@ export default function MyOffersScreen() {
                         {request.title}
                       </Text>
                       <Text style={styles.by} numberOfLines={1}>
-                        Posted by {request.profiles?.email ?? "unknown"}
+                        {t("postedBy")} {request.profiles?.email ?? "unknown"}
                       </Text>
                     </View>
                     <Feather
