@@ -257,7 +257,7 @@ export const translations = {
     refresh: "Refresh",
     marketplaceError: "Marketplace error",
     skip: "SKIP",
-    interested: "INTERESTED",
+    interestedBtn: "INTERESTED",
 
     // Create Offer Modal
     missingRequestId: "Missing requestId",
@@ -573,7 +573,7 @@ export const translations = {
     refresh: "Reîncarcă",
     marketplaceError: "Eroare piață",
     skip: "IGNORĂ",
-    interested: "INTERESAT",
+    interestedBtn: "INTERESAT",
 
     // Create Offer Modal
     missingRequestId: "RequestId lipsă",
