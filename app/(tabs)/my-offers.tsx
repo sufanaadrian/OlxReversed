@@ -4,17 +4,27 @@ import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  LayoutAnimation,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type SwipeDirection = "left" | "right";
 type OfferStatus = "pending" | "accepted" | "rejected";
@@ -75,6 +85,12 @@ export default function MyOffersScreen() {
   const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
   const toggleThread = (requestId: string) => {
     setOpenThreads((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
+  };
+
+  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
+  const toggleDetails = (requestId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpenDetails((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
   };
 
   const [swipes, setSwipes] = useState<
@@ -580,6 +596,7 @@ export default function MyOffersScreen() {
 
             // ✅ each row needs its own ref so openRowRef works
             const rowRef = React.createRef<Swipeable>();
+            const isDetailsOpen = openDetails[request.id] === true;
 
             return (
               <Swipeable
@@ -604,21 +621,69 @@ export default function MyOffersScreen() {
                 }}
               >
                 <View style={styles.card}>
-                  <View style={styles.cardTop}>
+                  <Pressable
+                    onPress={() => toggleDetails(request.id)}
+                    style={styles.cardTop}
+                  >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.category}>{request.category}</Text>
-                      <Text style={styles.title} numberOfLines={1}>
+                      <Text
+                        style={styles.title}
+                        numberOfLines={isDetailsOpen ? 0 : 1}
+                      >
                         {request.title}
                       </Text>
                       <Text style={styles.by} numberOfLines={1}>
-                        Posted by {request.profiles?.email ?? "unknown"}
+                        {t("postedBy")} {request.profiles?.email ?? "unknown"}
                       </Text>
                     </View>
-                  </View>
+                    <Feather
+                      name={isDetailsOpen ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color="#6B7280"
+                    />
+                  </Pressable>
 
-                  <Text style={styles.desc} numberOfLines={2}>
+                  <Text
+                    style={styles.desc}
+                    numberOfLines={isDetailsOpen ? 0 : 2}
+                  >
                     {request.description}
                   </Text>
+
+                  {isDetailsOpen && !!request.location && (
+                    <Text style={styles.detailLocation}>
+                      📍 {request.location}
+                    </Text>
+                  )}
+
+                  {isDetailsOpen && (
+                    <View style={styles.detailActionsRow}>
+                      <Pressable
+                        style={styles.detailActionBtn}
+                        onPress={() =>
+                          router.push(`/request/${request.id}` as any)
+                        }
+                      >
+                        <Text style={styles.detailActionBtnText}>
+                          {t("openRequestPage")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.detailActionBtn, styles.detailActionBtnSecondary]}
+                        onPress={() => toggleDetails(request.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.detailActionBtnText,
+                            styles.detailActionBtnSecondaryText,
+                          ]}
+                        >
+                          {t("collapse")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
 
                   <View style={styles.metaRow}>
                     <View style={styles.pill}>
@@ -1214,4 +1279,41 @@ const styles = StyleSheet.create({
   counterMsg: { color: theme.secondaryText, lineHeight: 18 },
   counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
   counterActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+
+  detailLocation: {
+    marginTop: 8,
+    color: theme.secondaryText,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  detailActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+
+  detailActionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#111827",
+  },
+
+  detailActionBtnText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  detailActionBtnSecondary: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+
+  detailActionBtnSecondaryText: {
+    color: theme.primaryText,
+  },
 });
