@@ -614,15 +614,15 @@ export default function MyOffersScreen() {
           />
 
           <FilterBtn
-            label={`${t("skipped")} (${counts.skipped})`}
-            active={filter === "skipped"}
-            onPress={() => setFilter("skipped")}
-          />
-
-          <FilterBtn
             label={`${t("offerWithdrawn")} (${offerViewCounts.withdrawn})`}
             active={filter === "withdrawn"}
             onPress={() => setFilter("withdrawn")}
+          />
+
+          <FilterBtn
+            label={`${t("skipped")} (${counts.skipped})`}
+            active={filter === "skipped"}
+            onPress={() => setFilter("skipped")}
           />
         </ScrollView>
         {/* scroll hint */}

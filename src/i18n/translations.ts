@@ -192,6 +192,7 @@ export const translations = {
     noItemsInFilter: "No items in this filter.",
     goToMarketplace: "Go to Marketplace",
     counterOfferFrom: "'s counter offer",
+    swipeToEditWithdraw: "Swipe for edit/withdraw",
 
     // Settings & Profile
     logIn: "Log in",
@@ -526,7 +527,7 @@ export const translations = {
     noItemsInFilter: "Nicio ofertă în acest filtru.",
     goToMarketplace: "Du-te pe Piață",
     counterOfferFrom: "a făcut o contraofertă in valoare de",
-
+    swipeToEditWithdraw: "Swipe pentru editare/retragere",
     // Settings & Profile
     logIn: "Conectare",
     logOut: "Deconectare",
