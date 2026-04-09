@@ -85,6 +85,42 @@ export const styles = StyleSheet.create({
   },
 
   // ─── Card ──────────────────────────────────────────────────────
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  sectionHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.border,
+  },
+  sectionHeaderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sectionHeaderDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   card: {
     backgroundColor: theme.surface,
     borderWidth: 1,

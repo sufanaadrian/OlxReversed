@@ -360,8 +360,88 @@ export default function MyOffersScreen() {
       });
     }
 
-    return base;
-  }, [swipes, filter, latestOfferByRequestId]);
+    // 3) Smart sort: priority tier + latest activity
+    const getTier = (item: (typeof swipes)[0]): number => {
+      const { request, direction } = item;
+      const latestOffer = latestOfferByRequestId.get(request.id);
+      const counter = latestCounterByRequestId.get(request.id);
+
+      // Counter-offer pending your response → top priority
+      if (counter?.status === "pending") return 1;
+      // Offer pending → waiting for buyer
+      if (latestOffer && latestOffer.status === "pending") return 2;
+      // Matched/accepted
+      if (
+        latestOffer?.status === "accepted" ||
+        counter?.status === "accepted"
+      )
+        return 3;
+      // Interested but no offer yet
+      if (direction === "right" && !latestOffer) return 4;
+      // Rejected — can resend
+      if (latestOffer?.status === "rejected") return 5;
+      // Withdrawn
+      if (latestOffer?.status === "withdrawn") return 6;
+      // Skipped
+      if (direction === "left") return 7;
+      return 8;
+    };
+
+    const getLatestActivityTs = (item: (typeof swipes)[0]): number => {
+      const reqOffers = offersByRequestId.get(item.request.id) ?? [];
+      let latest = new Date(item.swipedAt).getTime();
+      for (const o of reqOffers) {
+        const t = new Date(o.created_at).getTime();
+        if (t > latest) latest = t;
+        const cs = countersByOfferId.get(o.id) ?? [];
+        for (const c of cs) {
+          const ct = new Date(c.created_at).getTime();
+          if (ct > latest) latest = ct;
+        }
+      }
+      return latest;
+    };
+
+    const getSectionKey = (tier: number): string => {
+      switch (tier) {
+        case 1:
+          return "sectionNeedsResponse";
+        case 2:
+          return "sectionWaiting";
+        case 3:
+          return "sectionCompleted";
+        case 4:
+          return "sectionInterested";
+        case 5:
+          return "sectionRejected";
+        case 6:
+          return "sectionWithdrawn";
+        case 7:
+          return "sectionSkipped";
+        default:
+          return "sectionSkipped";
+      }
+    };
+
+    const sorted = [...base].sort((a, b) => {
+      const tierA = getTier(a);
+      const tierB = getTier(b);
+      if (tierA !== tierB) return tierA - tierB;
+      return getLatestActivityTs(b) - getLatestActivityTs(a);
+    });
+
+    return sorted.map((item) => {
+      const tier = getTier(item);
+      return { ...item, sectionKey: getSectionKey(tier) };
+    });
+  }, [
+    swipes,
+    filter,
+    latestOfferByRequestId,
+    latestCounterByRequestId,
+    offersByRequestId,
+    countersByOfferId,
+  ]);
 
   const openCreateOffer = (requestId: string) => {
     router.push({
@@ -584,7 +664,27 @@ export default function MyOffersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {visible.map(({ request, direction }) => {
+          {visible.map(({ request, direction, sectionKey }, visibleIdx) => {
+            // ─── Section header when group changes ───
+            const prevSection =
+              visibleIdx > 0 ? visible[visibleIdx - 1].sectionKey : null;
+            const showSectionHeader = sectionKey !== prevSection;
+
+            const sectionDotColor =
+              sectionKey === "sectionNeedsResponse"
+                ? "#f59e0b"
+                : sectionKey === "sectionWaiting"
+                  ? "#3b82f6"
+                  : sectionKey === "sectionCompleted"
+                    ? "#16a34a"
+                    : sectionKey === "sectionRejected"
+                      ? "#dc2626"
+                      : sectionKey === "sectionWithdrawn"
+                        ? "#9ca3af"
+                        : sectionKey === "sectionInterested"
+                          ? "#0ea5e9"
+                          : "#cbd5e1";
+
             const latestOffer = latestOfferByRequestId.get(request.id);
             const counter = latestCounterByRequestId.get(request.id);
             const requestOffers = offersByRequestId.get(request.id) ?? [];
@@ -682,10 +782,27 @@ export default function MyOffersScreen() {
             })();
 
             return (
-              <View
-                key={request.id}
-                style={[styles.card, { borderLeftColor: accentColor }]}
-              >
+              <React.Fragment key={request.id}>
+                {showSectionHeader && (
+                  <View style={styles.sectionHeader}>
+                    <View style={styles.sectionHeaderLine} />
+                    <View style={styles.sectionHeaderBadge}>
+                      <View
+                        style={[
+                          styles.sectionHeaderDot,
+                          { backgroundColor: sectionDotColor },
+                        ]}
+                      />
+                      <Text style={styles.sectionHeaderText}>
+                        {t(sectionKey)}
+                      </Text>
+                    </View>
+                    <View style={styles.sectionHeaderLine} />
+                  </View>
+                )}
+                <View
+                  style={[styles.card, { borderLeftColor: accentColor }]}
+                >
                 {/* ─── REQUEST SECTION ─── */}
                 <View style={styles.requestSection}>
                   <View style={styles.cardHeader}>
@@ -717,15 +834,17 @@ export default function MyOffersScreen() {
                     </View>
                   </View>
 
-                  {/* Posted by */}
-                  <Text style={styles.postedBy}>
-                    {t("postedBy")} {request.profiles?.email ?? "unknown"}
-                  </Text>
+                  {/* Posted by — only when expanded */}
+                  {isDetailsOpen && (
+                    <Text style={styles.postedBy}>
+                      {t("postedBy")} {request.profiles?.email ?? "unknown"}
+                    </Text>
+                  )}
 
-                  {/* Description */}
+                  {/* Description — 1 line when collapsed */}
                   <Text
                     style={styles.desc}
-                    numberOfLines={isDetailsOpen ? 0 : 2}
+                    numberOfLines={isDetailsOpen ? 0 : 1}
                   >
                     {request.description}
                   </Text>
@@ -1202,6 +1321,7 @@ export default function MyOffersScreen() {
                   </View>
                 </View>
               </View>
+              </React.Fragment>
             );
           })}
         </ScrollView>
