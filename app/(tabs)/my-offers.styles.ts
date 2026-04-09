@@ -520,6 +520,21 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#94a3b8",
   },
+  swipeHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 3,
+    marginTop: 6,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: "#bfdbfe",
+  },
+  swipeHintText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#93c5fd",
+  },
   offerHeaderRow: { gap: 3 },
   offerCompareRow: {
     flexDirection: "row",

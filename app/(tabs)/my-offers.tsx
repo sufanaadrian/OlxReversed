@@ -911,7 +911,7 @@ export default function MyOffersScreen() {
                     {latestOffer && latestOffer.status !== "withdrawn" && (
                       <View style={styles.offerLine}>
                         <Text style={styles.offerLineLabel}>
-                          {t("yourOffer")}
+                          {t("yourReOffer")}
                         </Text>
                         <Text style={styles.offerLinePrice}>
                           {formatPrice(Number(latestOffer.price))}
@@ -959,48 +959,6 @@ export default function MyOffersScreen() {
                           </View>
                         );
                       })()}
-
-                    {/* ─── Counter-offer callout (requires action) ─── */}
-                    {counter && counter.status === "pending" && (
-                      <View style={styles.counterCallout}>
-                        <View style={styles.counterCalloutHeader}>
-                          <Feather
-                            name="refresh-cw"
-                            size={14}
-                            color="#92400e"
-                          />
-                          <Text style={styles.counterCalloutTitle}>
-                            {t("counterOfferFrom")}
-                          </Text>
-                          <Text style={styles.counterCalloutPrice}>
-                            {formatPrice(Number(counter.price))}
-                          </Text>
-                        </View>
-                        {!!counter.message && (
-                          <Text style={styles.counterCalloutMsg}>
-                            {counter.message}
-                          </Text>
-                        )}
-                        <View style={styles.counterCalloutActions}>
-                          <Pressable
-                            style={styles.btnAccept}
-                            onPress={() => acceptCounter(counter)}
-                          >
-                            <Text style={styles.btnAcceptText}>
-                              {t("acceptCounter")}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={styles.btnReject}
-                            onPress={() => rejectCounter(counter)}
-                          >
-                            <Text style={styles.btnRejectText}>
-                              {t("reject")}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    )}
 
                     {/* ─── Negotiation history toggle ─── */}
                     {requestOffers.length > 0 && (
@@ -1099,12 +1057,29 @@ export default function MyOffersScreen() {
                                             </Text>
                                           </Text>
                                           {!!c.message && (
-                                            <Text
-                                              style={styles.counterMsg}
-                                              numberOfLines={3}
-                                            >
-                                              {c.message}
-                                            </Text>
+                                            <>
+                                              <Text
+                                                style={styles.counterMsg}
+                                                numberOfLines={
+                                                  expandedOfferDesc[c.id]
+                                                    ? 0
+                                                    : 3
+                                                }
+                                              >
+                                                {c.message}
+                                              </Text>
+                                              <Pressable
+                                                onPress={() =>
+                                                  toggleOfferDesc(c.id)
+                                                }
+                                              >
+                                                <Text style={styles.offerMeta}>
+                                                  {expandedOfferDesc[c.id]
+                                                    ? t("showLess")
+                                                    : t("showMore")}
+                                                </Text>
+                                              </Pressable>
+                                            </>
                                           )}
                                           {isLatest && cPending && (
                                             <View style={styles.counterActions}>
@@ -1231,6 +1206,18 @@ export default function MyOffersScreen() {
                                             </Text>
                                           </Pressable>
                                         </>
+                                      )}
+                                      {offerCanEdit && isLatest && (
+                                        <View style={styles.swipeHint}>
+                                          <Feather
+                                            name="chevrons-left"
+                                            size={11}
+                                            color="#93c5fd"
+                                          />
+                                          <Text style={styles.swipeHintText}>
+                                            {t("swipeToEditWithdraw")}
+                                          </Text>
+                                        </View>
                                       )}
                                     </View>
                                   </ReanimatedSwipeable>
