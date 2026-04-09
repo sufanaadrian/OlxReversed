@@ -2,33 +2,41 @@ import { StyleSheet } from "react-native";
 
 export const theme = {
   primary: "#1E40AF",
-  bg: "#F9FAFB",
+  bg: "#F1F5F9",
   surface: "#FFFFFF",
-  primaryText: "#020617",
+  primaryText: "#0F172A",
   secondaryText: "#64748B",
-  border: "#E5E7EB",
+  border: "#E2E8F0",
   accentSoft: "#DBEAFE",
   dangerSoft: "#FEE2E2",
   successSoft: "#DCFCE7",
+  warnSoft: "#FEF3C7",
 };
 
 export const styles = StyleSheet.create({
+  // ─── Page shell ────────────────────────────────────────────────
   page: {
     flex: 1,
     backgroundColor: theme.bg,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingTop: 12,
   },
   header: { marginBottom: 10 },
-  h1: { fontSize: 22, fontWeight: "900", color: theme.primaryText },
+  h1: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: theme.primaryText,
+    letterSpacing: -0.5,
+  },
 
+  // ─── Filter bar ────────────────────────────────────────────────
   filtersWrap: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 16,
     padding: 6,
-    marginBottom: 6,
+    marginBottom: 10,
     overflow: "hidden",
   },
   filters: {
@@ -44,147 +52,546 @@ export const styles = StyleSheet.create({
     width: 32,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: "rgba(255,255,255,0.85)",
   },
-
   scrollHintArrow: {
     fontSize: 22,
     fontWeight: "900",
     color: theme.secondaryText,
   },
-
-  filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
+  filterBtn: { paddingVertical: 7, paddingHorizontal: 11, borderRadius: 12 },
   filterBtnActive: { backgroundColor: theme.accentSoft },
-  filterText: { fontWeight: "900", color: theme.secondaryText, fontSize: 12 },
-  filterTextActive: { color: theme.primaryText },
+  filterText: { fontWeight: "700", color: theme.secondaryText, fontSize: 12 },
+  filterTextActive: { color: theme.primary, fontWeight: "900" },
 
+  // ─── Empty / loading state ─────────────────────────────────────
   centerCard: {
     flex: 1,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 20,
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     marginTop: 12,
   },
   centerTitle: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
-  centerSub: { color: theme.secondaryText, textAlign: "center" },
+  centerSub: {
+    color: theme.secondaryText,
+    textAlign: "center",
+    lineHeight: 20,
+  },
 
+  // ─── Card ──────────────────────────────────────────────────────
   card: {
     backgroundColor: theme.surface,
     borderWidth: 1,
+    borderLeftWidth: 4,
     borderColor: theme.border,
     borderRadius: 18,
+    marginBottom: 16,
+    // shadow
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  cardInner: {
     padding: 14,
-    marginBottom: 12,
   },
-  cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-  category: { color: theme.secondaryText, fontWeight: "900", fontSize: 12 },
+  requestSection: {
+    padding: 14,
+    backgroundColor: theme.surface,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: "hidden",
+  },
+  offerActivitySection: {
+    padding: 14,
+    paddingTop: 12,
+    backgroundColor: "#F8FAFC",
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    overflow: "hidden",
+  },
+
+  // Card header row: category + title | status badge
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  cardHeaderLeft: { flex: 1 },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: theme.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
   title: {
-    color: theme.primaryText,
-    fontWeight: "900",
     fontSize: 16,
-    marginTop: 2,
+    fontWeight: "900",
+    color: theme.primaryText,
+    lineHeight: 22,
   },
-  by: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+    flexShrink: 0,
+    maxWidth: 140,
+  },
+  statusBadgeText: { fontSize: 11, fontWeight: "800", lineHeight: 15 },
+
+  // Sub-header
+  postedBy: {
+    marginTop: 4,
+    color: theme.secondaryText,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  desc: {
+    marginTop: 8,
+    color: theme.secondaryText,
+    lineHeight: 20,
+    fontSize: 13,
+  },
+  location: {
+    marginTop: 6,
+    fontSize: 12,
     color: theme.secondaryText,
     fontWeight: "700",
-    fontSize: 12,
-    marginTop: 4,
   },
-  desc: { marginTop: 10, color: theme.secondaryText, lineHeight: 18 },
 
-  metaRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
-  pill: {
-    paddingVertical: 7,
+  // ─── Meta pills ────────────────────────────────────────────────
+  metaRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  basePill: {
+    paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.bg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pillInterested: {
     backgroundColor: theme.accentSoft,
-    borderColor: theme.primary,
+    borderColor: "#93c5fd",
   },
-  pillSkipped: { backgroundColor: theme.border, borderColor: theme.border },
-  pillText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
-
-  myOfferBox: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+  pillSkipped: {
+    backgroundColor: "#f1f5f9",
     borderColor: theme.border,
-    backgroundColor: theme.surface,
   },
-  myOfferTitle: { fontWeight: "900", color: theme.primaryText },
-  myOfferDesc: { marginTop: 4, color: theme.secondaryText, fontWeight: "700" },
-  myOfferMeta: {
-    marginTop: 6,
-    color: theme.secondaryText,
-    fontWeight: "700",
+  pillText: { fontSize: 12, fontWeight: "800", color: theme.primaryText },
+  pillTextMuted: {
     fontSize: 12,
+    fontWeight: "600",
+    color: theme.secondaryText,
   },
 
-  counterBox: {
+  // ─── Expand / collapse affordance ───────────────────────────────────
+  expandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  expandRowText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+  openRequestBtn: {
+    marginTop: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+  },
+  openRequestBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "white",
+  },
+
+  // ─── Your offer line (below meta pills) ───────────────────────
+  offerLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  offerLineLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    marginRight: 2,
+  },
+  offerLinePrice: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: theme.primaryText,
+    flex: 1,
+  },
+
+  // ─── Decision / accepted offer summary ────────────────────────
+  decisionLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    marginBottom: 2,
+  },
+  decisionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+  decisionValue: {
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  decisionValueAccepted: {
+    color: "#16a34a",
+  },
+  decisionValuePending: {
+    color: theme.secondaryText,
+    fontWeight: "600",
+    fontStyle: "italic",
+    fontSize: 13,
+  },
+
+  // ─── Counter-offer callout (action needed) ─────────────────────
+  counterCallout: {
     marginTop: 12,
+    backgroundColor: theme.warnSoft,
     borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.bg,
-    borderRadius: 16,
+    borderColor: "#fcd34d",
+    borderRadius: 14,
     padding: 12,
     gap: 6,
   },
-  counterTitle: { fontWeight: "900", color: theme.primaryText },
-  counterStatus: {
+  counterCalloutHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  counterCalloutTitle: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#92400e",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  counterCalloutPrice: {
+    fontSize: 18,
     fontWeight: "900",
-    color: theme.secondaryText,
+    color: "#78350f",
+    letterSpacing: -0.5,
+  },
+  counterCalloutMsg: {
+    color: "#78350f",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  counterCalloutActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  btnAccept: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnAcceptText: { color: "white", fontWeight: "900", fontSize: 13 },
+  btnReject: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: "#fcd34d",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnRejectText: { color: "#92400e", fontWeight: "900", fontSize: 13 },
+
+  // ─── Negotiation history ───────────────────────────────────────
+  historySection: {
+    marginTop: 12,
+  },
+  historyToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: "#f8fafc",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  historyToggleText: {
     fontSize: 12,
+    fontWeight: "800",
+    color: theme.secondaryText,
+    flex: 1,
   },
 
-  statusRow: { marginTop: 12 },
-  statusPill: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14 },
-  statusNone: { backgroundColor: theme.border },
-  statusPending: { backgroundColor: theme.accentSoft },
-  statusAccepted: { backgroundColor: theme.successSoft },
-  statusRejected: { backgroundColor: theme.dangerSoft },
-  statusWithdrawn: { backgroundColor: theme.dangerSoft },
+  threadWrap: { marginTop: 10, gap: 8 },
 
-  statusText: { fontWeight: "900", fontSize: 12, color: theme.primaryText },
+  // ─── Negotiation round container ───────────────────────────────
+  roundContainer: { gap: 0 },
+  roundLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  roundLabelText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#94a3b8",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
 
-  actionRow: { marginTop: 12, gap: 10 },
+  // "You" offer block (blue tint)
+  youBlock: {
+    backgroundColor: "#eff6ff",
+    borderLeftWidth: 3,
+    borderLeftColor: "#93c5fd",
+    borderRadius: 10,
+    padding: 10,
+    gap: 3,
+  },
+  youBlockLatest: {
+    borderLeftColor: "#3b82f6",
+    backgroundColor: "#dbeafe",
+  },
+  youBlockTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  youBlockFrom: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#1d4ed8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  youBlockPrice: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.primaryText,
+    lineHeight: 22,
+  },
+  youBlockPriceBad: { color: "#dc2626" },
+  youBlockPriceGood: { color: "#16a34a" },
+  youBlockStatus: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+
+  // Arrow connector between offer and counter
+  flowArrow: { alignItems: "center", paddingVertical: 2 },
+  flowArrowText: {
+    fontSize: 18,
+    color: "#94a3b8",
+    fontWeight: "900",
+    lineHeight: 22,
+  },
+
+  // Buyer counter block (amber tint)
+  buyerBlock: {
+    backgroundColor: "#fffbeb",
+    borderLeftWidth: 3,
+    borderLeftColor: "#fbbf24",
+    borderRadius: 10,
+    padding: 10,
+    gap: 3,
+  },
+  buyerBlockTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  buyerBlockFrom: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#92400e",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  buyerBlockPrice: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#78350f",
+    lineHeight: 22,
+  },
+
+  // Between-rounds separator
+  betweenRoundsDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 10,
+  },
+  betweenRoundsLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  betweenRoundsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  betweenRoundsText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94a3b8",
+  },
+  offerHeaderRow: { gap: 3 },
+  offerCompareRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  offerMain: { fontWeight: "900", color: theme.primaryText, fontSize: 14 },
+  offerMainGood: { color: "#16a34a" },
+  offerMainBad: { color: "#dc2626" },
+  offerMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
+  offerDesc: {
+    marginTop: 6,
+    marginBottom: 2,
+    color: theme.secondaryText,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  oldOfferText: {
+    fontWeight: "900",
+    color: "#dc2626",
+    textDecorationLine: "line-through",
+  },
+  arrowText: { fontWeight: "900", color: theme.secondaryText },
+  newOfferText: { fontWeight: "900", color: "#16a34a" },
+  currentBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 4,
+  },
+  currentBadgeText: { color: "white", fontWeight: "900", fontSize: 10 },
+
+  // Counter node inside thread
+  counterNode: {
+    marginTop: 8,
+    marginLeft: 6,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    gap: 4,
+  },
+  counterMain: { fontWeight: "600", color: theme.secondaryText },
+  counterEmail: { fontWeight: "800", color: theme.primaryText, fontSize: 13 },
+  counterPrice: { fontWeight: "900", color: theme.primaryText, fontSize: 14 },
+  counterMsg: { color: theme.secondaryText, lineHeight: 18, fontSize: 13 },
+  counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
+  counterActions: { flexDirection: "row", gap: 8, marginTop: 6 },
+
+  // ─── Expanded detail actions ───────────────────────────────────
+  detailActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  detailActionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 11,
+    alignItems: "center",
+    backgroundColor: "#0f172a",
+  },
+  detailActionBtnText: { color: "white", fontSize: 12, fontWeight: "700" },
+  detailActionBtnSecondary: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  detailActionBtnSecondaryText: { color: theme.primaryText },
+
+  // ─── Bottom action row ─────────────────────────────────────────
+  actionRow: { marginTop: 12, gap: 8 },
   btnPrimary: {
-    height: 44,
+    height: 46,
     borderRadius: 14,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
-  btnPrimaryText: { color: "white", fontWeight: "900" },
-
+  btnPrimaryText: { color: "white", fontWeight: "900", fontSize: 15 },
   btnSecondary: {
-    height: 44,
+    height: 46,
     borderRadius: 14,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
-  btnSecondaryText: { color: theme.primaryText, fontWeight: "900" },
-
+  btnSecondaryText: {
+    color: theme.primaryText,
+    fontWeight: "900",
+    fontSize: 15,
+  },
   skippedHint: {
     color: theme.secondaryText,
     fontWeight: "700",
     textAlign: "center",
+    fontSize: 13,
   },
 
+  // ─── Swipe-to-edit/withdraw actions ───────────────────────────
   rightActionsWrap: {
     width: 120,
     flexDirection: "row",
@@ -215,123 +622,4 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   actionText: { color: "white", fontWeight: "900", fontSize: 12 },
-
-  threadHeader: { marginTop: 10 },
-  threadToggle: { paddingVertical: 6 },
-  threadToggleText: { fontWeight: "900", color: theme.primaryText },
-
-  threadWrap: { marginTop: 10, gap: 10 },
-  threadTitle: { fontWeight: "900", color: theme.primaryText },
-
-  threadNode: {
-    borderLeftWidth: 3,
-    borderLeftColor: theme.border,
-    paddingLeft: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: theme.bg,
-  },
-
-  offerRow: { gap: 2 },
-  offerMain: { fontWeight: "900", color: theme.primaryText },
-  offerMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
-  offerDesc: {
-    marginTop: 6,
-    marginBottom: 6,
-    color: theme.secondaryText,
-    lineHeight: 18,
-  },
-
-  counterNode: {
-    marginTop: 10,
-    marginLeft: 6,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
-    gap: 4,
-  },
-
-  threadNodeLatest: {
-    borderLeftColor: theme.primary,
-    backgroundColor: "#f0f9ff",
-  },
-
-  currentBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    marginBottom: 4,
-  },
-
-  currentBadgeText: {
-    color: "white",
-    fontWeight: "900",
-    fontSize: 10,
-  },
-  offerHeaderRow: { gap: 6 },
-  offerCompareRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-
-  offerMainGood: { color: "#16a34a" },
-  offerMainBad: { color: "#dc2626" },
-
-  oldOfferText: {
-    fontWeight: "900",
-    color: "#dc2626",
-    textDecorationLine: "line-through",
-  },
-  arrowText: { fontWeight: "900", color: theme.secondaryText },
-  newOfferText: { fontWeight: "900", color: "#16a34a" },
-
-  counterMain: { fontWeight: "600", color: theme.secondaryText },
-  counterEmail: { fontWeight: "800", color: theme.primaryText, fontSize: 13 },
-  counterPrice: { fontWeight: "900", color: theme.primaryText, fontSize: 14 },
-  counterMsg: { color: theme.secondaryText, lineHeight: 18 },
-  counterMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
-  counterActions: { flexDirection: "row", gap: 10, marginTop: 8 },
-
-  detailLocation: {
-    marginTop: 8,
-    color: theme.secondaryText,
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  detailActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
-
-  detailActionBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: "#111827",
-  },
-
-  detailActionBtnText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  detailActionBtnSecondary: {
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-
-  detailActionBtnSecondaryText: {
-    color: theme.primaryText,
-  },
 });
