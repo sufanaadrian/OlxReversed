@@ -483,7 +483,7 @@ export const translations = {
 
     // My Offers
     yourOffers: "Ofertele tale",
-    yourOffer: "Ultima ta ofertă",
+    yourOffer: "Prima ta ofertă",
     yourReOffer: "Oferta ta",
     acceptedOfferLabel: "Ofertă acceptată",
     decisionPending: "Decizie în aşteptare",
