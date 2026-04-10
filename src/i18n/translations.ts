@@ -486,7 +486,7 @@ export const translations = {
     yourOffer: "Prima ta ofertă",
     yourReOffer: "Oferta ta",
     acceptedOfferLabel: "Ofertă acceptată",
-    decisionPending: "Decizie în aşteptare",
+    decisionPending: "Decizie în așteptare",
     budgetLabel: "Buget",
     allOffers: "Toate ofertele",
     noOffers: "Nicio ofertă încă",
