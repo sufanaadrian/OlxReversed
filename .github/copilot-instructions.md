@@ -125,7 +125,7 @@ CREATE TABLE public.counter_offers (
 );
 
 -- Swipe tracking (seller swiped right/left on a request)
-CREATE TABLE public.swipes (
+CREATE TABLE public.request_swipes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id),
   request_id uuid REFERENCES requests(id),
