@@ -420,15 +420,18 @@ export default function MyOffersScreen() {
       }
     };
 
-    const sorted = [...base].sort((a, b) => {
-      const tierA = getTier(a);
-      const tierB = getTier(b);
-      if (tierA !== tierB) return tierA - tierB;
-      return getLatestActivityTs(b) - getLatestActivityTs(a);
+    const decorated = base.map((item) => {
+      const tier = getTier(item);
+      const latestActivityTs = getLatestActivityTs(item);
+      return { item, tier, latestActivityTs };
     });
 
-    return sorted.map((item) => {
-      const tier = getTier(item);
+    const sorted = decorated.sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      return b.latestActivityTs - a.latestActivityTs;
+    });
+
+    return sorted.map(({ item, tier }) => {
       return { ...item, sectionKey: getSectionKey(tier) };
     });
   }, [
