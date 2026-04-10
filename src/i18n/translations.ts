@@ -526,7 +526,7 @@ export const translations = {
     fetchingSwipesOffers: "Se aduc swipuri și oferte",
     noItemsInFilter: "Nicio ofertă în acest filtru.",
     goToMarketplace: "Du-te pe Piață",
-    counterOfferFrom: "a făcut o contraofertă in valoare de",
+    counterOfferFrom: "a făcut o contraofertă în valoare de",
     swipeToEditWithdraw: "Swipe pentru editare/retragere",
     // Settings & Profile
     logIn: "Conectare",

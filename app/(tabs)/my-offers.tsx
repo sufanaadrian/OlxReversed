@@ -670,20 +670,20 @@ export default function MyOffersScreen() {
               visibleIdx > 0 ? visible[visibleIdx - 1].sectionKey : null;
             const showSectionHeader = sectionKey !== prevSection;
 
-            const sectionDotColor =
+            const sectionDotStyle =
               sectionKey === "sectionNeedsResponse"
-                ? "#f59e0b"
+                ? styles.sectionHeaderDotNeedsResponse
                 : sectionKey === "sectionWaiting"
-                  ? "#3b82f6"
+                  ? styles.sectionHeaderDotWaiting
                   : sectionKey === "sectionCompleted"
-                    ? "#16a34a"
+                    ? styles.sectionHeaderDotCompleted
                     : sectionKey === "sectionRejected"
-                      ? "#dc2626"
+                      ? styles.sectionHeaderDotRejected
                       : sectionKey === "sectionWithdrawn"
-                        ? "#9ca3af"
+                        ? styles.sectionHeaderDotWithdrawn
                         : sectionKey === "sectionInterested"
-                          ? "#0ea5e9"
-                          : "#cbd5e1";
+                          ? styles.sectionHeaderDotInterested
+                          : styles.sectionHeaderDotDefault;
 
             const latestOffer = latestOfferByRequestId.get(request.id);
             const counter = latestCounterByRequestId.get(request.id);
@@ -720,21 +720,21 @@ export default function MyOffersScreen() {
             const isDetailsOpen = openDetails[request.id] === true;
 
             // Left-border accent communicates status at a glance
-            const accentColor =
+            const cardAccentStyle =
               effectiveState === "accepted" ||
               effectiveState === "counter_accepted"
-                ? "#16a34a"
+                ? styles.cardAccentAccepted
                 : effectiveState === "counter_pending"
-                  ? "#f59e0b"
+                  ? styles.cardAccentCounterPending
                   : effectiveState === "pending"
-                    ? "#3b82f6"
+                    ? styles.cardAccentPending
                     : effectiveState === "rejected"
-                      ? "#dc2626"
+                      ? styles.cardAccentRejected
                       : latestOffer?.status === "withdrawn"
-                        ? "#9ca3af"
-                        : "#e2e8f0";
+                        ? styles.cardAccentWithdrawn
+                        : styles.cardAccentDefault;
 
-            // Status badge label + colors
+            // Status badge label + styles
             const statusBadge = (() => {
               if (
                 effectiveState === "accepted" ||
@@ -745,40 +745,44 @@ export default function MyOffersScreen() {
                     effectiveState === "counter_accepted"
                       ? t("counterOfferAccepted")
                       : t("accepted"),
-                  bg: "#dcfce7",
-                  fg: "#15803d",
+                  bgStyle: styles.statusBadgeBgAccepted,
+                  fgStyle: styles.statusBadgeTextAccepted,
                 };
               if (effectiveState === "counter_pending")
                 return {
                   label: t("counterOfferPending"),
-                  bg: "#fef3c7",
-                  fg: "#92400e",
+                  bgStyle: styles.statusBadgeBgCounterPending,
+                  fgStyle: styles.statusBadgeTextCounterPending,
                 };
               if (effectiveState === "pending")
                 return {
                   label: t("offerPending"),
-                  bg: "#dbeafe",
-                  fg: "#1a2687",
+                  bgStyle: styles.statusBadgeBgPending,
+                  fgStyle: styles.statusBadgeTextPending,
                 };
               if (effectiveState === "rejected")
                 return {
                   label: t("rejectedCanResend"),
-                  bg: "#fee2e2",
-                  fg: "#dc2626",
+                  bgStyle: styles.statusBadgeBgRejected,
+                  fgStyle: styles.statusBadgeTextRejected,
                 };
               if (latestOffer?.status === "withdrawn")
                 return {
                   label: t("offerWithdrawn"),
-                  bg: "#f1f5f9",
-                  fg: "#6b7280",
+                  bgStyle: styles.statusBadgeBgWithdrawn,
+                  fgStyle: styles.statusBadgeTextWithdrawn,
                 };
               if (direction === "right")
                 return {
                   label: t("noOfferYet"),
-                  bg: "#f0f9ff",
-                  fg: "#0369a1",
+                  bgStyle: styles.statusBadgeBgNoOffer,
+                  fgStyle: styles.statusBadgeTextNoOffer,
                 };
-              return { label: t("skipped"), bg: "#f1f5f9", fg: "#6b7280" };
+              return {
+                label: t("skipped"),
+                bgStyle: styles.statusBadgeBgWithdrawn,
+                fgStyle: styles.statusBadgeTextWithdrawn,
+              };
             })();
 
             return (
@@ -790,7 +794,7 @@ export default function MyOffersScreen() {
                       <View
                         style={[
                           styles.sectionHeaderDot,
-                          { backgroundColor: sectionDotColor },
+                          sectionDotStyle,
                         ]}
                       />
                       <Text style={styles.sectionHeaderText}>
@@ -800,7 +804,7 @@ export default function MyOffersScreen() {
                     <View style={styles.sectionHeaderLine} />
                   </View>
                 )}
-                <View style={[styles.card, { borderLeftColor: accentColor }]}>
+                <View style={[styles.card, cardAccentStyle]}>
                   {/* ─── REQUEST SECTION ─── */}
                   <View style={styles.requestSection}>
                     <View style={styles.cardHeader}>
@@ -818,13 +822,13 @@ export default function MyOffersScreen() {
                       <View
                         style={[
                           styles.statusBadge,
-                          { backgroundColor: statusBadge.bg },
+                          statusBadge.bgStyle,
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusBadgeText,
-                            { color: statusBadge.fg },
+                            statusBadge.fgStyle,
                           ]}
                         >
                           {statusBadge.label}
@@ -937,13 +941,7 @@ export default function MyOffersScreen() {
                           (directAccepted ? Number(latestOffer.price) : null);
 
                         return (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
+                          <View style={styles.decisionLine}>
                             <Text style={styles.offerLineLabel}>
                               {t("acceptedOfferLabel")}:
                             </Text>
@@ -1036,12 +1034,10 @@ export default function MyOffersScreen() {
                                           <Text
                                             style={[
                                               styles.buyerBlockPrice,
-                                              c.status === "accepted" && {
-                                                color: "#166534",
-                                              },
-                                              c.status === "rejected" && {
-                                                color: "#dc2626",
-                                              },
+                                              c.status === "accepted" &&
+                                                styles.buyerBlockPriceAccepted,
+                                              c.status === "rejected" &&
+                                                styles.buyerBlockPriceRejected,
                                             ]}
                                           >
                                             {formatPrice(Number(c.price))}

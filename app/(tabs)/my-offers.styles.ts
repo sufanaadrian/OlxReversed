@@ -114,6 +114,13 @@ export const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
+  sectionHeaderDotNeedsResponse: { backgroundColor: "#f59e0b" },
+  sectionHeaderDotWaiting: { backgroundColor: "#3b82f6" },
+  sectionHeaderDotCompleted: { backgroundColor: "#16a34a" },
+  sectionHeaderDotRejected: { backgroundColor: "#dc2626" },
+  sectionHeaderDotWithdrawn: { backgroundColor: "#9ca3af" },
+  sectionHeaderDotInterested: { backgroundColor: "#0ea5e9" },
+  sectionHeaderDotDefault: { backgroundColor: "#cbd5e1" },
   sectionHeaderText: {
     fontSize: 11,
     fontWeight: "800",
@@ -135,6 +142,12 @@ export const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  cardAccentAccepted: { borderLeftColor: "#16a34a" },
+  cardAccentCounterPending: { borderLeftColor: "#f59e0b" },
+  cardAccentPending: { borderLeftColor: "#3b82f6" },
+  cardAccentRejected: { borderLeftColor: "#dc2626" },
+  cardAccentWithdrawn: { borderLeftColor: "#9ca3af" },
+  cardAccentDefault: { borderLeftColor: "#e2e8f0" },
   cardInner: {
     padding: 14,
   },
@@ -186,6 +199,18 @@ export const styles = StyleSheet.create({
     maxWidth: 140,
   },
   statusBadgeText: { fontSize: 11, fontWeight: "800", lineHeight: 15 },
+  statusBadgeBgAccepted: { backgroundColor: "#dcfce7" },
+  statusBadgeBgCounterPending: { backgroundColor: "#fef3c7" },
+  statusBadgeBgPending: { backgroundColor: "#dbeafe" },
+  statusBadgeBgRejected: { backgroundColor: "#fee2e2" },
+  statusBadgeBgWithdrawn: { backgroundColor: "#f1f5f9" },
+  statusBadgeBgNoOffer: { backgroundColor: "#f0f9ff" },
+  statusBadgeTextAccepted: { color: "#15803d" },
+  statusBadgeTextCounterPending: { color: "#92400e" },
+  statusBadgeTextPending: { color: "#1a2687" },
+  statusBadgeTextRejected: { color: "#dc2626" },
+  statusBadgeTextWithdrawn: { color: "#6b7280" },
+  statusBadgeTextNoOffer: { color: "#0369a1" },
 
   // Sub-header
   postedBy: {
@@ -495,6 +520,8 @@ export const styles = StyleSheet.create({
     color: "#78350f",
     lineHeight: 22,
   },
+  buyerBlockPriceAccepted: { color: "#166534" },
+  buyerBlockPriceRejected: { color: "#dc2626" },
 
   // Between-rounds separator
   betweenRoundsDivider: {
