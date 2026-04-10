@@ -85,8 +85,14 @@ export default function MyOffersScreen() {
   const [filter, setFilter] = useState<CombinedFilter>("all");
 
   const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
+  const [openOlderThreads, setOpenOlderThreads] = useState<
+    Record<string, boolean>
+  >({});
   const toggleThread = (requestId: string) => {
     setOpenThreads((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
+  };
+  const toggleOlderThread = (requestId: string) => {
+    setOpenOlderThreads((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
   };
 
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
@@ -354,8 +360,88 @@ export default function MyOffersScreen() {
       });
     }
 
-    return base;
-  }, [swipes, filter, latestOfferByRequestId]);
+    // 3) Smart sort: priority tier + latest activity
+    const getTier = (item: (typeof swipes)[0]): number => {
+      const { request, direction } = item;
+      const latestOffer = latestOfferByRequestId.get(request.id);
+      const counter = latestCounterByRequestId.get(request.id);
+
+      // Counter-offer pending your response → top priority
+      if (counter?.status === "pending") return 1;
+      // Offer pending → waiting for buyer
+      if (latestOffer && latestOffer.status === "pending") return 2;
+      // Matched/accepted
+      if (latestOffer?.status === "accepted" || counter?.status === "accepted")
+        return 3;
+      // Interested but no offer yet
+      if (direction === "right" && !latestOffer) return 4;
+      // Rejected — can resend
+      if (latestOffer?.status === "rejected") return 5;
+      // Withdrawn
+      if (latestOffer?.status === "withdrawn") return 6;
+      // Skipped
+      if (direction === "left") return 7;
+      return 8;
+    };
+
+    const getLatestActivityTs = (item: (typeof swipes)[0]): number => {
+      const reqOffers = offersByRequestId.get(item.request.id) ?? [];
+      let latest = new Date(item.swipedAt).getTime();
+      for (const o of reqOffers) {
+        const t = new Date(o.created_at).getTime();
+        if (t > latest) latest = t;
+        const cs = countersByOfferId.get(o.id) ?? [];
+        for (const c of cs) {
+          const ct = new Date(c.created_at).getTime();
+          if (ct > latest) latest = ct;
+        }
+      }
+      return latest;
+    };
+
+    const getSectionKey = (tier: number): string => {
+      switch (tier) {
+        case 1:
+          return "sectionNeedsResponse";
+        case 2:
+          return "sectionWaiting";
+        case 3:
+          return "sectionCompleted";
+        case 4:
+          return "sectionInterested";
+        case 5:
+          return "sectionRejected";
+        case 6:
+          return "sectionWithdrawn";
+        case 7:
+          return "sectionSkipped";
+        default:
+          return "sectionSkipped";
+      }
+    };
+
+    const decorated = base.map((item) => {
+      const tier = getTier(item);
+      const latestActivityTs = getLatestActivityTs(item);
+      return { item, tier, latestActivityTs };
+    });
+
+    const sorted = decorated.sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      return b.latestActivityTs - a.latestActivityTs;
+    });
+
+    return sorted.map(({ item, tier }) => {
+      return { ...item, sectionKey: getSectionKey(tier) };
+    });
+  }, [
+    swipes,
+    filter,
+    latestOfferByRequestId,
+    latestCounterByRequestId,
+    offersByRequestId,
+    countersByOfferId,
+  ]);
 
   const openCreateOffer = (requestId: string) => {
     router.push({
@@ -385,6 +471,15 @@ export default function MyOffersScreen() {
       params: { id: requestId },
     } as any);
   };
+
+  const formatDateTime = (value: string) =>
+    new Date(value).toLocaleString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   const acceptCounter = async (counter: CounterOfferRow) => {
     const { error: cErr } = await supabase
@@ -522,15 +617,15 @@ export default function MyOffersScreen() {
           />
 
           <FilterBtn
-            label={`${t("skipped")} (${counts.skipped})`}
-            active={filter === "skipped"}
-            onPress={() => setFilter("skipped")}
-          />
-
-          <FilterBtn
             label={`${t("offerWithdrawn")} (${offerViewCounts.withdrawn})`}
             active={filter === "withdrawn"}
             onPress={() => setFilter("withdrawn")}
+          />
+
+          <FilterBtn
+            label={`${t("skipped")} (${counts.skipped})`}
+            active={filter === "skipped"}
+            onPress={() => setFilter("skipped")}
           />
         </ScrollView>
         {/* scroll hint */}
@@ -569,14 +664,36 @@ export default function MyOffersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {visible.map(({ request, direction }) => {
+          {visible.map(({ request, direction, sectionKey }, visibleIdx) => {
+            // ─── Section header when group changes ───
+            const prevSection =
+              visibleIdx > 0 ? visible[visibleIdx - 1].sectionKey : null;
+            const showSectionHeader = sectionKey !== prevSection;
+
+            const sectionDotStyle =
+              sectionKey === "sectionNeedsResponse"
+                ? styles.sectionHeaderDotNeedsResponse
+                : sectionKey === "sectionWaiting"
+                  ? styles.sectionHeaderDotWaiting
+                  : sectionKey === "sectionCompleted"
+                    ? styles.sectionHeaderDotCompleted
+                    : sectionKey === "sectionRejected"
+                      ? styles.sectionHeaderDotRejected
+                      : sectionKey === "sectionWithdrawn"
+                        ? styles.sectionHeaderDotWithdrawn
+                        : sectionKey === "sectionInterested"
+                          ? styles.sectionHeaderDotInterested
+                          : styles.sectionHeaderDotDefault;
+
             const latestOffer = latestOfferByRequestId.get(request.id);
             const counter = latestCounterByRequestId.get(request.id);
-
             const requestOffers = offersByRequestId.get(request.id) ?? [];
             const isThreadOpen = openThreads[request.id] !== false;
+            const olderRoundsOpen = openOlderThreads[request.id] === true;
+            const roundsToRender = olderRoundsOpen
+              ? requestOffers
+              : requestOffers.slice(0, 1);
 
-            // Map "withdrawn" to "none" to satisfy the type constraint
             const offerState: OfferStatus | "none" =
               latestOffer?.status === "withdrawn"
                 ? "none"
@@ -602,390 +719,616 @@ export default function MyOffersScreen() {
 
             const isDetailsOpen = openDetails[request.id] === true;
 
+            // Left-border accent communicates status at a glance
+            const cardAccentStyle =
+              effectiveState === "accepted" ||
+              effectiveState === "counter_accepted"
+                ? styles.cardAccentAccepted
+                : effectiveState === "counter_pending"
+                  ? styles.cardAccentCounterPending
+                  : effectiveState === "pending"
+                    ? styles.cardAccentPending
+                    : effectiveState === "rejected"
+                      ? styles.cardAccentRejected
+                      : latestOffer?.status === "withdrawn"
+                        ? styles.cardAccentWithdrawn
+                        : styles.cardAccentDefault;
+
+            // Status badge label + styles
+            const statusBadge = (() => {
+              if (
+                effectiveState === "accepted" ||
+                effectiveState === "counter_accepted"
+              )
+                return {
+                  label:
+                    effectiveState === "counter_accepted"
+                      ? t("counterOfferAccepted")
+                      : t("accepted"),
+                  bgStyle: styles.statusBadgeBgAccepted,
+                  fgStyle: styles.statusBadgeTextAccepted,
+                };
+              if (effectiveState === "counter_pending")
+                return {
+                  label: t("counterOfferPending"),
+                  bgStyle: styles.statusBadgeBgCounterPending,
+                  fgStyle: styles.statusBadgeTextCounterPending,
+                };
+              if (effectiveState === "pending")
+                return {
+                  label: t("offerPending"),
+                  bgStyle: styles.statusBadgeBgPending,
+                  fgStyle: styles.statusBadgeTextPending,
+                };
+              if (effectiveState === "rejected")
+                return {
+                  label: t("rejectedCanResend"),
+                  bgStyle: styles.statusBadgeBgRejected,
+                  fgStyle: styles.statusBadgeTextRejected,
+                };
+              if (latestOffer?.status === "withdrawn")
+                return {
+                  label: t("offerWithdrawn"),
+                  bgStyle: styles.statusBadgeBgWithdrawn,
+                  fgStyle: styles.statusBadgeTextWithdrawn,
+                };
+              if (direction === "right")
+                return {
+                  label: t("noOfferYet"),
+                  bgStyle: styles.statusBadgeBgNoOffer,
+                  fgStyle: styles.statusBadgeTextNoOffer,
+                };
+              return {
+                label: t("skipped"),
+                bgStyle: styles.statusBadgeBgWithdrawn,
+                fgStyle: styles.statusBadgeTextWithdrawn,
+              };
+            })();
+
             return (
-              <View key={request.id} style={styles.card}>
-                <Pressable
-                  onPress={() => toggleDetails(request.id)}
-                  style={styles.cardTop}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.category}>{request.category}</Text>
-                    <Text
-                      style={styles.title}
-                      numberOfLines={isDetailsOpen ? 0 : 1}
-                    >
-                      {request.title}
-                    </Text>
-                    <Text style={styles.by} numberOfLines={1}>
-                      {t("postedBy")} {request.profiles?.email ?? "unknown"}
-                    </Text>
-                  </View>
-                  <Feather
-                    name={isDetailsOpen ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color="#6B7280"
-                  />
-                </Pressable>
-
-                <Text style={styles.desc} numberOfLines={isDetailsOpen ? 0 : 2}>
-                  {request.description}
-                </Text>
-
-                {isDetailsOpen && !!request.location && (
-                  <Text style={styles.detailLocation}>
-                    📍 {request.location}
-                  </Text>
-                )}
-
-                {isDetailsOpen && (
-                  <View style={styles.detailActionsRow}>
-                    <Pressable
-                      style={styles.detailActionBtn}
-                      onPress={() =>
-                        router.push(`/request/${request.id}` as any)
-                      }
-                    >
-                      <Text style={styles.detailActionBtnText}>
-                        {t("openRequestPage")}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.detailActionBtn,
-                        styles.detailActionBtnSecondary,
-                      ]}
-                      onPress={() => toggleDetails(request.id)}
-                    >
-                      <Text
+              <React.Fragment key={request.id}>
+                {showSectionHeader && (
+                  <View style={styles.sectionHeader}>
+                    <View style={styles.sectionHeaderLine} />
+                    <View style={styles.sectionHeaderBadge}>
+                      <View
                         style={[
-                          styles.detailActionBtnText,
-                          styles.detailActionBtnSecondaryText,
+                          styles.sectionHeaderDot,
+                          sectionDotStyle,
+                        ]}
+                      />
+                      <Text style={styles.sectionHeaderText}>
+                        {t(sectionKey)}
+                      </Text>
+                    </View>
+                    <View style={styles.sectionHeaderLine} />
+                  </View>
+                )}
+                <View style={[styles.card, cardAccentStyle]}>
+                  {/* ─── REQUEST SECTION ─── */}
+                  <View style={styles.requestSection}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardHeaderLeft}>
+                        <Text style={styles.categoryLabel}>
+                          {request.category}
+                        </Text>
+                        <Text
+                          style={styles.title}
+                          numberOfLines={isDetailsOpen ? 0 : 2}
+                        >
+                          {request.title}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          statusBadge.bgStyle,
                         ]}
                       >
-                        {t("collapse")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                <View style={styles.metaRow}>
-                  <View style={styles.pill}>
-                    <Text style={styles.pillText}>
-                      {formatPrice(request.budget_min)} -{" "}
-                      {formatPrice(request.budget_max)}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.pill,
-                      direction === "right"
-                        ? styles.pillInterested
-                        : styles.pillSkipped,
-                    ]}
-                  >
-                    <Text style={styles.pillText}>
-                      {direction === "right" ? t("interested") : t("skipped")}
-                    </Text>
-                  </View>
-                </View>
-                {requestOffers.length > 0 && (
-                  <View style={styles.threadHeader}>
-                    <Pressable
-                      style={styles.btnSecondary}
-                      onPress={() => toggleThread(request.id)}
-                    >
-                      <Text style={styles.threadToggleText}>
-                        {isThreadOpen
-                          ? t("hideNegotiation")
-                          : `${t("showNegotiation")} (${requestOffers.length})`}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                {isThreadOpen && requestOffers.length > 0 && (
-                  <View style={styles.threadWrap}>
-                    <Text style={styles.threadTitle}>{t("negotiation")}</Text>
-
-                    {requestOffers.map((o, idx) => {
-                      const counters = countersByOfferId.get(o.id) ?? [];
-                      const acceptedCounter =
-                        counters.find((x) => x.status === "accepted") ?? null; // OK even newest-first
-
-                      const isLatest = idx === 0;
-
-                      const offerCanEdit =
-                        o.status !== "accepted" &&
-                        o.status !== "withdrawn" &&
-                        o.status !== "rejected";
-                      const offerRowRef = React.createRef<SwipeableMethods>();
-
-                      return (
-                        <ReanimatedSwipeable
-                          key={o.id}
-                          ref={offerRowRef}
-                          renderRightActions={() =>
-                            offerCanEdit ? renderRightActions(o) : null
-                          }
-                          overshootRight={false}
-                          onSwipeableWillOpen={() => {
-                            if (
-                              openRowRef.current &&
-                              openRowRef.current !== offerRowRef.current
-                            ) {
-                              openRowRef.current.close();
-                            }
-                          }}
-                          onSwipeableOpen={() => {
-                            openRowRef.current = offerRowRef.current;
-                          }}
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            statusBadge.fgStyle,
+                          ]}
                         >
-                          <View
-                            style={[
-                              styles.threadNode,
-                              isLatest && styles.threadNodeLatest,
-                            ]}
-                          >
-                            {isLatest && (
-                              <View style={styles.currentBadge}>
-                                <Text style={styles.currentBadgeText}>
-                                  {t("current")}
-                                </Text>
-                              </View>
-                            )}
+                          {statusBadge.label}
+                        </Text>
+                      </View>
+                    </View>
 
-                            <View style={styles.offerHeaderRow}>
-                              {acceptedCounter ? (
-                                // Vinted style (only when counter accepted)
-                                <View style={styles.offerCompareRow}>
-                                  <Text style={styles.oldOfferText}>
-                                    {formatPrice(Number(o.price))} •
-                                    {t("rejected")}
-                                  </Text>
+                    {/* Posted by — only when expanded */}
+                    {isDetailsOpen && (
+                      <Text style={styles.postedBy}>
+                        {t("postedBy")} {request.profiles?.email ?? "unknown"}
+                      </Text>
+                    )}
 
-                                  <Text style={styles.arrowText}>→</Text>
+                    {/* Description — 1 line when collapsed */}
+                    <Text
+                      style={styles.desc}
+                      numberOfLines={isDetailsOpen ? 0 : 1}
+                    >
+                      {request.description}
+                    </Text>
 
-                                  <Text style={styles.newOfferText}>
-                                    {formatPrice(Number(acceptedCounter.price))}{" "}
-                                    • {t("accepted")}
-                                  </Text>
-                                </View>
-                              ) : (
-                                // Normal style (always show status)
-                                <Text
-                                  style={[
-                                    styles.offerMain,
-                                    (o.status === "rejected" ||
-                                      o.status === "withdrawn") &&
-                                      styles.offerMainBad,
-                                    o.status === "accepted" &&
-                                      styles.offerMainGood,
-                                  ]}
-                                >
-                                  {formatPrice(Number(o.price))} •{" "}
-                                  {t(
-                                    o.status === "pending"
-                                      ? "pendingStatus"
-                                      : o.status === "accepted"
-                                        ? "acceptedStatus"
-                                        : o.status === "rejected"
-                                          ? "rejectedStatus"
-                                          : "withdrawnStatus",
-                                  )}
-                                </Text>
-                              )}
+                    {/* Location — only when expanded */}
+                    {isDetailsOpen && !!request.location && (
+                      <Text style={styles.location}>📍 {request.location}</Text>
+                    )}
 
-                              <Text style={styles.offerMeta}>
-                                {new Date(o.created_at).toLocaleString()}
-                              </Text>
-                            </View>
+                    {/* Budget + swipe status pills */}
+                    <View style={styles.metaRow}>
+                      <View style={styles.basePill}>
+                        <Text style={styles.pillTextMuted}>
+                          {t("budgetLabel")}:{" "}
+                        </Text>
+                        <Text style={styles.pillText}>
+                          {formatPrice(request.budget_min)} –{" "}
+                          {formatPrice(request.budget_max)}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.basePill,
+                          direction === "right"
+                            ? styles.pillInterested
+                            : styles.pillSkipped,
+                        ]}
+                      >
+                        <Text style={styles.pillText}>
+                          {direction === "right"
+                            ? `👍 ${t("interested")}`
+                            : `👎 ${t("skipped")}`}
+                        </Text>
+                      </View>
+                    </View>
 
-                            {!!o.description && (
-                              <>
-                                <Text
-                                  style={styles.offerDesc}
-                                  numberOfLines={
-                                    expandedOfferDesc[o.id] ? 0 : 3
-                                  }
-                                >
-                                  {o.description}
-                                </Text>
-                                <Pressable
-                                  onPress={() => toggleOfferDesc(o.id)}
-                                >
-                                  <Text style={styles.offerMeta}>
-                                    {expandedOfferDesc[o.id]
-                                      ? t("showLess")
-                                      : t("showMore")}
-                                  </Text>
-                                </Pressable>
-                              </>
-                            )}
+                    {/* Explicit expand / collapse affordance */}
+                    <Pressable
+                      style={styles.expandRow}
+                      onPress={() => toggleDetails(request.id)}
+                    >
+                      <Text style={styles.expandRowText}>
+                        {isDetailsOpen ? t("collapse") : t("showDetails")}
+                      </Text>
+                      <Feather
+                        name={isDetailsOpen ? "chevron-up" : "chevron-down"}
+                        size={13}
+                        color="#94a3b8"
+                      />
+                    </Pressable>
 
-                            {counters.map((c) => {
-                              const counterPending = c.status === "pending";
+                    {isDetailsOpen && (
+                      <Pressable
+                        style={styles.openRequestBtn}
+                        onPress={() =>
+                          router.push(`/request/${request.id}` as any)
+                        }
+                      >
+                        <Text style={styles.openRequestBtnText}>
+                          {t("openRequestPage")}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* ─── OFFER SECTION ─── */}
+                  <View style={styles.offerActivitySection}>
+                    {/* Your offer — shown as a labelled line, not a pill */}
+                    {latestOffer && latestOffer.status !== "withdrawn" && (
+                      <View style={styles.offerLine}>
+                        <Text style={styles.offerLineLabel}>
+                          {t("yourReOffer")}
+                        </Text>
+                        <Text style={styles.offerLinePrice}>
+                          {formatPrice(Number(latestOffer.price))}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* ─── Accepted offer summary ─── */}
+                    {latestOffer &&
+                      latestOffer.status !== "withdrawn" &&
+                      (() => {
+                        const acceptedCounterPrice =
+                          counterAccepted && counter
+                            ? Number(counter.price)
+                            : null;
+                        const directAccepted =
+                          !counterAccepted && latestOffer.status === "accepted";
+                        const resolvedPrice =
+                          acceptedCounterPrice ??
+                          (directAccepted ? Number(latestOffer.price) : null);
+
+                        return (
+                          <View style={styles.decisionLine}>
+                            <Text style={styles.offerLineLabel}>
+                              {t("acceptedOfferLabel")}:
+                            </Text>
+                            <Text
+                              style={[
+                                styles.decisionValue,
+                                resolvedPrice !== null
+                                  ? styles.decisionValueAccepted
+                                  : styles.decisionValuePending,
+                              ]}
+                            >
+                              {resolvedPrice !== null
+                                ? formatPrice(resolvedPrice)
+                                : t("decisionPending")}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+
+                    {/* ─── Negotiation history toggle ─── */}
+                    {requestOffers.length > 0 && (
+                      <View style={styles.historySection}>
+                        <Pressable
+                          style={styles.historyToggle}
+                          onPress={() => toggleThread(request.id)}
+                        >
+                          <Feather
+                            name={isThreadOpen ? "chevron-up" : "chevron-down"}
+                            size={14}
+                            color="#64748b"
+                          />
+                          <Text style={styles.historyToggleText}>
+                            {isThreadOpen
+                              ? t("hideNegotiation")
+                              : `${t("showNegotiation")} (${requestOffers.length})`}
+                          </Text>
+                        </Pressable>
+
+                        {isThreadOpen && (
+                          <View style={styles.threadWrap}>
+                            {roundsToRender.map((o, idx) => {
+                              const realIdx = olderRoundsOpen ? idx : 0;
+                              const counters =
+                                countersByOfferId.get(o.id) ?? [];
+                              const acceptedCounter =
+                                counters.find((x) => x.status === "accepted") ??
+                                null;
+                              // When a counter was accepted the offer row in DB also
+                              // gets status="accepted", but visually it was countered.
+                              const offerDisplayStatus = acceptedCounter
+                                ? "rejected"
+                                : o.status;
+                              const isLatest = idx === 0;
+                              const offerCanEdit =
+                                o.status !== "accepted" &&
+                                o.status !== "withdrawn" &&
+                                o.status !== "rejected";
+                              const offerRowRef =
+                                React.createRef<SwipeableMethods>();
 
                               return (
-                                <View key={c.id} style={styles.counterNode}>
-                                  <Text style={styles.counterMain}>
-                                    ↳{" "}
-                                    <Text style={styles.counterEmail}>
-                                      {request.profiles?.email ?? "unknown"}
-                                    </Text>{" "}
-                                    {t("counterOfferFrom")}:{" "}
-                                    <Text style={styles.counterPrice}>
-                                      {formatPrice(Number(c.price))}
-                                    </Text>
-                                  </Text>
-
-                                  {!!c.message && (
-                                    <Text
-                                      style={styles.counterMsg}
-                                      numberOfLines={3}
-                                    >
-                                      {c.message}
-                                    </Text>
-                                  )}
-
-                                  <Text style={styles.counterMeta}>
-                                    <Text
-                                      style={{
-                                        fontWeight: "900",
-                                        color:
-                                          o.status === "rejected"
-                                            ? "#dc2626" // red
-                                            : o.status === "withdrawn"
-                                              ? "#dc2626" // red for withdrawn too (optional)
-                                              : "#16a34a", // green for accepted / pending
-                                      }}
-                                    >
-                                      {t(
-                                        c.status === "pending"
-                                          ? "pendingStatus"
-                                          : c.status === "accepted"
-                                            ? "acceptedStatus"
-                                            : c.status === "rejected"
-                                              ? "rejectedStatus"
-                                              : "withdrawnStatus",
-                                      )}{" "}
-                                      •{" "}
-                                    </Text>
-                                    {new Date(c.created_at).toLocaleString()}
-                                  </Text>
-
-                                  {isLatest && counterPending && (
-                                    <View style={styles.counterActions}>
-                                      <Pressable
-                                        style={styles.btnPrimary}
-                                        onPress={() => acceptCounter(c)}
-                                      >
-                                        <Text style={styles.btnPrimaryText}>
-                                          {t("acceptCounter")}
-                                        </Text>
-                                      </Pressable>
-                                      <Pressable
-                                        style={styles.btnSecondary}
-                                        onPress={() => rejectCounter(c)}
-                                      >
-                                        <Text style={styles.btnSecondaryText}>
-                                          {t("reject")}
-                                        </Text>
-                                      </Pressable>
+                                <View key={o.id} style={styles.roundContainer}>
+                                  {/* Round label — only when multiple rounds */}
+                                  {requestOffers.length > 1 && (
+                                    <View style={styles.roundLabelRow}>
+                                      <Text style={styles.roundLabelText}>
+                                        {t("roundLabel")}{" "}
+                                        {requestOffers.length - realIdx}
+                                        {realIdx === 0
+                                          ? ` · ${t("roundCurrent")}`
+                                          : ""}
+                                      </Text>
                                     </View>
                                   )}
+
+                                  {/* Counter offers — newest first, above the offer */}
+                                  {counters.map((c) => {
+                                    const cPending = c.status === "pending";
+                                    return (
+                                      <React.Fragment key={c.id}>
+                                        <View style={styles.buyerBlock}>
+                                          <View style={styles.buyerBlockTop}>
+                                            <Text style={styles.buyerBlockFrom}>
+                                              {t("counterOfferLabel")}
+                                            </Text>
+                                            <Text style={styles.offerMeta}>
+                                              {formatDateTime(c.created_at)}
+                                            </Text>
+                                          </View>
+                                          <Text
+                                            style={[
+                                              styles.buyerBlockPrice,
+                                              c.status === "accepted" &&
+                                                styles.buyerBlockPriceAccepted,
+                                              c.status === "rejected" &&
+                                                styles.buyerBlockPriceRejected,
+                                            ]}
+                                          >
+                                            {formatPrice(Number(c.price))}
+                                            <Text style={styles.youBlockStatus}>
+                                              {" "}
+                                              ·{" "}
+                                              {t(
+                                                c.status === "pending"
+                                                  ? "pendingStatus"
+                                                  : c.status === "accepted"
+                                                    ? "acceptedStatus"
+                                                    : c.status === "rejected"
+                                                      ? "rejectedStatus"
+                                                      : "withdrawnStatus",
+                                              )}
+                                            </Text>
+                                          </Text>
+                                          {!!c.message && (
+                                            <>
+                                              <Text
+                                                style={styles.counterMsg}
+                                                numberOfLines={
+                                                  expandedOfferDesc[c.id]
+                                                    ? 0
+                                                    : 3
+                                                }
+                                              >
+                                                {c.message}
+                                              </Text>
+                                              <Pressable
+                                                onPress={() =>
+                                                  toggleOfferDesc(c.id)
+                                                }
+                                              >
+                                                <Text style={styles.offerMeta}>
+                                                  {expandedOfferDesc[c.id]
+                                                    ? t("showLess")
+                                                    : t("showMore")}
+                                                </Text>
+                                              </Pressable>
+                                            </>
+                                          )}
+                                          {isLatest && cPending && (
+                                            <View style={styles.counterActions}>
+                                              <Pressable
+                                                style={styles.btnPrimary}
+                                                onPress={() => acceptCounter(c)}
+                                              >
+                                                <Text
+                                                  style={styles.btnPrimaryText}
+                                                >
+                                                  {t("acceptCounter")}
+                                                </Text>
+                                              </Pressable>
+                                              <Pressable
+                                                style={styles.btnSecondary}
+                                                onPress={() => rejectCounter(c)}
+                                              >
+                                                <Text
+                                                  style={
+                                                    styles.btnSecondaryText
+                                                  }
+                                                >
+                                                  {t("reject")}
+                                                </Text>
+                                              </Pressable>
+                                            </View>
+                                          )}
+                                        </View>
+                                        {/* Arrow pointing up: counter offer responded to the offer below */}
+                                        <View style={styles.flowArrow}>
+                                          <Text style={styles.flowArrowText}>
+                                            ↑
+                                          </Text>
+                                        </View>
+                                      </React.Fragment>
+                                    );
+                                  })}
+
+                                  {/* Your offer — below the counter, swipeable for edit/withdraw */}
+                                  <ReanimatedSwipeable
+                                    ref={offerRowRef}
+                                    renderRightActions={() =>
+                                      offerCanEdit
+                                        ? renderRightActions(o)
+                                        : null
+                                    }
+                                    overshootRight={false}
+                                    onSwipeableWillOpen={() => {
+                                      if (
+                                        openRowRef.current &&
+                                        openRowRef.current !==
+                                          offerRowRef.current
+                                      ) {
+                                        openRowRef.current.close();
+                                      }
+                                    }}
+                                    onSwipeableOpen={() => {
+                                      openRowRef.current = offerRowRef.current;
+                                    }}
+                                  >
+                                    <View
+                                      style={[
+                                        styles.youBlock,
+                                        isLatest && styles.youBlockLatest,
+                                      ]}
+                                    >
+                                      <View style={styles.youBlockTop}>
+                                        <Text style={styles.youBlockFrom}>
+                                          {realIdx === requestOffers.length - 1
+                                            ? t("yourOffer")
+                                            : t("yourReOffer")}
+                                        </Text>
+                                        <Text style={styles.offerMeta}>
+                                          {formatDateTime(o.created_at)}
+                                        </Text>
+                                      </View>
+                                      <Text
+                                        style={[
+                                          styles.youBlockPrice,
+                                          (offerDisplayStatus === "rejected" ||
+                                            offerDisplayStatus ===
+                                              "withdrawn") &&
+                                            styles.youBlockPriceBad,
+                                          offerDisplayStatus === "accepted" &&
+                                            styles.youBlockPriceGood,
+                                        ]}
+                                      >
+                                        {formatPrice(Number(o.price))}
+                                        <Text style={styles.youBlockStatus}>
+                                          {" "}
+                                          ·{" "}
+                                          {t(
+                                            offerDisplayStatus === "pending"
+                                              ? "pendingStatus"
+                                              : offerDisplayStatus ===
+                                                  "accepted"
+                                                ? "acceptedStatus"
+                                                : offerDisplayStatus ===
+                                                    "rejected"
+                                                  ? "rejectedStatus"
+                                                  : "withdrawnStatus",
+                                          )}
+                                        </Text>
+                                      </Text>
+                                      {!!o.description && (
+                                        <>
+                                          <Text
+                                            style={styles.offerDesc}
+                                            numberOfLines={
+                                              expandedOfferDesc[o.id] ? 0 : 3
+                                            }
+                                          >
+                                            {o.description}
+                                          </Text>
+                                          <Pressable
+                                            onPress={() =>
+                                              toggleOfferDesc(o.id)
+                                            }
+                                          >
+                                            <Text style={styles.offerMeta}>
+                                              {expandedOfferDesc[o.id]
+                                                ? t("showLess")
+                                                : t("showMore")}
+                                            </Text>
+                                          </Pressable>
+                                        </>
+                                      )}
+                                      {offerCanEdit && isLatest && (
+                                        <View style={styles.swipeHint}>
+                                          <Feather
+                                            name="chevrons-left"
+                                            size={11}
+                                            color="#93c5fd"
+                                          />
+                                          <Text style={styles.swipeHintText}>
+                                            {t("swipeToEditWithdraw")}
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                  </ReanimatedSwipeable>
+
+                                  {/* Older rounds toggle */}
+                                  {!olderRoundsOpen &&
+                                    requestOffers.length > 1 &&
+                                    idx === 0 && (
+                                      <View style={styles.betweenRoundsDivider}>
+                                        <View
+                                          style={styles.betweenRoundsLine}
+                                        />
+                                        <Pressable
+                                          style={styles.betweenRoundsBadge}
+                                          onPress={() =>
+                                            toggleOlderThread(request.id)
+                                          }
+                                        >
+                                          <Feather
+                                            name="chevron-down"
+                                            size={11}
+                                            color="#94a3b8"
+                                          />
+                                          <Text
+                                            style={styles.betweenRoundsText}
+                                          >
+                                            {t("earlier")} (
+                                            {requestOffers.length - 1})
+                                          </Text>
+                                        </Pressable>
+                                        <View
+                                          style={styles.betweenRoundsLine}
+                                        />
+                                      </View>
+                                    )}
+
+                                  {olderRoundsOpen &&
+                                    idx === roundsToRender.length - 1 &&
+                                    requestOffers.length > 1 && (
+                                      <View style={styles.betweenRoundsDivider}>
+                                        <View
+                                          style={styles.betweenRoundsLine}
+                                        />
+                                        <Pressable
+                                          style={styles.betweenRoundsBadge}
+                                          onPress={() =>
+                                            toggleOlderThread(request.id)
+                                          }
+                                        >
+                                          <Feather
+                                            name="chevron-up"
+                                            size={11}
+                                            color="#94a3b8"
+                                          />
+                                          <Text
+                                            style={styles.betweenRoundsText}
+                                          >
+                                            {t("collapse")}
+                                          </Text>
+                                        </Pressable>
+                                        <View
+                                          style={styles.betweenRoundsLine}
+                                        />
+                                      </View>
+                                    )}
                                 </View>
                               );
                             })}
                           </View>
-                        </ReanimatedSwipeable>
-                      );
-                    })}
+                        )}
+                      </View>
+                    )}
+
+                    {/* ─── Bottom actions ─── */}
+                    <View style={styles.actionRow}>
+                      {canSendOffer && (
+                        <Pressable
+                          style={styles.btnPrimary}
+                          onPress={() => openCreateOffer(request.id)}
+                        >
+                          <Text style={styles.btnPrimaryText}>
+                            {offerState === "rejected"
+                              ? t("sendNewOffer")
+                              : t("sendOffer")}
+                          </Text>
+                        </Pressable>
+                      )}
+
+                      {counterPending && (
+                        <Text style={styles.skippedHint}>
+                          {t("counterOfferPendingHint")}
+                        </Text>
+                      )}
+
+                      {(offerState === "accepted" || counterAccepted) && (
+                        <Pressable
+                          style={styles.btnPrimary}
+                          onPress={() => openChat(request.id)}
+                        >
+                          <Text style={styles.btnPrimaryText}>{t("chat")}</Text>
+                        </Pressable>
+                      )}
+
+                      {direction === "left" && (
+                        <Text style={styles.skippedHint}>
+                          {t("skippedItemsReadOnly")}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                )}
-
-                <View style={styles.statusRow}>
-                  {effectiveState === "none" && (
-                    <View style={[styles.statusPill, styles.statusNone]}>
-                      <Text style={styles.statusText}>{t("noOfferYet")}</Text>
-                    </View>
-                  )}
-                  {effectiveState === "pending" && (
-                    <View style={[styles.statusPill, styles.statusPending]}>
-                      <Text style={styles.statusText}>{t("offerPending")}</Text>
-                    </View>
-                  )}
-                  {effectiveState === "accepted" && (
-                    <View style={[styles.statusPill, styles.statusAccepted]}>
-                      <Text style={styles.statusText}>{t("accepted")}</Text>
-                    </View>
-                  )}
-                  {effectiveState === "rejected" && (
-                    <View style={[styles.statusPill, styles.statusRejected]}>
-                      <Text style={styles.statusText}>
-                        {t("rejectedCanResend")}
-                      </Text>
-                    </View>
-                  )}
-                  {effectiveState === "counter_pending" && (
-                    <View style={[styles.statusPill, styles.statusPending]}>
-                      <Text style={styles.statusText}>
-                        {t("counterOfferPending")}
-                      </Text>
-                    </View>
-                  )}
-                  {effectiveState === "counter_accepted" && (
-                    <View style={[styles.statusPill, styles.statusAccepted]}>
-                      <Text style={styles.statusText}>
-                        {t("counterOfferAccepted")}
-                      </Text>
-                    </View>
-                  )}
-                  {(effectiveState as string) === "withdrawn" && (
-                    <View style={[styles.statusPill, styles.statusWithdrawn]}>
-                      <Text style={styles.statusText}>
-                        {t("offerWithdrawn")}
-                      </Text>
-                    </View>
-                  )}
                 </View>
-
-                <View style={styles.actionRow}>
-                  {canSendOffer && (
-                    <Pressable
-                      style={styles.btnPrimary}
-                      onPress={() => openCreateOffer(request.id)}
-                    >
-                      <Text style={styles.btnPrimaryText}>
-                        {offerState === "rejected"
-                          ? t("sendNewOffer")
-                          : t("sendOffer")}
-                      </Text>
-                    </Pressable>
-                  )}
-
-                  {counterPending && (
-                    <Text style={styles.skippedHint}>
-                      {t("counterOfferPendingHint")}
-                    </Text>
-                  )}
-
-                  {(offerState === "accepted" || counterAccepted) && (
-                    <Pressable
-                      style={styles.btnPrimary}
-                      onPress={() => openChat(request.id)}
-                    >
-                      <Text style={styles.btnPrimaryText}>{t("chat")}</Text>
-                    </Pressable>
-                  )}
-
-                  {direction === "left" && (
-                    <Text style={styles.skippedHint}>
-                      {t("skippedItemsReadOnly")}
-                    </Text>
-                  )}
-                </View>
-              </View>
+              </React.Fragment>
             );
           })}
         </ScrollView>
