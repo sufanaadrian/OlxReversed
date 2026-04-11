@@ -17,9 +17,9 @@ import {
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
-import { ImageViewer } from "../../src/components/ImageViewer";
 import { supabase } from "../../src/lib/supabase";
 import { styles } from "./my-offers.styles";
 
@@ -916,41 +916,80 @@ export default function MyOffersScreen() {
                     )}
 
                     {/* Detail grid — only when expanded */}
-                    {isDetailsOpen && (() => {
-                      const rows: { label: string; value: string }[] = [];
-                      if (request.timeline && timelineKeys[request.timeline])
-                        rows.push({ label: t("timelineLabel"), value: t(timelineKeys[request.timeline]) });
-                      if (request.duration && durationKeys[request.duration])
-                        rows.push({ label: t("durationLabel"), value: t(durationKeys[request.duration]) });
-                      if ((request.workers_needed ?? 1) > 1)
-                        rows.push({ label: t("workersLabel"), value: String(request.workers_needed) });
-                      if (request.work_mode && workModeKeys[request.work_mode])
-                        rows.push({ label: t("workModeLabel"), value: t(workModeKeys[request.work_mode]) });
-                      if (request.experience_level && request.experience_level !== "any" && experienceKeys[request.experience_level])
-                        rows.push({ label: t("experienceLabel"), value: t(experienceKeys[request.experience_level]) });
-                      if (rows.length === 0) return null;
-                      return (
-                        <View style={styles.detailGrid}>
-                          {rows.map((d, i) => (
-                            <View key={i} style={styles.detailGridItem}>
-                              <Text style={styles.detailGridLabel}>{d.label}</Text>
-                              <Text style={styles.detailGridValue}>{d.value}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })()}
+                    {isDetailsOpen &&
+                      (() => {
+                        const rows: { label: string; value: string }[] = [];
+                        if (request.timeline && timelineKeys[request.timeline])
+                          rows.push({
+                            label: t("timelineLabel"),
+                            value: t(timelineKeys[request.timeline]),
+                          });
+                        if (request.duration && durationKeys[request.duration])
+                          rows.push({
+                            label: t("durationLabel"),
+                            value: t(durationKeys[request.duration]),
+                          });
+                        if ((request.workers_needed ?? 1) > 1)
+                          rows.push({
+                            label: t("workersLabel"),
+                            value: String(request.workers_needed),
+                          });
+                        if (
+                          request.work_mode &&
+                          workModeKeys[request.work_mode]
+                        )
+                          rows.push({
+                            label: t("workModeLabel"),
+                            value: t(workModeKeys[request.work_mode]),
+                          });
+                        if (
+                          request.experience_level &&
+                          request.experience_level !== "any" &&
+                          experienceKeys[request.experience_level]
+                        )
+                          rows.push({
+                            label: t("experienceLabel"),
+                            value: t(experienceKeys[request.experience_level]),
+                          });
+                        if (rows.length === 0) return null;
+                        return (
+                          <View style={styles.detailGrid}>
+                            {rows.map((d, i) => (
+                              <View key={i} style={styles.detailGridItem}>
+                                <Text style={styles.detailGridLabel}>
+                                  {d.label}
+                                </Text>
+                                <Text style={styles.detailGridValue}>
+                                  {d.value}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })()}
 
                     {/* Photos — only when expanded */}
-                    {isDetailsOpen && request.photos && request.photos.length > 0 && (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
-                        {request.photos.map((uri, i) => (
-                          <Pressable key={i} onPress={() => openViewer(request.photos!, i)}>
-                            <Image source={{ uri }} style={styles.photoThumb} />
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                    )}
+                    {isDetailsOpen &&
+                      request.photos &&
+                      request.photos.length > 0 && (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.photoRow}
+                        >
+                          {request.photos.map((uri, i) => (
+                            <Pressable
+                              key={i}
+                              onPress={() => openViewer(request.photos!, i)}
+                            >
+                              <Image
+                                source={{ uri }}
+                                style={styles.photoThumb}
+                              />
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      )}
 
                     {/* Budget + swipe status pills */}
                     <View style={styles.metaRow}>
@@ -961,9 +1000,11 @@ export default function MyOffersScreen() {
                         <Text style={styles.pillText}>
                           {request.open_budget
                             ? t("openBudget")
-                            : request.budget_type && request.budget_type !== "range" && budgetTypeKeys[request.budget_type]
-                            ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
-                            : `${formatPrice(request.budget_min)} – ${formatPrice(request.budget_max)}`}
+                            : request.budget_type &&
+                                request.budget_type !== "range" &&
+                                budgetTypeKeys[request.budget_type]
+                              ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
+                              : `${formatPrice(request.budget_min)} – ${formatPrice(request.budget_max)}`}
                         </Text>
                       </View>
                       <View

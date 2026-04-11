@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
@@ -97,6 +98,8 @@ export default function MyRequestsScreen() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const openRowRef = useRef<Swipeable | null>(null);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   const load = useCallback(
     async (showSpinner: boolean = true) => {
@@ -337,11 +340,19 @@ export default function MyRequestsScreen() {
           <View style={styles.cardInner}>
             {/* Thumbnail */}
             {firstPhoto && (
-              <Image
-                source={{ uri: firstPhoto }}
-                style={styles.cardThumb}
-                resizeMode="cover"
-              />
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setViewerImages(item.photos ?? []);
+                  setViewerVisible(true);
+                }}
+              >
+                <Image
+                  source={{ uri: firstPhoto }}
+                  style={styles.cardThumb}
+                  resizeMode="cover"
+                />
+              </Pressable>
             )}
 
             <View style={styles.cardContent}>
@@ -548,6 +559,14 @@ export default function MyRequestsScreen() {
           }
         />
       )}
+
+      {/* Fullscreen image viewer */}
+      <ImageViewer
+        images={viewerImages}
+        visible={viewerVisible}
+        initialIndex={0}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }

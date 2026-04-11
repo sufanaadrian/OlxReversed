@@ -14,7 +14,7 @@ export const theme = {
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.bg },
 
-  header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
   searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   searchBox: {
     flex: 1,
@@ -56,7 +56,7 @@ export const styles = StyleSheet.create({
   chipText: { color: theme.secondaryText, fontSize: 13 },
   chipTextSelected: { color: theme.primaryText, fontWeight: "700" },
 
-  swipeArea: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
+  swipeArea: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
   emptyState: {
     flex: 1,
     backgroundColor: theme.surface,
@@ -90,7 +90,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   progressPill: {
     paddingVertical: 6,
@@ -137,7 +137,7 @@ export const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    height: "88%",
+    height: "94%",
     backgroundColor: theme.surface,
     borderRadius: 18,
     borderWidth: 1,
@@ -288,8 +288,8 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 14,
     paddingHorizontal: 16,
-    paddingBottom: 18,
-    paddingTop: 10,
+    paddingBottom: 14,
+    paddingTop: 4,
   },
   actionBtn: {
     height: 54,

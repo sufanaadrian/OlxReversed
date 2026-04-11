@@ -13,6 +13,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { ImageViewer } from "../../../src/components/ImageViewer";
 import { Screen } from "../../../src/components/Screen";
 import { useCurrency } from "../../../src/context/CurrencyContext";
 import { useTranslation } from "../../../src/context/LanguageContext";
@@ -36,6 +37,8 @@ type RequestRow = {
   posting_as: string | null;
   budget_type: string | null;
   timeline: string | null;
+  duration: string | null;
+  workers_needed: number | null;
   work_mode: string | null;
   experience_level: string | null;
   photos: string[] | null;
@@ -98,6 +101,13 @@ const timelineKeys: Record<string, string> = {
   flexible: "timelineFlexible",
 };
 
+const durationKeys: Record<string, string> = {
+  few_hours: "durationHours",
+  full_day: "durationDay",
+  multi_day: "durationMultiDay",
+  recurring: "durationRecurring",
+};
+
 const workModeKeys: Record<string, string> = {
   onsite: "workOnsite",
   remote: "workRemote",
@@ -137,6 +147,8 @@ export default function RequestDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [myOfferId, setMyOfferId] = useState<string | null>(null);
+  const [hasSwipedRight, setHasSwipedRight] = useState(false);
+  const didInitialLoad = useRef(false);
 
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
@@ -145,6 +157,8 @@ export default function RequestDetailScreen() {
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const photoListRef = useRef<FlatList>(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -155,7 +169,7 @@ export default function RequestDetailScreen() {
     const { data, error } = await supabase
       .from("requests")
       .select(
-        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,work_mode,experience_level,photos",
+        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,duration,workers_needed,work_mode,experience_level,photos",
       )
       .eq("id", id)
       .single();
@@ -179,6 +193,14 @@ export default function RequestDetailScreen() {
         .eq("status", "pending")
         .maybeSingle();
       setMyOfferId(existingOffer?.id ?? null);
+
+      const { data: swipeData } = await supabase
+        .from("request_swipes")
+        .select("direction")
+        .eq("request_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setHasSwipedRight(swipeData?.direction === "right");
     }
 
     if (owner) {
@@ -209,8 +231,11 @@ export default function RequestDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      load();
+      if (!didInitialLoad.current) {
+        didInitialLoad.current = true;
+        setLoading(true);
+        load();
+      }
     }, [load]),
   );
 
@@ -398,6 +423,46 @@ export default function RequestDetailScreen() {
   )
     detailBadges.push(t(budgetTypeKeys[request.budget_type]));
 
+  const detailRows: { label: string; value: string }[] = [];
+  if (request.timeline && timelineKeys[request.timeline])
+    detailRows.push({
+      label: t("timelineLabel"),
+      value: t(timelineKeys[request.timeline]),
+    });
+  if (request.duration && durationKeys[request.duration])
+    detailRows.push({
+      label: t("durationLabel"),
+      value: t(durationKeys[request.duration]),
+    });
+  if ((request.workers_needed ?? 1) > 1)
+    detailRows.push({
+      label: t("workersLabel"),
+      value: String(request.workers_needed),
+    });
+  if (request.work_mode && workModeKeys[request.work_mode])
+    detailRows.push({
+      label: t("workModeLabel"),
+      value: t(workModeKeys[request.work_mode]),
+    });
+  if (
+    request.experience_level &&
+    request.experience_level !== "any" &&
+    experienceKeys[request.experience_level]
+  )
+    detailRows.push({
+      label: t("experienceLabel"),
+      value: t(experienceKeys[request.experience_level]),
+    });
+  if (
+    request.budget_type &&
+    request.budget_type !== "range" &&
+    budgetTypeKeys[request.budget_type]
+  )
+    detailRows.push({
+      label: t("budgetTypeLabel"),
+      value: t(budgetTypeKeys[request.budget_type]),
+    });
+
   return (
     <Screen>
       <View style={styles.container}>
@@ -423,12 +488,19 @@ export default function RequestDetailScreen() {
                   );
                   setPhotoIndex(idx);
                 }}
-                renderItem={({ item: uri }) => (
-                  <Image
-                    source={{ uri }}
-                    style={styles.photoPage}
-                    resizeMode="cover"
-                  />
+                renderItem={({ item: uri, index: i }) => (
+                  <Pressable
+                    onPress={() => {
+                      setViewerIndex(i);
+                      setViewerVisible(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={styles.photoPage}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
                 )}
               />
               {photos.length > 1 && (
@@ -449,14 +521,6 @@ export default function RequestDetailScreen() {
             </View>
           )}
 
-          {/* Back button overlay */}
-          <Pressable
-            style={styles.backBtnOverlay}
-            onPress={() => router.back()}
-          >
-            <Feather name="chevron-left" size={22} color={theme.primaryText} />
-          </Pressable>
-
           {/* ── Main info card ── */}
           <View style={styles.infoCard}>
             <View style={styles.badgeRow}>
@@ -472,20 +536,22 @@ export default function RequestDetailScreen() {
                   {t(categoryTranslationKeys[request.category] || "other")}
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  request.status === "active"
-                    ? styles.statusOpen
-                    : request.status === "matched"
-                      ? styles.statusNegotiating
-                      : styles.statusClosed,
-                ]}
-              >
-                <Text style={styles.statusBadgeText}>
-                  {t(statusKeys[request.status] ?? "open")}
-                </Text>
-              </View>
+              {(isOwner || hasSwipedRight) && (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    request.status === "active"
+                      ? styles.statusOpen
+                      : request.status === "matched"
+                        ? styles.statusNegotiating
+                        : styles.statusClosed,
+                  ]}
+                >
+                  <Text style={styles.statusBadgeText}>
+                    {t(statusKeys[request.status] ?? "open")}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.title}>{request.title}</Text>
@@ -590,22 +656,23 @@ export default function RequestDetailScreen() {
             </Pressable>
           )}
 
-          {/* ── Detail badges ── */}
-          {detailBadges.length > 0 && (
+          {/* ── Detail info (labeled grid) ── */}
+          {detailRows.length > 0 && (
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>{t("showDetails")}</Text>
-              <View style={styles.badgeRow}>
-                {detailBadges.map((label, i) => (
-                  <View key={i} style={styles.detailBadge}>
-                    <Text style={styles.detailBadgeText}>{label}</Text>
+              <View style={styles.detailGrid}>
+                {detailRows.map((d, i) => (
+                  <View key={i} style={styles.detailGridItem}>
+                    <Text style={styles.detailGridLabel}>{d.label}</Text>
+                    <Text style={styles.detailGridValue}>{d.value}</Text>
                   </View>
                 ))}
               </View>
             </View>
           )}
 
-          {/* ── Seller actions (non-owner) ── */}
-          {!isOwner && request.status === "active" && (
+          {/* ── Seller actions (only if swiped right) ── */}
+          {!isOwner && hasSwipedRight && request.status === "active" && (
             <View style={styles.ownerActions}>
               {!myOfferId ? (
                 <Pressable
@@ -860,6 +927,19 @@ export default function RequestDetailScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* Back button — always visible overlay */}
+        <Pressable style={styles.backBtnOverlay} onPress={() => router.back()}>
+          <Feather name="chevron-left" size={22} color={theme.primaryText} />
+        </Pressable>
+
+        {/* Fullscreen image viewer */}
+        <ImageViewer
+          images={photos}
+          visible={viewerVisible}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerVisible(false)}
+        />
       </View>
     </Screen>
   );

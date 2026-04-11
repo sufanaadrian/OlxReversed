@@ -163,6 +163,33 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  detailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailGridItem: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  detailGridLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  detailGridValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primaryText,
+  },
+
   offersHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

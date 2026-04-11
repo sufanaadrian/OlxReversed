@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
@@ -381,6 +382,8 @@ function RequestCard({
   const { formatPrice } = useCurrency();
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const [expanded, setExpanded] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const rotate = translate.x.interpolate({
     inputRange: [-200, 0, 200],
@@ -532,12 +535,19 @@ function RequestCard({
                 contentContainerStyle={styles.thumbRow}
               >
                 {photos.map((uri, i) => (
-                  <Image
+                  <Pressable
                     key={i}
-                    source={{ uri }}
-                    style={styles.thumb}
-                    resizeMode="cover"
-                  />
+                    onPress={() => {
+                      setViewerIndex(i);
+                      setViewerVisible(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={styles.thumb}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
                 ))}
               </ScrollView>
             )}
@@ -620,21 +630,21 @@ function RequestCard({
                 {new Date(request.created_at).toLocaleDateString()}
               </Text>
             </View>
-
-            {/* View full details button */}
-            <Pressable
-              style={styles.viewDetailsBtn}
-              onPress={() =>
-                router.push({
-                  pathname: "/request/[id]",
-                  params: { id: request.id },
-                } as any)
-              }
-            >
-              <Text style={styles.viewDetailsBtnText}>{t("showDetails")}</Text>
-              <Feather name="arrow-right" size={14} color={theme.primary} />
-            </Pressable>
           </ScrollView>
+
+          {/* View full details — pinned at bottom of card */}
+          <Pressable
+            style={styles.viewDetailsBtn}
+            onPress={() =>
+              router.push({
+                pathname: "/request/[id]",
+                params: { id: request.id },
+              } as any)
+            }
+          >
+            <Text style={styles.viewDetailsBtnText}>{t("showDetails")}</Text>
+            <Feather name="arrow-right" size={14} color={theme.primary} />
+          </Pressable>
 
           {/* Swipe indicators */}
           <Animated.View
@@ -649,6 +659,14 @@ function RequestCard({
           </Animated.View>
         </Animated.View>
       </View>
+
+      {/* Fullscreen image viewer */}
+      <ImageViewer
+        images={photos}
+        visible={viewerVisible}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }
