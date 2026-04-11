@@ -81,6 +81,7 @@ export default function MyRequestsScreen() {
   const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [countsByRequestId, setCountsByRequestId] = useState<
@@ -100,12 +101,14 @@ export default function MyRequestsScreen() {
     const user = userRes.user;
 
     if (!user) {
+      setIsGuest(true);
       setRequests([]);
       setCountsByRequestId(new Map());
       setCounterCountsByRequestId(new Map());
       if (showSpinner) setLoading(false);
       return;
     }
+    setIsGuest(false);
 
     const { data: reqs, error: reqErr } = await supabase
       .from("requests")
@@ -434,7 +437,24 @@ export default function MyRequestsScreen() {
     );
   };
 
-  const ListEmpty = (
+  const ListEmpty = isGuest ? (
+    <View style={styles.centerCard}>
+      <Text style={styles.titleEmpty}>{t("signInRequired")}</Text>
+      <Text style={styles.muted}>{t("pleaseSignIn")}</Text>
+      <Pressable
+        onPress={() => router.push("/sign-in" as any)}
+        style={{
+          marginTop: 8,
+          paddingVertical: 10,
+          paddingHorizontal: 24,
+          borderRadius: 12,
+          backgroundColor: "#1E40AF",
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "800" }}>{t("signIn")}</Text>
+      </Pressable>
+    </View>
+  ) : (
     <View style={styles.centerCard}>
       <Text style={styles.titleEmpty}>{t("nothingHere")}</Text>
       <Text style={styles.muted}>{t("createARequest")}</Text>

@@ -391,6 +391,13 @@ export const translations = {
     sendResetLink: "Send reset link",
     resetLinkSent: "Check your email for the reset link.",
     backToSignIn: "Back to sign in",
+    memberSince: "Member since",
+    editProfile: "Edit profile",
+    activeRequests: "Active requests",
+    acceptedDeals: "Accepted deals",
+    settings: "Settings",
+    accountInfo: "Account",
+    signInToSeeProfile: "Sign in to see your profile and activity.",
   },
   ro: {
     // Navigation & Tabs
@@ -791,5 +798,12 @@ export const translations = {
     sendResetLink: "Trimite link de resetare",
     resetLinkSent: "Verifică emailul pentru link-ul de resetare.",
     backToSignIn: "Întoacre-te la autentificare",
+    memberSince: "Membru din",
+    editProfile: "Editează profilul",
+    activeRequests: "Cereri active",
+    acceptedDeals: "Tranzacții acceptate",
+    settings: "Setări",
+    accountInfo: "Cont",
+    signInToSeeProfile: "Conectează-te pentru a vedea profilul și activitatea ta.",
   },
 };

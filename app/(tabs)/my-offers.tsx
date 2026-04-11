@@ -74,6 +74,7 @@ export default function MyOffersScreen() {
   const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   type CombinedFilter =
     | "all"
@@ -126,12 +127,14 @@ export default function MyOffersScreen() {
     const uid = sess.session?.user.id;
 
     if (!uid) {
+      setIsGuest(true);
       setSwipes([]);
       setOffers([]);
       setCounterOffers([]);
       if (showSpinner) setLoading(false);
       return;
     }
+    setIsGuest(false);
 
     // 1) swipes + requests
     const { data: swipeData, error: swipeErr } = await supabase
@@ -639,6 +642,19 @@ export default function MyOffersScreen() {
           <Text style={styles.centerTitle}>{t("loading")}</Text>
           <Text style={styles.centerSub}>{t("fetchingSwipesOffers")}</Text>
         </View>
+      ) : isGuest ? (
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={styles.centerCard}>
+            <Text style={styles.centerTitle}>{t("signInRequired")}</Text>
+            <Text style={styles.centerSub}>{t("pleaseSignIn")}</Text>
+            <Pressable
+              style={styles.btnPrimary}
+              onPress={() => router.push("/sign-in" as any)}
+            >
+              <Text style={styles.btnPrimaryText}>{t("signIn")}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       ) : visible.length === 0 ? (
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
@@ -792,10 +808,7 @@ export default function MyOffersScreen() {
                     <View style={styles.sectionHeaderLine} />
                     <View style={styles.sectionHeaderBadge}>
                       <View
-                        style={[
-                          styles.sectionHeaderDot,
-                          sectionDotStyle,
-                        ]}
+                        style={[styles.sectionHeaderDot, sectionDotStyle]}
                       />
                       <Text style={styles.sectionHeaderText}>
                         {t(sectionKey)}
@@ -819,17 +832,9 @@ export default function MyOffersScreen() {
                           {request.title}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          statusBadge.bgStyle,
-                        ]}
-                      >
+                      <View style={[styles.statusBadge, statusBadge.bgStyle]}>
                         <Text
-                          style={[
-                            styles.statusBadgeText,
-                            statusBadge.fgStyle,
-                          ]}
+                          style={[styles.statusBadgeText, statusBadge.fgStyle]}
                         >
                           {statusBadge.label}
                         </Text>

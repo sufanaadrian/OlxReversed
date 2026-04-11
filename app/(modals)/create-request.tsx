@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./create-request.styles";
 
@@ -59,17 +60,9 @@ export default function CreateRequestModal() {
   }, [title, description, budgetMin, budgetMax]);
 
   const submit = async () => {
-    // Must be logged in to create
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
-
-    if (!user) {
-      router.push({
-        pathname: "/sign-in",
-        params: { redirect: "/create-request" },
-      } as any);
-      return;
-    }
+    const guard = await requireAuth("/create-request");
+    if (!guard.ok) return;
+    const user = { id: guard.userId };
 
     setLoading(true);
     try {

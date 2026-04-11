@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
+import { requireAuth } from "../../src/lib/authGuard";
 import { styles, theme } from "./_layout.styles";
 
 export default function TabsLayout() {
@@ -13,8 +14,10 @@ export default function TabsLayout() {
 
   const close = () => setOpen(false);
 
-  const goCreateRequest = () => {
+  const goCreateRequest = async () => {
     close();
+    const guard = await requireAuth("/create-request");
+    if (!guard.ok) return;
     router.push("/create-request");
   };
 
