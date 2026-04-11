@@ -67,6 +67,12 @@ export default function SignUpScreen() {
       return;
     }
 
+    if (accountType === "business" && !companyName.trim()) {
+      setMsg(t("fillAllRequired"));
+      setIsError(true);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setMsg(t("passwordsDoNotMatch"));
       setIsError(true);
