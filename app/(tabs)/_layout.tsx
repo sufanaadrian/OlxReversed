@@ -23,7 +23,7 @@ export default function TabsLayout() {
 
   const goMarketplace = () => {
     close();
-    router.push("/marketplace");
+    router.push("/(tabs)/marketplace" as any);
   };
 
   return (

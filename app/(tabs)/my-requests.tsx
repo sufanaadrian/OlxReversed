@@ -94,111 +94,114 @@ export default function MyRequestsScreen() {
 
   const openRowRef = useRef<Swipeable | null>(null);
 
-  const load = useCallback(async (showSpinner: boolean = true) => {
-    if (showSpinner) setLoading(true);
+  const load = useCallback(
+    async (showSpinner: boolean = true) => {
+      if (showSpinner) setLoading(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
+      const { data: userRes } = await supabase.auth.getUser();
+      const user = userRes.user;
 
-    if (!user) {
-      setIsGuest(true);
-      setRequests([]);
-      setCountsByRequestId(new Map());
-      setCounterCountsByRequestId(new Map());
-      if (showSpinner) setLoading(false);
-      return;
-    }
-    setIsGuest(false);
+      if (!user) {
+        setIsGuest(true);
+        setRequests([]);
+        setCountsByRequestId(new Map());
+        setCounterCountsByRequestId(new Map());
+        if (showSpinner) setLoading(false);
+        return;
+      }
+      setIsGuest(false);
 
-    const { data: reqs, error: reqErr } = await supabase
-      .from("requests")
-      .select(
-        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at",
-      )
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      const { data: reqs, error: reqErr } = await supabase
+        .from("requests")
+        .select(
+          "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-    if (reqErr) {
-      Alert.alert(t("error"), reqErr.message);
-      setRequests([]);
-      setCountsByRequestId(new Map());
-      setCounterCountsByRequestId(new Map());
-      if (showSpinner) setLoading(false);
-      return;
-    }
+      if (reqErr) {
+        Alert.alert(t("error"), reqErr.message);
+        setRequests([]);
+        setCountsByRequestId(new Map());
+        setCounterCountsByRequestId(new Map());
+        if (showSpinner) setLoading(false);
+        return;
+      }
 
-    const reqList = (reqs ?? []) as RequestRow[];
-    setRequests(reqList);
+      const reqList = (reqs ?? []) as RequestRow[];
+      setRequests(reqList);
 
-    if (reqList.length === 0) {
-      setCountsByRequestId(new Map());
-      setCounterCountsByRequestId(new Map());
-      if (showSpinner) setLoading(false);
-      return;
-    }
+      if (reqList.length === 0) {
+        setCountsByRequestId(new Map());
+        setCounterCountsByRequestId(new Map());
+        if (showSpinner) setLoading(false);
+        return;
+      }
 
-    const ids = reqList.map((r) => r.id);
+      const ids = reqList.map((r) => r.id);
 
-    // Offers counts (includes withdrawn)
-    const { data: offers, error: offErr } = await supabase
-      .from("offers")
-      .select("id,request_id,status")
-      .in("request_id", ids);
+      // Offers counts (includes withdrawn)
+      const { data: offers, error: offErr } = await supabase
+        .from("offers")
+        .select("id,request_id,status")
+        .in("request_id", ids);
 
-    if (offErr) {
-      setCountsByRequestId(new Map());
-      setCounterCountsByRequestId(new Map());
-      if (showSpinner) setLoading(false);
-      return;
-    }
+      if (offErr) {
+        setCountsByRequestId(new Map());
+        setCounterCountsByRequestId(new Map());
+        if (showSpinner) setLoading(false);
+        return;
+      }
 
-    const offerMap = new Map<string, OfferCounts>();
-    (offers ?? []).forEach((o: any) => {
-      const row = o as OfferMini;
-      const prev = offerMap.get(row.request_id) ?? {
-        total: 0,
-        pending: 0,
-        accepted: 0,
-        withdrawn: 0,
-      };
+      const offerMap = new Map<string, OfferCounts>();
+      (offers ?? []).forEach((o: any) => {
+        const row = o as OfferMini;
+        const prev = offerMap.get(row.request_id) ?? {
+          total: 0,
+          pending: 0,
+          accepted: 0,
+          withdrawn: 0,
+        };
 
-      offerMap.set(row.request_id, {
-        total: prev.total + 1,
-        pending: prev.pending + (row.status === "pending" ? 1 : 0),
-        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
-        withdrawn: prev.withdrawn + (row.status === "withdrawn" ? 1 : 0),
+        offerMap.set(row.request_id, {
+          total: prev.total + 1,
+          pending: prev.pending + (row.status === "pending" ? 1 : 0),
+          accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+          withdrawn: prev.withdrawn + (row.status === "withdrawn" ? 1 : 0),
+        });
       });
-    });
-    setCountsByRequestId(offerMap);
+      setCountsByRequestId(offerMap);
 
-    // Counter offers counts
-    const { data: counters, error: coErr } = await supabase
-      .from("counter_offers")
-      .select("id,request_id,status")
-      .in("request_id", ids);
+      // Counter offers counts
+      const { data: counters, error: coErr } = await supabase
+        .from("counter_offers")
+        .select("id,request_id,status")
+        .in("request_id", ids);
 
-    if (coErr) {
-      setCounterCountsByRequestId(new Map());
-      if (showSpinner) setLoading(false);
-      return;
-    }
+      if (coErr) {
+        setCounterCountsByRequestId(new Map());
+        if (showSpinner) setLoading(false);
+        return;
+      }
 
-    const counterMap = new Map<string, CounterCounts>();
-    (counters ?? []).forEach((c: any) => {
-      const row = c as CounterOfferMini;
-      const prev = counterMap.get(row.request_id) ?? {
-        pending: 0,
-        accepted: 0,
-      };
-      counterMap.set(row.request_id, {
-        pending: prev.pending + (row.status === "pending" ? 1 : 0),
-        accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+      const counterMap = new Map<string, CounterCounts>();
+      (counters ?? []).forEach((c: any) => {
+        const row = c as CounterOfferMini;
+        const prev = counterMap.get(row.request_id) ?? {
+          pending: 0,
+          accepted: 0,
+        };
+        counterMap.set(row.request_id, {
+          pending: prev.pending + (row.status === "pending" ? 1 : 0),
+          accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
+        });
       });
-    });
-    setCounterCountsByRequestId(counterMap);
+      setCounterCountsByRequestId(counterMap);
 
-    if (showSpinner) setLoading(false);
-  }, []);
+      if (showSpinner) setLoading(false);
+    },
+    [t],
+  );
 
   useFocusEffect(
     useCallback(() => {
