@@ -22,13 +22,13 @@ export async function requireAuth(redirectBack?: string): Promise<GuardResult> {
     return { ok: false };
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("onboarding_completed")
     .eq("id", session.user.id)
     .single();
 
-  if (profile && !profile.onboarding_completed) {
+  if (profileError || !profile || !profile.onboarding_completed) {
     router.replace("/onboarding" as any);
     return { ok: false };
   }
