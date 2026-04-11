@@ -798,7 +798,7 @@ export const translations = {
       "Introdu emailul tău şi îți vom trimite un link de resetare.",
     sendResetLink: "Trimite link de resetare",
     resetLinkSent: "Verifică emailul pentru link-ul de resetare.",
-    backToSignIn: "Întoacre-te la autentificare",
+    backToSignIn: "Întoarce-te la autentificare",
     memberSince: "Membru din",
     editProfile: "Editează profilul",
     activeRequests: "Cereri active",
