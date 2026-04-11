@@ -274,6 +274,17 @@ export const translations = {
     jobSectionSpecifics: "Job specifics",
     jobSectionContext: "Context & requirements",
     jobSectionPhotos: "Photos",
+    postingAs: "I am...",
+    postingSeeking: "Looking to hire",
+    postingSeekingDesc: "I need someone to do this job",
+    postingOffering: "Offering my services",
+    postingOfferingDesc: "I can do this job for you",
+    budgetType: "Budget type",
+    budgetTypeRange: "Range",
+    budgetPerHour: "Per hour",
+    budgetPerDay: "Per day",
+    budgetFixed: "Fixed price",
+    budgetAmount: "Amount",
     openBudget: "Open to offers",
     timeline: "When is this needed?",
     timelineAsap: "ASAP",
@@ -310,6 +321,20 @@ export const translations = {
     addPhotos: "Add photo",
     photoHint: "Up to 5 photos (optional)",
     uploadingPhotos: "Uploading photos...",
+
+    // Offering mode overrides
+    offeringTitle: "Service title",
+    offeringTitlePlaceholder: "e.g. Plumbing, tutoring, home cleaning...",
+    offeringDescPlaceholder:
+      "Describe your service, skills, and what you offer...",
+    offeringBudgetType: "My rate",
+    offeringOpenBudget: "Negotiable",
+    offeringTimeline: "When are you available?",
+    offeringExperience: "My experience level",
+    offeringEquipmentClient: "Client provides",
+    offeringEquipmentPro: "I bring my own",
+    offeringAvailability: "My availability",
+    offeringDuration: "Typical job duration",
 
     // Marketplace Screen
     searchRequests: "Search jobs",
@@ -721,6 +746,17 @@ export const translations = {
     jobSectionSpecifics: "Specificații job",
     jobSectionContext: "Context și cerințe",
     jobSectionPhotos: "Fotografii",
+    postingAs: "Eu sunt...",
+    postingSeeking: "Caut să angajez",
+    postingSeekingDesc: "Am nevoie de cineva să facă acest job",
+    postingOffering: "Ofer serviciile mele",
+    postingOfferingDesc: "Pot face acest job pentru tine",
+    budgetType: "Tip buget",
+    budgetTypeRange: "Interval",
+    budgetPerHour: "Pe oră",
+    budgetPerDay: "Pe zi",
+    budgetFixed: "Preț fix",
+    budgetAmount: "Sumă",
     openBudget: "Deschis la oferte",
     timeline: "Când ai nevoie?",
     timelineAsap: "Cât mai curând",
@@ -756,6 +792,21 @@ export const translations = {
     addPhotos: "Adaugă foto",
     photoHint: "Până la 5 fotografii (opțional)",
     uploadingPhotos: "Se încarcă fotografiile...",
+
+    // Offering mode overrides
+    offeringTitle: "Titlul serviciului",
+    offeringTitlePlaceholder:
+      "ex. Instalații sanitare, meditații, curățenie...",
+    offeringDescPlaceholder:
+      "Descrie serviciul tău, abilitățile și ce oferi...",
+    offeringBudgetType: "Tariful meu",
+    offeringOpenBudget: "Negociabil",
+    offeringTimeline: "Când ești disponibil?",
+    offeringExperience: "Nivelul meu de experiență",
+    offeringEquipmentClient: "Clientul asigură",
+    offeringEquipmentPro: "Aduc eu",
+    offeringAvailability: "Disponibilitatea mea",
+    offeringDuration: "Durata tipică",
 
     // Marketplace Screen
     searchRequests: "Caută joburi",

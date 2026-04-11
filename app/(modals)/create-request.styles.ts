@@ -199,4 +199,29 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitBtnText: { fontSize: 15, fontWeight: "900", color: "white" },
+
+  // ── Posting-mode selector ────────────────────────────────────────
+  modeRow: { flexDirection: "row", gap: 10 },
+  modeCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+    padding: 14,
+    alignItems: "center",
+    gap: 6,
+  },
+  modeCardActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.accentSoft,
+  },
+  modeIcon: { fontSize: 24 },
+  modeTitle: { fontSize: 13, fontWeight: "900", color: theme.primaryText },
+  modeDesc: {
+    fontSize: 11,
+    color: theme.secondaryText,
+    textAlign: "center",
+    lineHeight: 15,
+  },
 });

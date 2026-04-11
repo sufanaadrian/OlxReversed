@@ -43,19 +43,27 @@ type WorkMode = "onsite" | "remote" | "hybrid";
 type Experience = "any" | "beginner" | "experienced" | "expert";
 type Equipment = "not_needed" | "pro_provides" | "client_provides";
 type Schedule = "anytime" | "weekdays" | "weekends";
+type PostingMode = "seeking" | "offering";
+type BudgetType = "range" | "per_hour" | "per_day" | "fixed";
 
 const MAX_PHOTOS = 5;
 
 export default function CreateRequestModal() {
   const t = useTranslation();
 
+  // ── Posting mode ──────────────────────────────────────────────────
+  const [postingAs, setPostingAs] = useState<PostingMode>("seeking");
+  const isOffering = postingAs === "offering";
+
   // ── Core ─────────────────────────────────────────────────────────
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] =
     useState<(typeof categories)[number]>("Services");
+  const [budgetType, setBudgetType] = useState<BudgetType>("range");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState("");
   const [openBudget, setOpenBudget] = useState(false);
   const [location, setLocation] = useState("");
 
@@ -81,14 +89,28 @@ export default function CreateRequestModal() {
     if (!title.trim()) return false;
     if (!description.trim()) return false;
     if (!openBudget) {
-      const min = Number(budgetMin);
-      const max = Number(budgetMax);
-      if (!budgetMin || !budgetMax) return false;
-      if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
-      if (min <= 0 || max <= 0 || min > max) return false;
+      if (budgetType === "range") {
+        const min = Number(budgetMin);
+        const max = Number(budgetMax);
+        if (!budgetMin || !budgetMax) return false;
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+        if (min <= 0 || max <= 0 || min > max) return false;
+      } else {
+        const amt = Number(budgetAmount);
+        if (!budgetAmount) return false;
+        if (!Number.isFinite(amt) || amt <= 0) return false;
+      }
     }
     return true;
-  }, [title, description, budgetMin, budgetMax, openBudget]);
+  }, [
+    title,
+    description,
+    budgetType,
+    budgetMin,
+    budgetMax,
+    budgetAmount,
+    openBudget,
+  ]);
 
   const addPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) return;
@@ -151,17 +173,33 @@ export default function CreateRequestModal() {
       const photoUrls: string[] =
         photos.length > 0 ? await Promise.all(photos.map(uploadPhoto)) : [];
 
+      // Build budget values based on selected type
+      let bMin: number | null = null;
+      let bMax: number | null = null;
+      if (!openBudget) {
+        if (budgetType === "range") {
+          bMin = Number(budgetMin);
+          bMax = Number(budgetMax);
+        } else {
+          const amt = Number(budgetAmount);
+          bMin = amt;
+          bMax = amt;
+        }
+      }
+
       const { error } = await supabase.from("requests").insert({
         user_id: guard.userId,
         title: title.trim(),
         description: description.trim(),
         category,
         type: "service",
-        budget_min: openBudget ? null : Number(budgetMin),
-        budget_max: openBudget ? null : Number(budgetMax),
+        budget_min: bMin,
+        budget_max: bMax,
         open_budget: openBudget,
         location: location.trim() || null,
         status: "active",
+        posting_as: postingAs,
+        budget_type: openBudget ? null : budgetType,
         timeline,
         scheduled_date:
           timeline === "specific_date" ? scheduledDate.trim() || null : null,
@@ -215,17 +253,50 @@ export default function CreateRequestModal() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Posting Mode ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("postingAs")}</Text>
+            <View style={styles.modeRow}>
+              <Pressable
+                style={[
+                  styles.modeCard,
+                  postingAs === "seeking" && styles.modeCardActive,
+                ]}
+                onPress={() => setPostingAs("seeking")}
+              >
+                <Text style={styles.modeIcon}>🔍</Text>
+                <Text style={styles.modeTitle}>{t("postingSeeking")}</Text>
+                <Text style={styles.modeDesc}>{t("postingSeekingDesc")}</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.modeCard,
+                  postingAs === "offering" && styles.modeCardActive,
+                ]}
+                onPress={() => setPostingAs("offering")}
+              >
+                <Text style={styles.modeIcon}>🛠️</Text>
+                <Text style={styles.modeTitle}>{t("postingOffering")}</Text>
+                <Text style={styles.modeDesc}>{t("postingOfferingDesc")}</Text>
+              </Pressable>
+            </View>
+          </View>
+
           {/* ── Section 1: Core Details ── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t("jobSectionCore")}</Text>
 
             <Text style={[styles.label, styles.labelFirst]}>
-              {t("requestTitle")}
+              {isOffering ? t("offeringTitle") : t("requestTitle")}
             </Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder={t("exampleRequestTitle")}
+              placeholder={
+                isOffering
+                  ? t("offeringTitlePlaceholder")
+                  : t("exampleRequestTitle")
+              }
               placeholderTextColor={theme.secondaryText}
               style={styles.input}
             />
@@ -234,7 +305,11 @@ export default function CreateRequestModal() {
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder={t("descriptionPlaceholder")}
+              placeholder={
+                isOffering
+                  ? t("offeringDescPlaceholder")
+                  : t("descriptionPlaceholder")
+              }
               placeholderTextColor={theme.secondaryText}
               style={[styles.input, styles.textarea]}
               multiline
@@ -264,9 +339,46 @@ export default function CreateRequestModal() {
               })}
             </ScrollView>
 
-            <Text style={styles.label}>{t("budgetRange")}</Text>
-            {!openBudget && (
-              <View style={styles.budgetRow}>
+            <Text style={styles.label}>
+              {isOffering ? t("offeringBudgetType") : t("budgetType")}
+            </Text>
+            <View style={styles.chipsWrap}>
+              {(["range", "per_hour", "per_day", "fixed"] as BudgetType[]).map(
+                (v) => (
+                  <Pressable
+                    key={v}
+                    style={[
+                      styles.chip,
+                      !openBudget && budgetType === v && styles.chipActive,
+                      openBudget && { opacity: 0.4 },
+                    ]}
+                    onPress={() => {
+                      if (!openBudget) setBudgetType(v);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        !openBudget &&
+                          budgetType === v &&
+                          styles.chipTextActive,
+                      ]}
+                    >
+                      {v === "range"
+                        ? t("budgetTypeRange")
+                        : v === "per_hour"
+                          ? t("budgetPerHour")
+                          : v === "per_day"
+                            ? t("budgetPerDay")
+                            : t("budgetFixed")}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+
+            {!openBudget && budgetType === "range" && (
+              <View style={[styles.budgetRow, { marginTop: 10 }]}>
                 <View style={styles.budgetInput}>
                   <TextInput
                     value={budgetMin}
@@ -289,6 +401,18 @@ export default function CreateRequestModal() {
                 </View>
               </View>
             )}
+
+            {!openBudget && budgetType !== "range" && (
+              <TextInput
+                value={budgetAmount}
+                onChangeText={setBudgetAmount}
+                placeholder={t("budgetAmount")}
+                placeholderTextColor={theme.secondaryText}
+                keyboardType="number-pad"
+                style={[styles.input, { marginTop: 10 }]}
+              />
+            )}
+
             <Pressable
               style={styles.openBudgetPressable}
               onPress={() => setOpenBudget((v) => !v)}
@@ -307,7 +431,9 @@ export default function CreateRequestModal() {
                   </Text>
                 )}
               </View>
-              <Text style={styles.openBudgetLabel}>{t("openBudget")}</Text>
+              <Text style={styles.openBudgetLabel}>
+                {isOffering ? t("offeringOpenBudget") : t("openBudget")}
+              </Text>
             </Pressable>
 
             <Text style={styles.label}>{t("locationOptional")}</Text>
@@ -325,7 +451,7 @@ export default function CreateRequestModal() {
             <Text style={styles.sectionTitle}>{t("jobSectionSpecifics")}</Text>
 
             <Text style={[styles.label, styles.labelFirst]}>
-              {t("timeline")}
+              {isOffering ? t("offeringTimeline") : t("timeline")}
             </Text>
             <View style={styles.chipsWrap}>
               {(["asap", "specific_date", "flexible"] as Timeline[]).map(
@@ -365,7 +491,9 @@ export default function CreateRequestModal() {
               </>
             )}
 
-            <Text style={styles.label}>{t("duration")}</Text>
+            <Text style={styles.label}>
+              {isOffering ? t("offeringDuration") : t("duration")}
+            </Text>
             <View style={styles.chipsWrap}>
               {(
                 [
@@ -398,22 +526,26 @@ export default function CreateRequestModal() {
               ))}
             </View>
 
-            <Text style={styles.label}>{t("workersNeeded")}</Text>
-            <View style={styles.stepperRow}>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => setWorkers((v) => Math.max(1, v - 1))}
-              >
-                <Text style={styles.stepperBtnText}>−</Text>
-              </Pressable>
-              <Text style={styles.stepperValue}>{workers}</Text>
-              <Pressable
-                style={styles.stepperBtn}
-                onPress={() => setWorkers((v) => Math.min(20, v + 1))}
-              >
-                <Text style={styles.stepperBtnText}>+</Text>
-              </Pressable>
-            </View>
+            {!isOffering && (
+              <>
+                <Text style={styles.label}>{t("workersNeeded")}</Text>
+                <View style={styles.stepperRow}>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() => setWorkers((v) => Math.max(1, v - 1))}
+                  >
+                    <Text style={styles.stepperBtnText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValue}>{workers}</Text>
+                  <Pressable
+                    style={styles.stepperBtn}
+                    onPress={() => setWorkers((v) => Math.min(20, v + 1))}
+                  >
+                    <Text style={styles.stepperBtnText}>+</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
 
           {/* ── Section 3: Context ── */}
@@ -446,7 +578,9 @@ export default function CreateRequestModal() {
               ))}
             </View>
 
-            <Text style={styles.label}>{t("experienceLevel")}</Text>
+            <Text style={styles.label}>
+              {isOffering ? t("offeringExperience") : t("experienceLevel")}
+            </Text>
             <View style={styles.chipsWrap}>
               {(
                 ["any", "beginner", "experienced", "expert"] as Experience[]
@@ -493,14 +627,20 @@ export default function CreateRequestModal() {
                     {v === "not_needed"
                       ? t("equipmentNotNeeded")
                       : v === "pro_provides"
-                        ? t("equipmentPro")
-                        : t("equipmentClient")}
+                        ? isOffering
+                          ? t("offeringEquipmentPro")
+                          : t("equipmentPro")
+                        : isOffering
+                          ? t("offeringEquipmentClient")
+                          : t("equipmentClient")}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
-            <Text style={styles.label}>{t("preferredSchedule")}</Text>
+            <Text style={styles.label}>
+              {isOffering ? t("offeringAvailability") : t("preferredSchedule")}
+            </Text>
             <View style={styles.chipsWrap}>
               {(["anytime", "weekdays", "weekends"] as Schedule[]).map((v) => (
                 <Pressable

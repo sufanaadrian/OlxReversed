@@ -56,6 +56,8 @@ type RequestRow = {
   created_at: string;
   location: string | null;
   open_budget: boolean | null;
+  posting_as: string | null;
+  budget_type: string | null;
   timeline: string | null;
   duration: string | null;
   workers_needed: number | null;
@@ -89,6 +91,12 @@ const experienceKeys: Record<string, string> = {
   beginner: "experienceBeginner",
   experienced: "experienceExperienced",
   expert: "experienceExpert",
+};
+
+const budgetTypeKeys: Record<string, string> = {
+  per_hour: "budgetPerHour",
+  per_day: "budgetPerDay",
+  fixed: "budgetFixed",
 };
 
 const { width } = Dimensions.get("window");
@@ -145,6 +153,8 @@ export default function MarketplaceScreen() {
     location,
     user_id,
     open_budget,
+    posting_as,
+    budget_type,
     timeline,
     duration,
     workers_needed,
@@ -477,6 +487,13 @@ function RequestCard({
             )}
 
             <View style={styles.badgeRow}>
+              {request.posting_as === "offering" && (
+                <View style={[styles.badge, { backgroundColor: "#DCFCE7" }]}>
+                  <Text style={[styles.badgeText, { color: "#166534" }]}>
+                    {t("postingOffering")}
+                  </Text>
+                </View>
+              )}
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {t(categoryTranslationKeys[request.category] || "other")}
@@ -539,7 +556,11 @@ function RequestCard({
                 <Text style={styles.detailText}>
                   {request.open_budget
                     ? t("openBudget")
-                    : `${formatPrice(request.budget_min)} – ${formatPrice(request.budget_max)}`}
+                    : request.budget_type &&
+                        request.budget_type !== "range" &&
+                        budgetTypeKeys[request.budget_type]
+                      ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
+                      : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`}
                 </Text>
               </View>
 
