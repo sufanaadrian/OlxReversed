@@ -146,15 +146,39 @@ export const styles = StyleSheet.create({
   },
   cardContent: { flex: 1, padding: 16 },
 
+  cardPhoto: {
+    width: "100%",
+    height: 140,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+  },
   badge: {
-    alignSelf: "flex-start",
     backgroundColor: theme.accentSoft,
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    marginBottom: 10,
   },
   badgeText: { fontSize: 12, color: theme.primaryText, fontWeight: "700" },
+  badgeOutline: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+  },
+  badgeOutlineText: {
+    fontSize: 11,
+    color: theme.secondaryText,
+    fontWeight: "700",
+  },
 
   title: {
     fontSize: 20,

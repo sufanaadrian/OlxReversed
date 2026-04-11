@@ -1,7 +1,10 @@
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,73 +20,163 @@ import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./create-request.styles";
 
 const categories = [
+  "Services",
   "Vehicles",
   "Real Estate",
-  "Services",
   "Electronics & Tech",
   "Fashion & Personal",
   "Other",
 ] as const;
 
 const categoryTranslationKeys: Record<string, string> = {
+  Services: "services",
   Vehicles: "vehicles",
   "Real Estate": "realEstate",
-  Services: "services",
   "Electronics & Tech": "electronics",
   "Fashion & Personal": "fashion",
   Other: "other",
 };
 
-type RequestType = "product" | "service";
+type Timeline = "asap" | "specific_date" | "flexible";
+type Duration = "few_hours" | "full_day" | "multi_day" | "recurring";
+type WorkMode = "onsite" | "remote" | "hybrid";
+type Experience = "any" | "beginner" | "experienced" | "expert";
+type Equipment = "not_needed" | "pro_provides" | "client_provides";
+type Schedule = "anytime" | "weekdays" | "weekends";
+
+const MAX_PHOTOS = 5;
 
 export default function CreateRequestModal() {
   const t = useTranslation();
+
+  // ── Core ─────────────────────────────────────────────────────────
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] =
     useState<(typeof categories)[number]>("Services");
-  const [type, setType] = useState<RequestType>("service");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
+  const [openBudget, setOpenBudget] = useState(false);
   const [location, setLocation] = useState("");
+
+  // ── Job Specifics ────────────────────────────────────────────────
+  const [timeline, setTimeline] = useState<Timeline>("asap");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [duration, setDuration] = useState<Duration>("few_hours");
+  const [workers, setWorkers] = useState(1);
+
+  // ── Context ──────────────────────────────────────────────────────
+  const [workMode, setWorkMode] = useState<WorkMode>("onsite");
+  const [experience, setExperience] = useState<Experience>("any");
+  const [equipment, setEquipment] = useState<Equipment>("not_needed");
+  const [preferredSchedule, setPreferredSchedule] =
+    useState<Schedule>("anytime");
+  const [specialRequirements, setSpecialRequirements] = useState("");
+
+  // ── Photos ───────────────────────────────────────────────────────
+  const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const canSubmit = useMemo(() => {
-    const min = Number(budgetMin);
-    const max = Number(budgetMax);
     if (!title.trim()) return false;
     if (!description.trim()) return false;
-    if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
-    if (min <= 0 || max <= 0) return false;
-    if (min > max) return false;
+    if (!openBudget) {
+      const min = Number(budgetMin);
+      const max = Number(budgetMax);
+      if (!budgetMin || !budgetMax) return false;
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+      if (min <= 0 || max <= 0 || min > max) return false;
+    }
     return true;
-  }, [title, description, budgetMin, budgetMax]);
+  }, [title, description, budgetMin, budgetMax, openBudget]);
+
+  const addPhoto = async () => {
+    if (photos.length >= MAX_PHOTOS) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t("photosPermission"), t("allowPhotosAccess"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.85,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled) return;
+    const uri = result.assets?.[0]?.uri;
+    if (!uri) return;
+    setPhotos((prev) => [...prev, uri]);
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadPhoto = async (uri: string): Promise<string> => {
+    const extMatch = uri.match(/\.(\w+)(\?|$)/);
+    const ext = extMatch?.[1]?.toLowerCase() ?? "jpg";
+    const mime = `image/${ext === "jpg" ? "jpeg" : ext}`;
+    const fileName = `job-photos/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+
+    let readUri = uri;
+    if (!uri.startsWith("file://")) {
+      const dest = `${FileSystem.cacheDirectory}upload-${Date.now()}.${ext}`;
+      await FileSystem.copyAsync({ from: uri, to: dest });
+      readUri = dest;
+    }
+
+    const base64 = await FileSystem.readAsStringAsync(readUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const binary = globalThis.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const { data, error } = await supabase.storage
+      .from("job-photos")
+      .upload(fileName, bytes, { contentType: mime, upsert: false });
+    if (error) throw error;
+
+    const { data: pub } = supabase.storage
+      .from("job-photos")
+      .getPublicUrl(data.path);
+    return pub.publicUrl;
+  };
 
   const submit = async () => {
     const guard = await requireAuth("/create-request");
     if (!guard.ok) return;
-    const user = { id: guard.userId };
 
     setLoading(true);
     try {
-      const min = Number(budgetMin);
-      const max = Number(budgetMax);
+      const photoUrls: string[] =
+        photos.length > 0 ? await Promise.all(photos.map(uploadPhoto)) : [];
 
       const { error } = await supabase.from("requests").insert({
-        user_id: user.id,
+        user_id: guard.userId,
         title: title.trim(),
         description: description.trim(),
         category,
-        budget_min: min,
-        budget_max: max,
-        type,
+        type: "service",
+        budget_min: openBudget ? null : Number(budgetMin),
+        budget_max: openBudget ? null : Number(budgetMax),
+        open_budget: openBudget,
+        location: location.trim() || null,
         status: "active",
-        location: location.trim() ? location.trim() : null,
+        timeline,
+        scheduled_date:
+          timeline === "specific_date" ? scheduledDate.trim() || null : null,
+        duration,
+        workers_needed: workers,
+        work_mode: workMode,
+        experience_level: experience,
+        equipment,
+        preferred_schedule: preferredSchedule,
+        special_requirements: specialRequirements.trim() || null,
+        photos: photoUrls,
       });
 
-      if (error) throw new Error(error.message);
-
-      router.back(); // close modal and return to previous screen
+      if (error) throw error;
+      router.back();
     } catch (e: any) {
       Alert.alert(t("couldNotPostRequest"), e?.message ?? "Unknown error");
     } finally {
@@ -97,14 +190,12 @@ export default function CreateRequestModal() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.headerBtn}>
             <Text style={styles.headerBtnText}>{t("cancel")}</Text>
           </Pressable>
-
           <Text style={styles.headerTitle}>{t("postARequest")}</Text>
-
           <Pressable
             onPress={submit}
             disabled={!canSubmit || loading}
@@ -122,147 +213,384 @@ export default function CreateRequestModal() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Title */}
-          <Text style={styles.label}>{t("requestTitle")}</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder={t("exampleRequestTitle")}
-            placeholderTextColor={theme.secondaryText}
-            style={styles.input}
-          />
+          {/* ── Section 1: Core Details ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("jobSectionCore")}</Text>
 
-          {/* Description */}
-          <Text style={styles.label}>{t("description")}</Text>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder={t("descriptionPlaceholder")}
-            placeholderTextColor={theme.secondaryText}
-            style={[styles.input, styles.textarea]}
-            multiline
-          />
+            <Text style={[styles.label, styles.labelFirst]}>
+              {t("requestTitle")}
+            </Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder={t("exampleRequestTitle")}
+              placeholderTextColor={theme.secondaryText}
+              style={styles.input}
+            />
 
-          {/* Type */}
-          <Text style={styles.label}>{t("type")}</Text>
-          <View style={styles.segment}>
-            <Pressable
-              onPress={() => setType("product")}
-              style={[
-                styles.segmentItem,
-                type === "product" && styles.segmentItemActive,
-              ]}
+            <Text style={styles.label}>{t("description")}</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder={t("descriptionPlaceholder")}
+              placeholderTextColor={theme.secondaryText}
+              style={[styles.input, styles.textarea]}
+              multiline
+            />
+
+            <Text style={styles.label}>{t("category")}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsScroll}
             >
-              <Text
+              {categories.map((c) => {
+                const active = c === category;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setCategory(c)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text
+                      style={[styles.chipText, active && styles.chipTextActive]}
+                    >
+                      {t(categoryTranslationKeys[c] || "other")}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={styles.label}>{t("budgetRange")}</Text>
+            {!openBudget && (
+              <View style={styles.budgetRow}>
+                <View style={styles.budgetInput}>
+                  <TextInput
+                    value={budgetMin}
+                    onChangeText={setBudgetMin}
+                    placeholder={t("min")}
+                    placeholderTextColor={theme.secondaryText}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.budgetInput}>
+                  <TextInput
+                    value={budgetMax}
+                    onChangeText={setBudgetMax}
+                    placeholder={t("max")}
+                    placeholderTextColor={theme.secondaryText}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+            )}
+            <Pressable
+              style={styles.openBudgetPressable}
+              onPress={() => setOpenBudget((v) => !v)}
+            >
+              <View
                 style={[
-                  styles.segmentText,
-                  type === "product" && styles.segmentTextActive,
+                  styles.openBudgetCheckbox,
+                  openBudget && styles.openBudgetCheckboxActive,
                 ]}
               >
-                {t("product")}
-              </Text>
+                {openBudget && (
+                  <Text
+                    style={{ color: "white", fontSize: 12, fontWeight: "900" }}
+                  >
+                    ✓
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.openBudgetLabel}>{t("openBudget")}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => setType("service")}
-              style={[
-                styles.segmentItem,
-                type === "service" && styles.segmentItemActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  type === "service" && styles.segmentTextActive,
-                ]}
-              >
-                {t("service")}
-              </Text>
-            </Pressable>
+
+            <Text style={styles.label}>{t("locationOptional")}</Text>
+            <TextInput
+              value={location}
+              onChangeText={setLocation}
+              placeholder={t("exampleLocation")}
+              placeholderTextColor={theme.secondaryText}
+              style={styles.input}
+            />
           </View>
 
-          {/* Category */}
-          <Text style={styles.label}>{t("category")}</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            {categories.map((c) => {
-              const selected = c === category;
-              return (
+          {/* ── Section 2: Job Specifics ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("jobSectionSpecifics")}</Text>
+
+            <Text style={[styles.label, styles.labelFirst]}>
+              {t("timeline")}
+            </Text>
+            <View style={styles.chipsWrap}>
+              {(["asap", "specific_date", "flexible"] as Timeline[]).map(
+                (v) => (
+                  <Pressable
+                    key={v}
+                    style={[styles.chip, timeline === v && styles.chipActive]}
+                    onPress={() => setTimeline(v)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        timeline === v && styles.chipTextActive,
+                      ]}
+                    >
+                      {v === "asap"
+                        ? t("timelineAsap")
+                        : v === "specific_date"
+                          ? t("timelineDate")
+                          : t("timelineFlexible")}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+
+            {timeline === "specific_date" && (
+              <>
+                <Text style={styles.label}>{t("scheduledDate")}</Text>
+                <TextInput
+                  value={scheduledDate}
+                  onChangeText={setScheduledDate}
+                  placeholder={t("scheduledDatePlaceholder")}
+                  placeholderTextColor={theme.secondaryText}
+                  style={styles.input}
+                />
+              </>
+            )}
+
+            <Text style={styles.label}>{t("duration")}</Text>
+            <View style={styles.chipsWrap}>
+              {(
+                [
+                  "few_hours",
+                  "full_day",
+                  "multi_day",
+                  "recurring",
+                ] as Duration[]
+              ).map((v) => (
                 <Pressable
-                  key={c}
-                  onPress={() => setCategory(c)}
-                  style={[styles.chip, selected && styles.chipSelected]}
+                  key={v}
+                  style={[styles.chip, duration === v && styles.chipActive]}
+                  onPress={() => setDuration(v)}
                 >
                   <Text
                     style={[
                       styles.chipText,
-                      selected && styles.chipTextSelected,
+                      duration === v && styles.chipTextActive,
                     ]}
                   >
-                    {t(categoryTranslationKeys[c] || "other")}
+                    {v === "few_hours"
+                      ? t("durationHours")
+                      : v === "full_day"
+                        ? t("durationDay")
+                        : v === "multi_day"
+                          ? t("durationMultiDay")
+                          : t("durationRecurring")}
                   </Text>
                 </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Budget */}
-          <Text style={styles.label}>{t("budgetRange")}</Text>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <TextInput
-                value={budgetMin}
-                onChangeText={setBudgetMin}
-                placeholder={t("min")}
-                placeholderTextColor={theme.secondaryText}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
+              ))}
             </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <TextInput
-                value={budgetMax}
-                onChangeText={setBudgetMax}
-                placeholder={t("max")}
-                placeholderTextColor={theme.secondaryText}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
+
+            <Text style={styles.label}>{t("workersNeeded")}</Text>
+            <View style={styles.stepperRow}>
+              <Pressable
+                style={styles.stepperBtn}
+                onPress={() => setWorkers((v) => Math.max(1, v - 1))}
+              >
+                <Text style={styles.stepperBtnText}>−</Text>
+              </Pressable>
+              <Text style={styles.stepperValue}>{workers}</Text>
+              <Pressable
+                style={styles.stepperBtn}
+                onPress={() => setWorkers((v) => Math.min(20, v + 1))}
+              >
+                <Text style={styles.stepperBtnText}>+</Text>
+              </Pressable>
             </View>
           </View>
 
-          {/* Location */}
-          <Text style={styles.label}>{t("locationOptional")}</Text>
-          <TextInput
-            value={location}
-            onChangeText={setLocation}
-            placeholder={t("exampleLocation")}
-            placeholderTextColor={theme.secondaryText}
-            style={styles.input}
-          />
+          {/* ── Section 3: Context ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("jobSectionContext")}</Text>
 
-          {/* Submit button (big) */}
+            <Text style={[styles.label, styles.labelFirst]}>
+              {t("workMode")}
+            </Text>
+            <View style={styles.chipsWrap}>
+              {(["onsite", "remote", "hybrid"] as WorkMode[]).map((v) => (
+                <Pressable
+                  key={v}
+                  style={[styles.chip, workMode === v && styles.chipActive]}
+                  onPress={() => setWorkMode(v)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      workMode === v && styles.chipTextActive,
+                    ]}
+                  >
+                    {v === "onsite"
+                      ? t("workOnsite")
+                      : v === "remote"
+                        ? t("workRemote")
+                        : t("workHybrid")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t("experienceLevel")}</Text>
+            <View style={styles.chipsWrap}>
+              {(
+                ["any", "beginner", "experienced", "expert"] as Experience[]
+              ).map((v) => (
+                <Pressable
+                  key={v}
+                  style={[styles.chip, experience === v && styles.chipActive]}
+                  onPress={() => setExperience(v)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      experience === v && styles.chipTextActive,
+                    ]}
+                  >
+                    {v === "any"
+                      ? t("experienceAny")
+                      : v === "beginner"
+                        ? t("experienceBeginner")
+                        : v === "experienced"
+                          ? t("experienceExperienced")
+                          : t("experienceExpert")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t("equipmentLabel")}</Text>
+            <View style={styles.chipsWrap}>
+              {(
+                ["not_needed", "pro_provides", "client_provides"] as Equipment[]
+              ).map((v) => (
+                <Pressable
+                  key={v}
+                  style={[styles.chip, equipment === v && styles.chipActive]}
+                  onPress={() => setEquipment(v)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      equipment === v && styles.chipTextActive,
+                    ]}
+                  >
+                    {v === "not_needed"
+                      ? t("equipmentNotNeeded")
+                      : v === "pro_provides"
+                        ? t("equipmentPro")
+                        : t("equipmentClient")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t("preferredSchedule")}</Text>
+            <View style={styles.chipsWrap}>
+              {(["anytime", "weekdays", "weekends"] as Schedule[]).map((v) => (
+                <Pressable
+                  key={v}
+                  style={[
+                    styles.chip,
+                    preferredSchedule === v && styles.chipActive,
+                  ]}
+                  onPress={() => setPreferredSchedule(v)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      preferredSchedule === v && styles.chipTextActive,
+                    ]}
+                  >
+                    {v === "anytime"
+                      ? t("scheduleAnytime")
+                      : v === "weekdays"
+                        ? t("scheduleWeekdays")
+                        : t("scheduleWeekends")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t("specialRequirements")}</Text>
+            <TextInput
+              value={specialRequirements}
+              onChangeText={setSpecialRequirements}
+              placeholder={t("specialRequirementsPlaceholder")}
+              placeholderTextColor={theme.secondaryText}
+              style={[styles.input, styles.textareaSmall]}
+              multiline
+            />
+          </View>
+
+          {/* ── Section 4: Photos ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("jobSectionPhotos")}</Text>
+            <View style={styles.photoGrid}>
+              {photos.map((uri, idx) => (
+                <View key={`${uri}-${idx}`} style={styles.photoThumb}>
+                  <Image
+                    source={{ uri }}
+                    style={styles.photoImg}
+                    resizeMode="cover"
+                  />
+                  <Pressable
+                    style={styles.photoOverlay}
+                    onPress={() => removePhoto(idx)}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 13,
+                        fontWeight: "900",
+                        lineHeight: 16,
+                      }}
+                    >
+                      ✕
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <Pressable style={styles.addPhotoBtn} onPress={addPhoto}>
+                  <Text style={{ fontSize: 24, color: theme.secondaryText }}>
+                    +
+                  </Text>
+                  <Text style={styles.addPhotoBtnText}>{t("addPhotos")}</Text>
+                </Pressable>
+              )}
+            </View>
+            <Text style={styles.photoHint}>{t("photoHint")}</Text>
+          </View>
+
+          {/* ── Submit ── */}
           <Pressable
             onPress={submit}
             disabled={!canSubmit || loading}
             style={[
-              styles.primaryBtn,
+              styles.submitBtn,
               (!canSubmit || loading) && { opacity: 0.5 },
             ]}
           >
-            <Text style={styles.primaryBtnText}>
-              {loading ? "Posting..." : "Post Request"}
+            <Text style={styles.submitBtnText}>
+              {loading ? t("uploadingPhotos") : t("postARequest")}
             </Text>
           </Pressable>
-
-          <Text style={styles.helper}>
-            You must be logged in to post. Marketplace browsing still works
-            without login.
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -13,6 +13,7 @@ export const theme = {
 export const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.bg },
 
+  // ── Header ───────────────────────────────────────────────────────
   header: {
     height: 54,
     paddingHorizontal: 12,
@@ -26,7 +27,6 @@ export const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
   headerBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
   headerBtnText: { color: theme.secondaryText, fontWeight: "800" },
-
   headerBtnPrimary: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -35,71 +35,168 @@ export const styles = StyleSheet.create({
   },
   headerBtnPrimaryText: { color: "white", fontWeight: "900" },
 
-  content: { padding: 16, paddingBottom: 28 },
+  // ── Content ──────────────────────────────────────────────────────
+  content: { padding: 16, paddingBottom: 40 },
 
+  // ── Section cards ────────────────────────────────────────────────
+  section: {
+    backgroundColor: theme.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 14,
+  },
+
+  // ── Labels & inputs ──────────────────────────────────────────────
   label: {
-    marginTop: 14,
-    marginBottom: 8,
-    color: theme.primaryText,
+    fontSize: 13,
     fontWeight: "800",
-  },
-
-  input: {
-    height: 46,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 14,
-    paddingHorizontal: 12,
     color: theme.primaryText,
+    marginBottom: 8,
+    marginTop: 14,
   },
-  textarea: { height: 110, paddingTop: 12, textAlignVertical: "top" },
-
-  row: { flexDirection: "row", alignItems: "center" },
-
-  segment: {
-    flexDirection: "row",
-    backgroundColor: theme.surface,
+  labelFirst: { marginTop: 0 },
+  input: {
+    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 14,
-    overflow: "hidden",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: theme.primaryText,
+    fontSize: 14,
   },
-  segmentItem: { flex: 1, paddingVertical: 12, alignItems: "center" },
-  segmentItemActive: { backgroundColor: theme.accentSoft },
-  segmentText: { color: theme.secondaryText, fontWeight: "800" },
-  segmentTextActive: { color: theme.primaryText },
+  textarea: { height: 100, textAlignVertical: "top" },
+  textareaSmall: { height: 72, textAlignVertical: "top" },
+  row: { flexDirection: "row", alignItems: "center", gap: 10 },
 
-  chipsRow: { gap: 8, paddingRight: 12 },
+  // ── Chips ────────────────────────────────────────────────────────
+  chipsScroll: { gap: 8, paddingVertical: 2, paddingRight: 8 },
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: 999,
-    backgroundColor: theme.surface,
+    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
   },
-  chipSelected: {
-    backgroundColor: theme.accentSoft,
+  chipActive: { backgroundColor: theme.accentSoft, borderColor: theme.primary },
+  chipText: { fontSize: 13, fontWeight: "700", color: theme.secondaryText },
+  chipTextActive: { color: theme.primary, fontWeight: "900" },
+
+  // ── Budget ───────────────────────────────────────────────────────
+  budgetRow: { flexDirection: "row", gap: 10 },
+  budgetInput: { flex: 1 },
+  openBudgetPressable: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 4,
+  },
+  openBudgetCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  openBudgetCheckboxActive: {
+    backgroundColor: theme.primary,
     borderColor: theme.primary,
   },
-  chipText: { color: theme.secondaryText, fontWeight: "700" },
-  chipTextSelected: { color: theme.primaryText, fontWeight: "900" },
+  openBudgetLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.primaryText,
+  },
 
-  primaryBtn: {
-    marginTop: 18,
-    height: 48,
+  // ── Workers stepper ──────────────────────────────────────────────
+  stepperRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  stepperBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperBtnText: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: theme.primaryText,
+    lineHeight: 26,
+  },
+  stepperValue: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: theme.primaryText,
+    minWidth: 36,
+    textAlign: "center",
+  },
+
+  // ── Photo grid ───────────────────────────────────────────────────
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  photoThumb: { width: 90, height: 90, borderRadius: 12, overflow: "hidden" },
+  photoImg: { width: 90, height: 90 },
+  photoOverlay: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addPhotoBtn: {
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    borderStyle: "dashed",
+    backgroundColor: theme.bg,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  addPhotoBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: theme.secondaryText,
+    marginTop: 8,
+    lineHeight: 16,
+  },
+
+  // ── Submit ───────────────────────────────────────────────────────
+  submitBtn: {
+    marginTop: 4,
+    height: 52,
     borderRadius: 16,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: { color: "white", fontWeight: "900" },
-
-  helper: {
-    marginTop: 10,
-    color: theme.secondaryText,
-    fontSize: 12,
-    lineHeight: 16,
-  },
+  submitBtnText: { fontSize: 15, fontWeight: "900", color: "white" },
 });

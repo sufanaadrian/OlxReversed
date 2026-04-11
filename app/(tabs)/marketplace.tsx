@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { Alert } from "react-native"; // add at top if missing
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -16,7 +17,6 @@ import {
 } from "react-native";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
-import { useApp } from "../../src/context/useApp";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./marketplace.styles";
 
@@ -55,7 +55,40 @@ type RequestRow = {
   status: "active" | "closed";
   created_at: string;
   location: string | null;
-  profiles?: { email: string | null } | null; // ✅ joined from profiles
+  open_budget: boolean | null;
+  timeline: string | null;
+  duration: string | null;
+  workers_needed: number | null;
+  work_mode: string | null;
+  experience_level: string | null;
+  photos: string[] | null;
+  profiles?: { email: string | null } | null;
+};
+
+const timelineKeys: Record<string, string> = {
+  asap: "timelineAsap",
+  specific_date: "timelineDate",
+  flexible: "timelineFlexible",
+};
+
+const durationKeys: Record<string, string> = {
+  few_hours: "durationHours",
+  full_day: "durationDay",
+  multi_day: "durationMultiDay",
+  recurring: "durationRecurring",
+};
+
+const workModeKeys: Record<string, string> = {
+  onsite: "workOnsite",
+  remote: "workRemote",
+  hybrid: "workHybrid",
+};
+
+const experienceKeys: Record<string, string> = {
+  any: "experienceAny",
+  beginner: "experienceBeginner",
+  experienced: "experienceExperienced",
+  expert: "experienceExpert",
 };
 
 const { width } = Dimensions.get("window");
@@ -63,8 +96,6 @@ const SWIPE_THRESHOLD = Math.min(120, width * 0.28);
 
 export default function MarketplaceScreen() {
   const t = useTranslation();
-  // keep your app-context action for now
-  const { addInterestedRequest } = useApp();
 
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +144,13 @@ export default function MarketplaceScreen() {
     created_at,
     location,
     user_id,
+    open_budget,
+    timeline,
+    duration,
+    workers_needed,
+    work_mode,
+    experience_level,
+    photos,
     profiles!requests_user_id_fkey (
       email
     )
@@ -146,7 +184,7 @@ export default function MarketplaceScreen() {
     setRequests((data ?? []) as any);
     setCurrentIndex(0);
     setLoading(false);
-  }, []);
+  }, [t]);
 
   // Refresh when you come back from the modal (or any time this tab focuses)
   useFocusEffect(
@@ -430,15 +468,61 @@ function RequestCard({
           ]}
         >
           <View style={styles.cardContent}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {t(categoryTranslationKeys[request.category] || "other")}
-              </Text>
+            {request.photos && request.photos.length > 0 && (
+              <Image
+                source={{ uri: request.photos[0] }}
+                style={styles.cardPhoto}
+                resizeMode="cover"
+              />
+            )}
+
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {t(categoryTranslationKeys[request.category] || "other")}
+                </Text>
+              </View>
+              {request.timeline && timelineKeys[request.timeline] && (
+                <View style={styles.badgeOutline}>
+                  <Text style={styles.badgeOutlineText}>
+                    {t(timelineKeys[request.timeline])}
+                  </Text>
+                </View>
+              )}
+              {request.duration && durationKeys[request.duration] && (
+                <View style={styles.badgeOutline}>
+                  <Text style={styles.badgeOutlineText}>
+                    {t(durationKeys[request.duration])}
+                  </Text>
+                </View>
+              )}
+              {(request.workers_needed ?? 1) > 1 && (
+                <View style={styles.badgeOutline}>
+                  <Text style={styles.badgeOutlineText}>
+                    {request.workers_needed} {t("workersNeeded")}
+                  </Text>
+                </View>
+              )}
+              {request.work_mode && workModeKeys[request.work_mode] && (
+                <View style={styles.badgeOutline}>
+                  <Text style={styles.badgeOutlineText}>
+                    {t(workModeKeys[request.work_mode])}
+                  </Text>
+                </View>
+              )}
+              {request.experience_level &&
+                request.experience_level !== "any" &&
+                experienceKeys[request.experience_level] && (
+                  <View style={styles.badgeOutline}>
+                    <Text style={styles.badgeOutlineText}>
+                      {t(experienceKeys[request.experience_level])}
+                    </Text>
+                  </View>
+                )}
             </View>
 
             <Text style={styles.title}>{request.title}</Text>
 
-            {/* ✅ Posted by email */}
             <Text style={styles.postedBy}>
               {t("postedBy")} {email}
             </Text>
@@ -453,8 +537,9 @@ function RequestCard({
                   color={theme.secondaryText}
                 />
                 <Text style={styles.detailText}>
-                  {formatPrice(request.budget_min)} –{" "}
-                  {formatPrice(request.budget_max)}
+                  {request.open_budget
+                    ? t("openBudget")
+                    : `${formatPrice(request.budget_min)} – ${formatPrice(request.budget_max)}`}
                 </Text>
               </View>
 
