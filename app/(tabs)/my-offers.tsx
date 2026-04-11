@@ -643,7 +643,7 @@ export default function MyOffersScreen() {
           <Text style={styles.centerSub}>{t("fetchingSwipesOffers")}</Text>
         </View>
       ) : isGuest ? (
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollGrow}>
           <View style={styles.centerCard}>
             <Text style={styles.centerTitle}>{t("signInRequired")}</Text>
             <Text style={styles.centerSub}>{t("pleaseSignIn")}</Text>
@@ -657,7 +657,7 @@ export default function MyOffersScreen() {
         </ScrollView>
       ) : visible.length === 0 ? (
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollGrow}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
