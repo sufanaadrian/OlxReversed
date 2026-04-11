@@ -297,6 +297,48 @@ export const styles = StyleSheet.create({
     color: "white",
   },
 
+  // ─── Detail grid ───────────────────────────────────────────────
+  detailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+  },
+  detailGridItem: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minWidth: 90,
+  },
+  detailGridLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  detailGridValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primaryText,
+  },
+
+  // ─── Photo thumbnails ──────────────────────────────────────────
+  photoRow: {
+    marginTop: 10,
+  },
+  photoThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    marginRight: 6,
+    backgroundColor: theme.border,
+  },
+
   // ─── Your offer line (below meta pills) ───────────────────────
   offerLine: {
     flexDirection: "row",
