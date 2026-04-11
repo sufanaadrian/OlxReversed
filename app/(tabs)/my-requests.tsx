@@ -443,15 +443,11 @@ export default function MyRequestsScreen() {
       <Text style={styles.muted}>{t("pleaseSignIn")}</Text>
       <Pressable
         onPress={() => router.push("/sign-in" as any)}
-        style={{
-          marginTop: 8,
-          paddingVertical: 10,
-          paddingHorizontal: 24,
-          borderRadius: 12,
-          backgroundColor: "#1E40AF",
-        }}
+        style={[styles.filterBtn, styles.filterBtnActive]}
       >
-        <Text style={{ color: "#fff", fontWeight: "800" }}>{t("signIn")}</Text>
+        <Text style={[styles.filterText, styles.filterTextActive]}>
+          {t("signIn")}
+        </Text>
       </Pressable>
     </View>
   ) : (
