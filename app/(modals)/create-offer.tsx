@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Screen } from "../../src/components/Screen";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./create-offer.styles";
 
@@ -109,14 +110,9 @@ export default function CreateOfferModal() {
       return;
     }
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id;
-
-    if (!uid) {
-      Alert.alert(t("signInRequired"), t("pleaseSignIn"));
-      router.push("/sign-in" as any);
-      return;
-    }
+    const guard = await requireAuth();
+    if (!guard.ok) return;
+    const uid = guard.userId;
 
     // Block only if latest is pending/accepted
     if (!canSend) {

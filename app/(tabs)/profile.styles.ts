@@ -8,115 +8,205 @@ export const theme = {
   secondaryText: "#64748B",
   border: "#E5E7EB",
   accentSoft: "#DBEAFE",
+  success: "#16A34A",
+  successSoft: "#DCFCE7",
+  amber: "#D97706",
+  amberSoft: "#FEF3C7",
 };
 
 export const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
-  h1: {
+  container: { flex: 1, backgroundColor: theme.bg },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
+
+  // Hero card
+  heroCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: theme.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  avatarText: { fontSize: 28, fontWeight: "900", color: theme.primary },
+  displayName: {
     fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
-    marginBottom: 12,
+    textAlign: "center",
   },
-
-  card: {
+  email: {
+    fontSize: 13,
+    color: theme.secondaryText,
+    marginTop: 2,
+    textAlign: "center",
+  },
+  chipsRow: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+    justifyContent: "center",
+  },
+  chip: {
+    flexDirection: "row",
     alignItems: "center",
-    padding: 14,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: theme.accentSoft,
+  },
+  chipBusiness: { backgroundColor: theme.amberSoft },
+  chipText: { fontSize: 12, fontWeight: "700", color: theme.primary },
+  chipTextBusiness: { color: theme.amber },
+  memberSince: { fontSize: 12, color: theme.secondaryText, marginTop: 8 },
+
+  // Stats
+  statsRow: { flexDirection: "row", gap: 5, marginBottom: 12 },
+  statCard: {
+    flex: 1,
+    padding: 4,
     borderRadius: 16,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
+    alignItems: "center",
+    gap: 2,
+  },
+  statValue: { fontSize: 24, fontWeight: "900", color: theme.primaryText },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textAlign: "center",
   },
 
-  avatar: {
-    height: 48,
-    width: 48,
+  // Grouped sections
+  section: {
+    backgroundColor: theme.surface,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  sectionHeader: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  rowFirst: { borderTopWidth: 0 },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
-
-  name: { fontSize: 16, fontWeight: "800", color: theme.primaryText },
-  email: { marginTop: 2, fontSize: 13, color: theme.secondaryText },
-
-  statsRow: { flexDirection: "row", gap: 12, marginTop: 12 },
-  statCard: {
+  rowIconDanger: { backgroundColor: "#FEE2E2" },
+  rowLabel: {
     flex: 1,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  statLabel: { fontSize: 12, color: theme.secondaryText, fontWeight: "700" },
-  statValue: {
-    marginTop: 6,
-    fontSize: 20,
-    fontWeight: "900",
-    color: theme.primaryText,
-  },
-
-  settingSection: {
-    marginTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  sectionTitle: {
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
     color: theme.primaryText,
-    marginBottom: 10,
   },
-  languageButtons: {
+  rowLabelDanger: { color: "#DC2626" },
+  rowValue: { fontSize: 13, color: theme.secondaryText, fontWeight: "600" },
+
+  // Toggle buttons (language / currency)
+  toggleRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    paddingTop: 4,
   },
-  languageBtn: {
+  toggleBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: theme.surface,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: "center",
-    justifyContent: "center",
   },
-  languageBtnActive: {
+  toggleBtnActive: {
     backgroundColor: theme.primary,
     borderColor: theme.primary,
   },
-  languageBtnText: {
+  toggleBtnText: {
     fontSize: 13,
     fontWeight: "700",
     color: theme.secondaryText,
   },
-  languageBtnTextActive: {
-    color: "white",
-  },
+  toggleBtnTextActive: { color: "#FFFFFF" },
 
-  authBtn: {
-    marginTop: 16,
-    height: 48,
-    borderRadius: 16,
+  // Guest state
+  guestCard: {
     backgroundColor: theme.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 28,
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  guestAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: theme.bg,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 10,
+    marginBottom: 4,
   },
-  authText: { fontSize: 14, fontWeight: "900", color: theme.primaryText },
+  guestTitle: { fontSize: 17, fontWeight: "900", color: theme.primaryText },
+  guestSub: {
+    fontSize: 13,
+    color: theme.secondaryText,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  signInBtn: {
+    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+  },
+  signInBtnText: { fontSize: 14, fontWeight: "900", color: "#FFFFFF" },
 
   version: {
-    marginTop: 18,
     textAlign: "center",
     color: theme.secondaryText,
     fontSize: 12,
+    marginTop: 4,
   },
 });

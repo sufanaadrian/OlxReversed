@@ -74,6 +74,7 @@ export default function MyOffersScreen() {
   const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   type CombinedFilter =
     | "all"
@@ -119,25 +120,28 @@ export default function MyOffersScreen() {
   // ✅ store the currently open row so we can close it
   const openRowRef = useRef<SwipeableMethods | null>(null);
 
-  const load = useCallback(async (showSpinner: boolean = true) => {
-    if (showSpinner) setLoading(true);
+  const load = useCallback(
+    async (showSpinner: boolean = true) => {
+      if (showSpinner) setLoading(true);
 
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user.id;
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
 
-    if (!uid) {
-      setSwipes([]);
-      setOffers([]);
-      setCounterOffers([]);
-      if (showSpinner) setLoading(false);
-      return;
-    }
+      if (!uid) {
+        setIsGuest(true);
+        setSwipes([]);
+        setOffers([]);
+        setCounterOffers([]);
+        if (showSpinner) setLoading(false);
+        return;
+      }
+      setIsGuest(false);
 
-    // 1) swipes + requests
-    const { data: swipeData, error: swipeErr } = await supabase
-      .from("request_swipes")
-      .select(
-        `
+      // 1) swipes + requests
+      const { data: swipeData, error: swipeErr } = await supabase
+        .from("request_swipes")
+        .select(
+          `
         request_id,
         direction,
         created_at,
@@ -155,77 +159,79 @@ export default function MyOffersScreen() {
           profiles!requests_user_id_fkey ( email )
         )
       `,
-      )
-      .eq("user_id", uid)
-      .order("created_at", { ascending: false });
+        )
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
 
-    if (swipeErr) {
-      Alert.alert(t("error"), swipeErr.message);
+      if (swipeErr) {
+        Alert.alert(t("error"), swipeErr.message);
+        if (showSpinner) setLoading(false);
+        return;
+      }
+
+      const normalizedSwipes = (swipeData ?? [])
+        .map((row: any) => {
+          const req = Array.isArray(row.requests)
+            ? row.requests[0]
+            : row.requests;
+          if (!req) return null;
+
+          return {
+            request: req as RequestRow,
+            direction: row.direction as SwipeDirection,
+            swipedAt: row.created_at as string,
+          };
+        })
+        .filter(
+          (
+            x,
+          ): x is {
+            request: RequestRow;
+            direction: SwipeDirection;
+            swipedAt: string;
+          } => x !== null,
+        );
+
+      setSwipes(normalizedSwipes);
+
+      // 2) my offers (include withdrawn so you can filter them)
+      const { data: offerData, error: offerErr } = await supabase
+        .from("offers")
+        .select("id,request_id,user_id,status,price,description,created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
+
+      if (offerErr) {
+        Alert.alert(t("error"), offerErr.message);
+        setOffers([]);
+        if (showSpinner) setLoading(false);
+        return;
+      }
+
+      setOffers((offerData ?? []) as OfferRow[]);
+
+      // 3) counter offers where I am seller
+      const { data: counterData, error: counterErr } = await supabase
+        .from("counter_offers")
+        .select(
+          "id,request_id,offer_id,requester_id,seller_id,price,message,status,created_at",
+        )
+        .eq("seller_id", uid)
+        .order("created_at", { ascending: false });
+
+      if (counterErr) {
+        Alert.alert(t("error"), counterErr.message);
+        setCounterOffers([]);
+        if (showSpinner) setLoading(false);
+        return;
+      }
+
+      setCounterOffers((counterData ?? []) as CounterOfferRow[]);
+
       if (showSpinner) setLoading(false);
-      return;
-    }
-
-    const normalizedSwipes = (swipeData ?? [])
-      .map((row: any) => {
-        const req = Array.isArray(row.requests)
-          ? row.requests[0]
-          : row.requests;
-        if (!req) return null;
-
-        return {
-          request: req as RequestRow,
-          direction: row.direction as SwipeDirection,
-          swipedAt: row.created_at as string,
-        };
-      })
-      .filter(
-        (
-          x,
-        ): x is {
-          request: RequestRow;
-          direction: SwipeDirection;
-          swipedAt: string;
-        } => x !== null,
-      );
-
-    setSwipes(normalizedSwipes);
-
-    // 2) my offers (include withdrawn so you can filter them)
-    const { data: offerData, error: offerErr } = await supabase
-      .from("offers")
-      .select("id,request_id,user_id,status,price,description,created_at")
-      .eq("user_id", uid)
-      .order("created_at", { ascending: false });
-
-    if (offerErr) {
-      Alert.alert(t("error"), offerErr.message);
-      setOffers([]);
-      if (showSpinner) setLoading(false);
-      return;
-    }
-
-    setOffers((offerData ?? []) as OfferRow[]);
-
-    // 3) counter offers where I am seller
-    const { data: counterData, error: counterErr } = await supabase
-      .from("counter_offers")
-      .select(
-        "id,request_id,offer_id,requester_id,seller_id,price,message,status,created_at",
-      )
-      .eq("seller_id", uid)
-      .order("created_at", { ascending: false });
-
-    if (counterErr) {
-      Alert.alert(t("error"), counterErr.message);
-      setCounterOffers([]);
-      if (showSpinner) setLoading(false);
-      return;
-    }
-
-    setCounterOffers((counterData ?? []) as CounterOfferRow[]);
-
-    if (showSpinner) setLoading(false);
-  }, []);
+    },
+    [t],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -315,20 +321,6 @@ export default function MyOffersScreen() {
 
     return { active, withdrawn };
   }, [swipes, latestOfferByRequestId]);
-
-  const visibleBySwipe = useMemo(() => {
-    if (filter === "all") return swipes;
-
-    if (filter === "interested") {
-      return swipes.filter(({ request, direction }) => {
-        if (direction !== "right") return false;
-        const latestOffer = latestOfferByRequestId.get(request.id);
-        return latestOffer == null; // ✅ same rule as the count
-      });
-    }
-
-    return swipes.filter((s) => s.direction === "left");
-  }, [swipes, filter, latestOfferByRequestId]);
 
   const visible = useMemo(() => {
     // start from all swipes
@@ -639,9 +631,24 @@ export default function MyOffersScreen() {
           <Text style={styles.centerTitle}>{t("loading")}</Text>
           <Text style={styles.centerSub}>{t("fetchingSwipesOffers")}</Text>
         </View>
+      ) : isGuest ? (
+        <ScrollView contentContainerStyle={styles.scrollGrow}>
+          <View style={styles.centerCard}>
+            <Text style={styles.centerTitle}>{t("signInRequired")}</Text>
+            <Text style={styles.centerSub}>{t("pleaseSignIn")}</Text>
+            <Pressable
+              style={[styles.filterBtn, styles.filterBtnActive]}
+              onPress={() => router.push("/sign-in" as any)}
+            >
+              <Text style={[styles.filterText, styles.filterTextActive]}>
+                {t("signIn")}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       ) : visible.length === 0 ? (
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollGrow}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -792,10 +799,7 @@ export default function MyOffersScreen() {
                     <View style={styles.sectionHeaderLine} />
                     <View style={styles.sectionHeaderBadge}>
                       <View
-                        style={[
-                          styles.sectionHeaderDot,
-                          sectionDotStyle,
-                        ]}
+                        style={[styles.sectionHeaderDot, sectionDotStyle]}
                       />
                       <Text style={styles.sectionHeaderText}>
                         {t(sectionKey)}
@@ -819,17 +823,9 @@ export default function MyOffersScreen() {
                           {request.title}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          statusBadge.bgStyle,
-                        ]}
-                      >
+                      <View style={[styles.statusBadge, statusBadge.bgStyle]}>
                         <Text
-                          style={[
-                            styles.statusBadgeText,
-                            statusBadge.fgStyle,
-                          ]}
+                          style={[styles.statusBadgeText, statusBadge.fgStyle]}
                         >
                           {statusBadge.label}
                         </Text>

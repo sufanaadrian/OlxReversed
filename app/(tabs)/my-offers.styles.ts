@@ -65,6 +65,7 @@ export const styles = StyleSheet.create({
   filterTextActive: { color: theme.primary, fontWeight: "900" },
 
   // ─── Empty / loading state ─────────────────────────────────────
+  scrollGrow: { flexGrow: 1 },
   centerCard: {
     flex: 1,
     backgroundColor: theme.surface,

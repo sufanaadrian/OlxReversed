@@ -17,7 +17,6 @@ import {
   InteractionManager,
   KeyboardAvoidingView,
   LayoutAnimation,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -203,7 +202,7 @@ export default function ChatScreen() {
         Alert.alert(t("pickerFailed"), e?.message ?? String(e));
       }
     }
-  }, []);
+  }, [t]);
 
   // Android: Modal.onDismiss is unreliable, so run pending action when modal closes
   useEffect(() => {
@@ -364,7 +363,7 @@ export default function ChatScreen() {
       () => listRef.current?.scrollToOffset({ offset: 0, animated: true }),
       30,
     );
-  }, [requestId, refreshMeId, markAsRead]);
+  }, [requestId, refreshMeId, markAsRead, t]);
 
   const listWithDates = useMemo(() => {
     // IMPORTANT: because FlatList is inverted, we want data array to be newest -> oldest.
@@ -604,13 +603,10 @@ export default function ChatScreen() {
     }, 1200);
   };
 
-  // -------- Close deal handshake (unchanged) --------
-  const requestClose = async (reason: "completed" | "cancelled") => {
+  // -------- Close deal handshake --------
+  const confirmClose = useCallback(async () => {
     if (!request) return;
-    if (request.status !== "matched") {
-      Alert.alert(t("notAllowed"), t("chatOnlyNegotiating"));
-      return;
-    }
+    if (request.status !== "matched") return;
 
     const uid = await refreshMeId();
     if (!uid) {
@@ -618,8 +614,8 @@ export default function ChatScreen() {
       return;
     }
 
-    if (request.close_requested_by && request.close_requested_by !== uid) {
-      await confirmClose();
+    if (!request.close_requested_by || request.close_requested_by === uid) {
+      Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
       return;
     }
 
@@ -628,10 +624,9 @@ export default function ChatScreen() {
       const { error } = await supabase
         .from("requests")
         .update({
-          close_requested_by: uid,
-          close_confirmed_by: null,
-          close_reason: reason,
-          closed_at: null,
+          close_confirmed_by: uid,
+          status: "closed",
+          closed_at: new Date().toISOString(),
         })
         .eq("id", request.id);
 
@@ -644,56 +639,112 @@ export default function ChatScreen() {
     } finally {
       setCloseWorking(false);
     }
-  };
-  const closeSheetThen = useCallback(async (fn: () => Promise<void>) => {
-    setAttachOpen(false);
-    // Give time for the modal to close; required on iOS (and sometimes Android) or pickers may no-op.
-    await new Promise((r) => setTimeout(r, 250));
-    await new Promise<void>((resolve) =>
-      InteractionManager.runAfterInteractions(() => resolve()),
-    );
-    await fn();
-  }, []);
+  }, [request, t, refreshMeId, load]);
 
-  const getImageMediaTypes = () => {
-    const mt = (ImagePicker as any)?.MediaType?.Image;
-    if (mt) return [mt];
-    // If you're seeing this, your expo-image-picker is probably old.
-    // We intentionally avoid deprecated MediaTypeOptions to keep the warning away.
-    return null;
-  };
+  const undoCloseRequest = useCallback(async () => {
+    if (!request) return;
 
-  const ensureLibraryPermission = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        "Permission needed",
-        "Please allow Photos access in Settings to pick images.",
-        [
-          { text: "Cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
-        ],
-      );
-      return false;
+    const uid = await refreshMeId();
+    if (!uid) return;
+    if (request.close_requested_by !== uid) return;
+
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_requested_by: null,
+          close_confirmed_by: null,
+          close_reason: null,
+          closed_at: null,
+        })
+        .eq("id", request.id);
+
+      if (error) {
+        Alert.alert(t("error"), error.message);
+        return;
+      }
+      await load();
+    } finally {
+      setCloseWorking(false);
     }
-    return true;
-  };
+  }, [request, t, refreshMeId, load]);
 
-  const ensureCameraPermission = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(
-        "Permission needed",
-        "Please allow Camera access in Settings to take photos.",
-        [
-          { text: "Cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
-        ],
-      );
-      return false;
+  const dismissCloseRequest = useCallback(async () => {
+    if (!request) return;
+
+    const uid = await refreshMeId();
+    if (!uid) return;
+
+    if (!request.close_requested_by) return;
+    if (request.close_requested_by === uid) return;
+
+    setCloseWorking(true);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          close_requested_by: null,
+          close_confirmed_by: null,
+          close_reason: null,
+          closed_at: null,
+        })
+        .eq("id", request.id);
+
+      if (error) {
+        Alert.alert(t("error"), error.message);
+        return;
+      }
+      await load();
+    } finally {
+      setCloseWorking(false);
     }
-    return true;
-  };
+  }, [request, t, refreshMeId, load]);
+
+  const requestClose = useCallback(
+    async (reason: "completed" | "cancelled") => {
+      if (!request) return;
+      if (request.status !== "matched") {
+        Alert.alert(t("notAllowed"), t("chatOnlyNegotiating"));
+        return;
+      }
+
+      const uid = await refreshMeId();
+      if (!uid) {
+        Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
+        return;
+      }
+
+      if (request.close_requested_by && request.close_requested_by !== uid) {
+        await confirmClose();
+        return;
+      }
+
+      setCloseWorking(true);
+      try {
+        const { error } = await supabase
+          .from("requests")
+          .update({
+            close_requested_by: uid,
+            close_confirmed_by: null,
+            close_reason: reason,
+            closed_at: null,
+          })
+          .eq("id", request.id);
+
+        if (error) {
+          Alert.alert(t("error"), error.message);
+          return;
+        }
+
+        await load();
+      } finally {
+        setCloseWorking(false);
+      }
+    },
+    [request, t, refreshMeId, confirmClose, load],
+  );
+
   function base64ToUint8Array(base64: string) {
     const binary = globalThis.atob(base64);
     const len = binary.length;
@@ -753,31 +804,6 @@ export default function ChatScreen() {
     [],
   );
 
-  const uploadToSupabase = useCallback(
-    async (uri: string, mime: string, folder: string) => {
-      const ext = (mime?.split("/")?.[1] || "jpg").toLowerCase();
-      const filename = `${folder}/${Date.now()}-${Math.random()
-        .toString(16)
-        .slice(2)}.${ext}`;
-
-      const res = await fetch(uri);
-      const blob = await res.blob();
-
-      const { data, error } = await supabase.storage
-        .from("chat-attachments")
-        .upload(filename, blob, { contentType: mime, upsert: false });
-
-      if (error) throw error;
-
-      const { data: pub } = supabase.storage
-        .from("chat-attachments")
-        .getPublicUrl(data.path);
-
-      return pub.publicUrl;
-    },
-    [],
-  );
-
   const sendPayloadText = useCallback(
     async (payloadText: string) => {
       if (!acceptedOffer) return;
@@ -813,7 +839,7 @@ export default function ChatScreen() {
         Alert.alert(t("sendFailed"), error.message);
       }
     },
-    [acceptedOffer, canChat],
+    [acceptedOffer, canChat, refreshMeId, t],
   );
 
   const sendImage = useCallback(
@@ -846,7 +872,7 @@ export default function ChatScreen() {
         setUploadingMedia(false);
       }
     },
-    [request, acceptedOffer, uploadImageToSupabase, sendPayloadText],
+    [request, acceptedOffer, uploadImageToSupabase, sendPayloadText, t],
   );
 
   const pickFromGallery = async () => {
@@ -913,103 +939,6 @@ export default function ChatScreen() {
     };
 
     setAttachOpen(false);
-  };
-
-  const confirmClose = async () => {
-    if (!request) return;
-    if (request.status !== "matched") return;
-
-    const uid = await refreshMeId();
-    if (!uid) {
-      Alert.alert(t("signInRequired"), t("pleaseSignInGeneric"));
-      return;
-    }
-
-    if (!request.close_requested_by || request.close_requested_by === uid) {
-      Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
-      return;
-    }
-
-    setCloseWorking(true);
-    try {
-      const { error } = await supabase
-        .from("requests")
-        .update({
-          close_confirmed_by: uid,
-          status: "closed",
-          closed_at: new Date().toISOString(),
-        })
-        .eq("id", request.id);
-
-      if (error) {
-        Alert.alert(t("error"), error.message);
-        return;
-      }
-
-      await load();
-    } finally {
-      setCloseWorking(false);
-    }
-  };
-
-  const undoCloseRequest = async () => {
-    if (!request) return;
-
-    const uid = await refreshMeId();
-    if (!uid) return;
-    if (request.close_requested_by !== uid) return;
-
-    setCloseWorking(true);
-    try {
-      const { error } = await supabase
-        .from("requests")
-        .update({
-          close_requested_by: null,
-          close_confirmed_by: null,
-          close_reason: null,
-          closed_at: null,
-        })
-        .eq("id", request.id);
-
-      if (error) {
-        Alert.alert(t("error"), error.message);
-        return;
-      }
-      await load();
-    } finally {
-      setCloseWorking(false);
-    }
-  };
-
-  const dismissCloseRequest = async () => {
-    if (!request) return;
-
-    const uid = await refreshMeId();
-    if (!uid) return;
-
-    if (!request.close_requested_by) return;
-    if (request.close_requested_by === uid) return;
-
-    setCloseWorking(true);
-    try {
-      const { error } = await supabase
-        .from("requests")
-        .update({
-          close_requested_by: null,
-          close_confirmed_by: null,
-          close_reason: null,
-          closed_at: null,
-        })
-        .eq("id", request.id);
-
-      if (error) {
-        Alert.alert(t("error"), error.message);
-        return;
-      }
-      await load();
-    } finally {
-      setCloseWorking(false);
-    }
   };
 
   const closeCTA = useMemo(() => {
@@ -1114,7 +1043,16 @@ export default function ChatScreen() {
     }
 
     return null;
-  }, [request, meId, closeWorking]);
+  }, [
+    request,
+    meId,
+    closeWorking,
+    t,
+    confirmClose,
+    dismissCloseRequest,
+    requestClose,
+    undoCloseRequest,
+  ]);
 
   const contextBox = useMemo(() => {
     if (!request) return null;
@@ -1217,13 +1155,12 @@ export default function ChatScreen() {
     );
   }, [
     request,
-    acceptedOffer,
     finalPrice,
     statusLabel,
     closeCTA,
-    otherOnline,
-    otherTyping,
     contextExpanded,
+    formatPrice,
+    t,
   ]);
 
   const renderItem = ({ item }: { item: MessageRow }) => {

@@ -20,32 +20,6 @@ export default function SignInScreen() {
     router.replace(target as any);
   };
 
-  const onCreateAccount = async () => {
-    setLoading(true);
-    setMsg("");
-
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-
-    // If confirm email is OFF -> user may be logged in immediately (session exists)
-    if (data.session) {
-      goAfterAuth();
-      return;
-    }
-
-    // If confirm email is ON -> session is null, user must confirm
-    setMsg(t("accountCreatedConfirm"));
-  };
-
   const onSignIn = async () => {
     setLoading(true);
     setMsg("");
@@ -88,6 +62,15 @@ export default function SignInScreen() {
         style={{ borderWidth: 1, padding: 12, borderRadius: 12 }}
       />
 
+      <Pressable
+        onPress={() => router.push("/forgot-password" as any)}
+        style={{ alignSelf: "flex-end" }}
+      >
+        <Text style={{ fontSize: 13, color: "#1E40AF", fontWeight: "700" }}>
+          {t("forgotPassword")}
+        </Text>
+      </Pressable>
+
       {!!msg && <Text style={{ color: "#334155" }}>{msg}</Text>}
 
       <Pressable
@@ -107,20 +90,24 @@ export default function SignInScreen() {
         </Text>
       </Pressable>
 
-      <Pressable
-        onPress={onCreateAccount}
-        disabled={loading}
+      <View
         style={{
-          padding: 14,
-          borderRadius: 12,
-          borderWidth: 1,
-          opacity: loading ? 0.7 : 1,
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 4,
+          marginTop: 8,
         }}
       >
-        <Text style={{ textAlign: "center", fontWeight: "800" }}>
-          {loading ? t("working") : t("createAccount")}
+        <Text style={{ fontSize: 13, color: "#64748B" }}>
+          {t("dontHaveAccount")}
         </Text>
-      </Pressable>
+        <Pressable onPress={() => router.replace("/sign-up" as any)}>
+          <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E40AF" }}>
+            {t("signUp")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
