@@ -804,6 +804,7 @@ export const translations = {
     acceptedDeals: "Tranzacții acceptate",
     settings: "Setări",
     accountInfo: "Cont",
-    signInToSeeProfile: "Conectează-te pentru a vedea profilul și activitatea ta.",
+    signInToSeeProfile:
+      "Conectează-te pentru a vedea profilul și activitatea ta.",
   },
 };
