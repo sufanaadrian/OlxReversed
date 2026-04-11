@@ -19,6 +19,9 @@ export default function RootLayout() {
                   options={{ presentation: "modal" }}
                 />
                 <Stack.Screen name="sign-in" />
+                <Stack.Screen name="sign-up" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="forgot-password" />
               </Stack>
             </AppProvider>
           </CurrencyProvider>
