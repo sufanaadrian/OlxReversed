@@ -233,20 +233,54 @@ export const styles = StyleSheet.create({
   },
   indicatorText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
 
-  expandToggle: {
+  expandInline: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.primary,
+    marginTop: 2,
+  },
+
+  detailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailGridItem: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  detailGridLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  detailGridValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primaryText,
+  },
+
+  viewDetailsBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingTop: 6,
+    gap: 6,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: theme.border,
     marginTop: 2,
   },
-  expandToggleText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: theme.secondaryText,
+  viewDetailsBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primary,
   },
 
   actions: {

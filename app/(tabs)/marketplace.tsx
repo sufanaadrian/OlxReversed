@@ -454,6 +454,37 @@ function RequestCard({
       ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
       : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`;
 
+  const detailRows: { label: string; value: string }[] = [];
+  if (request.timeline && timelineKeys[request.timeline])
+    detailRows.push({
+      label: t("timelineLabel"),
+      value: t(timelineKeys[request.timeline]),
+    });
+  if (request.duration && durationKeys[request.duration])
+    detailRows.push({
+      label: t("durationLabel"),
+      value: t(durationKeys[request.duration]),
+    });
+  if ((request.workers_needed ?? 1) > 1)
+    detailRows.push({
+      label: t("workersLabel"),
+      value: String(request.workers_needed),
+    });
+  if (request.work_mode && workModeKeys[request.work_mode])
+    detailRows.push({
+      label: t("workModeLabel"),
+      value: t(workModeKeys[request.work_mode]),
+    });
+  if (
+    request.experience_level &&
+    request.experience_level !== "any" &&
+    experienceKeys[request.experience_level]
+  )
+    detailRows.push({
+      label: t("experienceLabel"),
+      value: t(experienceKeys[request.experience_level]),
+    });
+
   return (
     <View style={styles.cardWrap}>
       {/* Progress */}
@@ -493,7 +524,25 @@ function RequestCard({
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}
           >
-            {/* Badges — always visible */}
+            {/* Photo strip at top */}
+            {photos.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbRow}
+              >
+                {photos.map((uri, i) => (
+                  <Image
+                    key={i}
+                    source={{ uri }}
+                    style={styles.thumb}
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Badges */}
             <View style={styles.badgeRow}>
               {request.posting_as === "offering" && (
                 <View style={[styles.badge, { backgroundColor: "#DCFCE7" }]}>
@@ -509,7 +558,7 @@ function RequestCard({
               </View>
             </View>
 
-            {/* Title — always visible */}
+            {/* Title */}
             <Text style={styles.title}>{request.title}</Text>
             {!!postedBy && (
               <Text style={styles.postedBy}>
@@ -517,7 +566,7 @@ function RequestCard({
               </Text>
             )}
 
-            {/* Budget + location — always visible */}
+            {/* Budget + location */}
             <View style={styles.details}>
               <View style={styles.detailRow}>
                 <Feather
@@ -540,102 +589,50 @@ function RequestCard({
             </View>
 
             {/* Description — truncated when collapsed */}
-            <Text style={styles.desc} numberOfLines={expanded ? 0 : 3}>
-              {request.description}
-            </Text>
-
-            {/* Expanded section */}
-            {expanded && (
-              <>
-                {/* Detail badges */}
-                {(request.timeline ||
-                  request.duration ||
-                  (request.workers_needed ?? 1) > 1 ||
-                  request.work_mode ||
-                  (request.experience_level &&
-                    request.experience_level !== "any")) && (
-                  <View style={styles.badgeRow}>
-                    {request.timeline && timelineKeys[request.timeline] && (
-                      <View style={styles.badgeOutline}>
-                        <Text style={styles.badgeOutlineText}>
-                          {t(timelineKeys[request.timeline])}
-                        </Text>
-                      </View>
-                    )}
-                    {request.duration && durationKeys[request.duration] && (
-                      <View style={styles.badgeOutline}>
-                        <Text style={styles.badgeOutlineText}>
-                          {t(durationKeys[request.duration])}
-                        </Text>
-                      </View>
-                    )}
-                    {(request.workers_needed ?? 1) > 1 && (
-                      <View style={styles.badgeOutline}>
-                        <Text style={styles.badgeOutlineText}>
-                          {request.workers_needed} {t("workersNeeded")}
-                        </Text>
-                      </View>
-                    )}
-                    {request.work_mode && workModeKeys[request.work_mode] && (
-                      <View style={styles.badgeOutline}>
-                        <Text style={styles.badgeOutlineText}>
-                          {t(workModeKeys[request.work_mode])}
-                        </Text>
-                      </View>
-                    )}
-                    {request.experience_level &&
-                      request.experience_level !== "any" &&
-                      experienceKeys[request.experience_level] && (
-                        <View style={styles.badgeOutline}>
-                          <Text style={styles.badgeOutlineText}>
-                            {t(experienceKeys[request.experience_level])}
-                          </Text>
-                        </View>
-                      )}
-                  </View>
-                )}
-
-                {/* Photo thumbnails */}
-                {photos.length > 0 && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.thumbRow}
-                  >
-                    {photos.map((uri, i) => (
-                      <Image
-                        key={i}
-                        source={{ uri }}
-                        style={styles.thumb}
-                        resizeMode="cover"
-                      />
-                    ))}
-                  </ScrollView>
-                )}
-
-                <View style={styles.detailRow}>
-                  <Feather name="clock" size={16} color={theme.secondaryText} />
-                  <Text style={styles.posted}>
-                    {t("posted")}{" "}
-                    {new Date(request.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-              </>
+            {!!request.description && (
+              <Pressable onPress={() => setExpanded((prev) => !prev)}>
+                <Text style={styles.desc} numberOfLines={expanded ? 0 : 3}>
+                  {request.description}
+                </Text>
+                <Text style={styles.expandInline}>
+                  {expanded ? t("showLess") : t("showMore")}
+                </Text>
+              </Pressable>
             )}
 
-            {/* Expand / collapse toggle */}
-            <Pressable
-              style={styles.expandToggle}
-              onPress={() => setExpanded((prev) => !prev)}
-            >
-              <Text style={styles.expandToggleText}>
-                {expanded ? t("showLess") : t("showMore")}
+            {/* Detail info — labeled rows, readable for new users */}
+            {detailRows.length > 0 && (
+              <View style={styles.detailGrid}>
+                {detailRows.map((d, i) => (
+                  <View key={i} style={styles.detailGridItem}>
+                    <Text style={styles.detailGridLabel}>{d.label}</Text>
+                    <Text style={styles.detailGridValue}>{d.value}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Posted date */}
+            <View style={styles.detailRow}>
+              <Feather name="clock" size={16} color={theme.secondaryText} />
+              <Text style={styles.posted}>
+                {t("posted")}{" "}
+                {new Date(request.created_at).toLocaleDateString()}
               </Text>
-              <Feather
-                name={expanded ? "chevron-up" : "chevron-down"}
-                size={14}
-                color={theme.secondaryText}
-              />
+            </View>
+
+            {/* View full details button */}
+            <Pressable
+              style={styles.viewDetailsBtn}
+              onPress={() =>
+                router.push({
+                  pathname: "/request/[id]",
+                  params: { id: request.id },
+                } as any)
+              }
+            >
+              <Text style={styles.viewDetailsBtnText}>{t("showDetails")}</Text>
+              <Feather name="arrow-right" size={14} color={theme.primary} />
             </Pressable>
           </ScrollView>
 

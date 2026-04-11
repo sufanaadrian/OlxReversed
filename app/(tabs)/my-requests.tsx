@@ -20,16 +20,6 @@ import { styles, theme } from "./my-requests.styles";
 
 type Filter = "all" | "active" | "matched" | "closed";
 
-const categoryTranslationKeys: Record<string, string> = {
-  Vehicles: "vehicles",
-  "Real Estate": "realEstate",
-  Services: "services",
-  "Electronics & Tech": "electronics",
-  "Fashion & Personal": "fashion",
-  Other: "other",
-  All: "all",
-};
-
 const budgetTypeKeys: Record<string, string> = {
   per_hour: "budgetPerHour",
   per_day: "budgetPerDay",
@@ -355,20 +345,17 @@ export default function MyRequestsScreen() {
             )}
 
             <View style={styles.cardContent}>
-              {/* Top row: category + status */}
+              {/* Top row: posted-as + status */}
               <View style={styles.topRow}>
-                <View style={styles.topLeft}>
-                  {item.posting_as === "offering" && (
-                    <View style={styles.offeringTag}>
-                      <Text style={styles.offeringTagText}>
-                        {t("postingOffering")}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.categoryPill}>
-                    {t(categoryTranslationKeys[item.category] || "other")}
-                  </Text>
-                </View>
+                {item.posting_as === "offering" ? (
+                  <View style={styles.offeringTag}>
+                    <Text style={styles.offeringTagText}>
+                      {t("postingOffering")}
+                    </Text>
+                  </View>
+                ) : (
+                  <View />
+                )}
                 <View
                   style={[
                     styles.statusPill,
