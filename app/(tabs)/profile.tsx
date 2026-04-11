@@ -25,6 +25,8 @@ export default function ProfileScreen() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [requestsCount, setRequestsCount] = useState(0);
+  const [offersCount, setOffersCount] = useState(0);
+
   const [dealsCount, setDealsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { language, setLanguage } = useLanguage();
@@ -47,7 +49,7 @@ export default function ProfileScreen() {
 
     setEmail(user.email ?? null);
 
-    const [profileRes, requestsRes, dealsRes] = await Promise.all([
+    const [profileRes, requestsRes, offersRes, dealsRes] = await Promise.all([
       supabase
         .from("profiles")
         .select("display_name,phone,city,account_type,intent,created_at")
@@ -60,12 +62,16 @@ export default function ProfileScreen() {
       supabase
         .from("offers")
         .select("id", { count: "exact", head: true })
-        .eq("seller_id", user.id)
-        .eq("status", "accepted"),
+        .eq("user_id", user.id),
+      supabase
+        .from("deals")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id),
     ]);
 
     setProfileData((profileRes.data as ProfileData) ?? null);
     setRequestsCount(requestsRes.count ?? 0);
+    setOffersCount(offersRes.count ?? 0);
     setDealsCount(dealsRes.count ?? 0);
     setIsLoading(false);
   };
@@ -182,6 +188,10 @@ export default function ProfileScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{requestsCount}</Text>
               <Text style={styles.statLabel}>{t("activeRequests")}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{offersCount}</Text>
+              <Text style={styles.statLabel}>{t("activeOffers")}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{dealsCount}</Text>

@@ -73,16 +73,16 @@ export const styles = StyleSheet.create({
   memberSince: { fontSize: 12, color: theme.secondaryText, marginTop: 8 },
 
   // Stats
-  statsRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  statsRow: { flexDirection: "row", gap: 5, marginBottom: 12 },
   statCard: {
     flex: 1,
-    padding: 16,
+    padding: 4,
     borderRadius: 16,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: "center",
-    gap: 4,
+    gap: 2,
   },
   statValue: { fontSize: 24, fontWeight: "900", color: theme.primaryText },
   statLabel: {
