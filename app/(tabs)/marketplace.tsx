@@ -64,7 +64,7 @@ type RequestRow = {
   work_mode: string | null;
   experience_level: string | null;
   photos: string[] | null;
-  profiles?: { email: string | null } | null;
+  profiles?: { display_name: string | null } | null;
 };
 
 const timelineKeys: Record<string, string> = {
@@ -162,7 +162,7 @@ export default function MarketplaceScreen() {
     experience_level,
     photos,
     profiles!requests_user_id_fkey (
-      email
+      display_name
     )
   `,
       )
@@ -380,6 +380,7 @@ function RequestCard({
 }) {
   const { formatPrice } = useCurrency();
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const [expanded, setExpanded] = useState(false);
 
   const rotate = translate.x.interpolate({
     inputRange: [-200, 0, 200],
@@ -400,7 +401,8 @@ function RequestCard({
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, g) => Math.abs(g.dx) > 6,
+      onMoveShouldSetPanResponder: (_evt, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove: Animated.event(
         [null, { dx: translate.x, dy: translate.y }],
         { useNativeDriver: false },
@@ -441,8 +443,16 @@ function RequestCard({
   ).current;
 
   const progress = total === 0 ? 0 : (remaining / total) * 100;
+  const postedBy = request.profiles?.display_name ?? null;
+  const photos = request.photos ?? [];
 
-  const email = request.profiles?.email ?? "unknown";
+  const budgetText = request.open_budget
+    ? t("openBudget")
+    : request.budget_type &&
+        request.budget_type !== "range" &&
+        budgetTypeKeys[request.budget_type]
+      ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
+      : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`;
 
   return (
     <View style={styles.cardWrap}>
@@ -453,7 +463,6 @@ function RequestCard({
             {remaining} {t("remaining_left")}
           </Text>
         </View>
-
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
@@ -477,15 +486,14 @@ function RequestCard({
             },
           ]}
         >
-          <View style={styles.cardContent}>
-            {request.photos && request.photos.length > 0 && (
-              <Image
-                source={{ uri: request.photos[0] }}
-                style={styles.cardPhoto}
-                resizeMode="cover"
-              />
-            )}
-
+          {/* Scrollable content */}
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.cardBody}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+          >
+            {/* Badges — always visible */}
             <View style={styles.badgeRow}>
               {request.posting_as === "offering" && (
                 <View style={[styles.badge, { backgroundColor: "#DCFCE7" }]}>
@@ -499,53 +507,17 @@ function RequestCard({
                   {t(categoryTranslationKeys[request.category] || "other")}
                 </Text>
               </View>
-              {request.timeline && timelineKeys[request.timeline] && (
-                <View style={styles.badgeOutline}>
-                  <Text style={styles.badgeOutlineText}>
-                    {t(timelineKeys[request.timeline])}
-                  </Text>
-                </View>
-              )}
-              {request.duration && durationKeys[request.duration] && (
-                <View style={styles.badgeOutline}>
-                  <Text style={styles.badgeOutlineText}>
-                    {t(durationKeys[request.duration])}
-                  </Text>
-                </View>
-              )}
-              {(request.workers_needed ?? 1) > 1 && (
-                <View style={styles.badgeOutline}>
-                  <Text style={styles.badgeOutlineText}>
-                    {request.workers_needed} {t("workersNeeded")}
-                  </Text>
-                </View>
-              )}
-              {request.work_mode && workModeKeys[request.work_mode] && (
-                <View style={styles.badgeOutline}>
-                  <Text style={styles.badgeOutlineText}>
-                    {t(workModeKeys[request.work_mode])}
-                  </Text>
-                </View>
-              )}
-              {request.experience_level &&
-                request.experience_level !== "any" &&
-                experienceKeys[request.experience_level] && (
-                  <View style={styles.badgeOutline}>
-                    <Text style={styles.badgeOutlineText}>
-                      {t(experienceKeys[request.experience_level])}
-                    </Text>
-                  </View>
-                )}
             </View>
 
+            {/* Title — always visible */}
             <Text style={styles.title}>{request.title}</Text>
+            {!!postedBy && (
+              <Text style={styles.postedBy}>
+                {t("postedBy")} {postedBy}
+              </Text>
+            )}
 
-            <Text style={styles.postedBy}>
-              {t("postedBy")} {email}
-            </Text>
-
-            <Text style={styles.desc}>{request.description}</Text>
-
+            {/* Budget + location — always visible */}
             <View style={styles.details}>
               <View style={styles.detailRow}>
                 <Feather
@@ -553,17 +525,8 @@ function RequestCard({
                   size={16}
                   color={theme.secondaryText}
                 />
-                <Text style={styles.detailText}>
-                  {request.open_budget
-                    ? t("openBudget")
-                    : request.budget_type &&
-                        request.budget_type !== "range" &&
-                        budgetTypeKeys[request.budget_type]
-                      ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
-                      : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`}
-                </Text>
+                <Text style={styles.detailText}>{budgetText}</Text>
               </View>
-
               {!!request.location && (
                 <View style={styles.detailRow}>
                   <Feather
@@ -574,13 +537,107 @@ function RequestCard({
                   <Text style={styles.detailText}>{request.location}</Text>
                 </View>
               )}
-
-              <Text style={styles.posted}>
-                {t("posted")}{" "}
-                {new Date(request.created_at).toLocaleDateString()}
-              </Text>
             </View>
-          </View>
+
+            {/* Description — truncated when collapsed */}
+            <Text style={styles.desc} numberOfLines={expanded ? 0 : 3}>
+              {request.description}
+            </Text>
+
+            {/* Expanded section */}
+            {expanded && (
+              <>
+                {/* Detail badges */}
+                {(request.timeline ||
+                  request.duration ||
+                  (request.workers_needed ?? 1) > 1 ||
+                  request.work_mode ||
+                  (request.experience_level &&
+                    request.experience_level !== "any")) && (
+                  <View style={styles.badgeRow}>
+                    {request.timeline && timelineKeys[request.timeline] && (
+                      <View style={styles.badgeOutline}>
+                        <Text style={styles.badgeOutlineText}>
+                          {t(timelineKeys[request.timeline])}
+                        </Text>
+                      </View>
+                    )}
+                    {request.duration && durationKeys[request.duration] && (
+                      <View style={styles.badgeOutline}>
+                        <Text style={styles.badgeOutlineText}>
+                          {t(durationKeys[request.duration])}
+                        </Text>
+                      </View>
+                    )}
+                    {(request.workers_needed ?? 1) > 1 && (
+                      <View style={styles.badgeOutline}>
+                        <Text style={styles.badgeOutlineText}>
+                          {request.workers_needed} {t("workersNeeded")}
+                        </Text>
+                      </View>
+                    )}
+                    {request.work_mode && workModeKeys[request.work_mode] && (
+                      <View style={styles.badgeOutline}>
+                        <Text style={styles.badgeOutlineText}>
+                          {t(workModeKeys[request.work_mode])}
+                        </Text>
+                      </View>
+                    )}
+                    {request.experience_level &&
+                      request.experience_level !== "any" &&
+                      experienceKeys[request.experience_level] && (
+                        <View style={styles.badgeOutline}>
+                          <Text style={styles.badgeOutlineText}>
+                            {t(experienceKeys[request.experience_level])}
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+                )}
+
+                {/* Photo thumbnails */}
+                {photos.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.thumbRow}
+                  >
+                    {photos.map((uri, i) => (
+                      <Image
+                        key={i}
+                        source={{ uri }}
+                        style={styles.thumb}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </ScrollView>
+                )}
+
+                <View style={styles.detailRow}>
+                  <Feather name="clock" size={16} color={theme.secondaryText} />
+                  <Text style={styles.posted}>
+                    {t("posted")}{" "}
+                    {new Date(request.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {/* Expand / collapse toggle */}
+            <Pressable
+              style={styles.expandToggle}
+              onPress={() => setExpanded((prev) => !prev)}
+            >
+              <Text style={styles.expandToggleText}>
+                {expanded ? t("showLess") : t("showMore")}
+              </Text>
+              <Feather
+                name={expanded ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={theme.secondaryText}
+              />
+            </Pressable>
+          </ScrollView>
 
           {/* Swipe indicators */}
           <Animated.View
@@ -588,7 +645,6 @@ function RequestCard({
           >
             <Text style={styles.indicatorText}>{t("skip")}</Text>
           </Animated.View>
-
           <Animated.View
             style={[styles.indicatorRight, { opacity: rightOpacity }]}
           >

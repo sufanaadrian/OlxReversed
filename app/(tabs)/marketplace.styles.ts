@@ -144,31 +144,35 @@ export const styles = StyleSheet.create({
     borderColor: theme.border,
     overflow: "hidden",
   },
-  cardContent: { flex: 1, padding: 16 },
 
-  cardPhoto: {
-    width: "100%",
-    height: 140,
-    borderRadius: 12,
-    marginBottom: 10,
+  // Photo thumbnails (inside scrollable card body)
+  thumbRow: { gap: 8, paddingVertical: 4 },
+  thumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: theme.border,
   },
+
+  // Scrollable card body
+  cardScroll: { flex: 1 },
+  cardBody: { padding: 14, gap: 10 },
 
   badgeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginBottom: 10,
   },
   badge: {
     backgroundColor: theme.accentSoft,
     borderRadius: 999,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 10,
   },
   badgeText: { fontSize: 12, color: theme.primaryText, fontWeight: "700" },
   badgeOutline: {
     borderRadius: 999,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: theme.border,
@@ -184,27 +188,30 @@ export const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
-    marginBottom: 4,
   },
 
   postedBy: {
     fontSize: 12,
     color: theme.secondaryText,
-    marginBottom: 10,
     fontWeight: "700",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 2,
   },
 
   desc: {
     fontSize: 14,
     color: theme.secondaryText,
     lineHeight: 20,
-    marginBottom: 14,
   },
 
-  details: { marginTop: "auto", gap: 10 },
+  details: { gap: 8, paddingBottom: 8 },
   detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  detailText: { fontSize: 14, color: theme.primaryText },
-  posted: { fontSize: 12, color: theme.secondaryText, marginTop: 2 },
+  detailText: { fontSize: 14, color: theme.primaryText, flex: 1 },
+  posted: { fontSize: 12, color: theme.secondaryText },
 
   indicatorLeft: {
     position: "absolute",
@@ -225,6 +232,22 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.accentSoft,
   },
   indicatorText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+
+  expandToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    marginTop: 2,
+  },
+  expandToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
 
   actions: {
     flexDirection: "row",
