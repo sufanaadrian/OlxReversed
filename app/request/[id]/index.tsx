@@ -316,28 +316,52 @@ export default function RequestDetailScreen() {
   }, [offers, offerFilter, latestCounterByOfferId]);
 
   const acceptOffer = async (offerId: string) => {
-    await supabase
+    const { error: acceptError } = await supabase
       .from("offers")
       .update({ status: "accepted" })
       .eq("id", offerId);
 
-    await supabase
+    if (acceptError) {
+      Alert.alert(acceptError.message);
+      return;
+    }
+
+    const { error: rejectOthersError } = await supabase
       .from("offers")
       .update({ status: "rejected" })
       .eq("request_id", id)
       .neq("id", offerId)
       .eq("status", "pending");
 
-    await supabase.from("requests").update({ status: "matched" }).eq("id", id);
+    if (rejectOthersError) {
+      Alert.alert(rejectOthersError.message);
+      return;
+    }
+
+    const { error: matchRequestError } = await supabase
+      .from("requests")
+      .update({ status: "matched" })
+      .eq("id", id);
+
+    if (matchRequestError) {
+      Alert.alert(matchRequestError.message);
+      return;
+    }
 
     await load();
   };
 
   const rejectOffer = async (offerId: string) => {
-    await supabase
+    const { error } = await supabase
       .from("offers")
       .update({ status: "rejected" })
       .eq("id", offerId);
+
+    if (error) {
+      Alert.alert(error.message);
+      return;
+    }
+
     await load();
   };
 
