@@ -1,4 +1,6 @@
-import { StyleSheet } from "react-native";
+import { Dimensions, StyleSheet } from "react-native";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export const theme = {
   primary: "#1E40AF",
@@ -7,62 +9,345 @@ export const theme = {
   primaryText: "#020617",
   secondaryText: "#64748B",
   border: "#E5E7EB",
+  accentSoft: "#DBEAFE",
+  success: "#16A34A",
   danger: "#DC2626",
 };
 
 export const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    padding: 16,
-    gap: 14,
+  container: { flex: 1, backgroundColor: theme.bg },
+  scrollContent: { paddingBottom: 40 },
+
+  backBtnOverlay: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    zIndex: 10,
+    height: 38,
+    width: 38,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 
-  center: {
-    flex: 1,
+  photoContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH * 0.7,
+    backgroundColor: theme.border,
+  },
+  photoPage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH * 0.7,
+  },
+  noPhotoBox: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH * 0.45,
+    backgroundColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
   },
+  noPhotoText: { color: theme.secondaryText, fontSize: 14, marginTop: 8 },
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: -20,
+    marginBottom: 4,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  dotActive: { backgroundColor: "#fff" },
 
-  title: {
-    fontSize: 22,
+  infoCard: {
+    backgroundColor: theme.surface,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    alignItems: "center",
+  },
+  categoryBadge: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  categoryBadgeText: { fontSize: 12, fontWeight: "900", color: theme.primary },
+  statusBadge: {
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  statusOpen: { backgroundColor: "#DCFCE7" },
+  statusNegotiating: { backgroundColor: "#FEF9C3" },
+  statusClosed: { backgroundColor: theme.border },
+  statusBadgeText: {
+    fontSize: 12,
     fontWeight: "900",
     color: theme.primaryText,
   },
+  offeringBadge: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  offeringBadgeText: { fontSize: 12, fontWeight: "900", color: "#166534" },
 
-  desc: {
+  title: { fontSize: 22, fontWeight: "900", color: theme.primaryText },
+
+  priceRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  price: { fontSize: 20, fontWeight: "900", color: theme.primary },
+
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+    alignItems: "center",
+  },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metaText: { fontSize: 13, color: theme.secondaryText },
+
+  sectionCard: {
+    backgroundColor: theme.surface,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 18,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sectionTitle: {
     fontSize: 15,
+    fontWeight: "900",
+    color: theme.primaryText,
+    marginBottom: 2,
+  },
+  descText: { fontSize: 14, color: theme.secondaryText, lineHeight: 22 },
+
+  detailBadge: {
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+  },
+  detailBadgeText: {
+    fontSize: 12,
     color: theme.secondaryText,
-    lineHeight: 22,
+    fontWeight: "700",
   },
 
-  meta: {
+  detailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailGridItem: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  detailGridLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  detailGridValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primaryText,
+  },
+
+  specialReqBox: {
+    marginTop: 10,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  specialReqText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: theme.primaryText,
+    lineHeight: 18,
+  },
+
+  offersHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  offersCount: { fontSize: 13, color: theme.secondaryText, fontWeight: "700" },
+
+  offersBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: theme.accentSoft,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  offersBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  offersBannerTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: theme.primary,
+  },
+  offersBannerBadges: {
+    flexDirection: "row",
     gap: 6,
   },
-
-  metaText: {
+  offersBannerPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+  },
+  offersBannerPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+  offersBannerEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: theme.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  offersBannerEmptyText: {
     fontSize: 14,
+    fontWeight: "700",
     color: theme.secondaryText,
   },
 
-  actions: {
-    gap: 10,
-    marginTop: 12,
+  offerCard: {
+    backgroundColor: theme.bg,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  offerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  offerSeller: { fontSize: 13, fontWeight: "900", color: theme.primaryText },
+  offerStatusPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+  },
+  pillPending: { backgroundColor: theme.accentSoft },
+  pillAccepted: { backgroundColor: "#DCFCE7" },
+  pillRejected: { backgroundColor: "#FEE2E2" },
+  pillWithdrawn: { backgroundColor: theme.border },
+  offerStatusText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+  offerPrice: { fontSize: 17, fontWeight: "900", color: theme.primaryText },
+  offerDesc: { fontSize: 13, color: theme.secondaryText, lineHeight: 18 },
+
+  counterBox: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    padding: 10,
+    gap: 4,
+  },
+  counterTitle: { fontWeight: "900", fontSize: 13, color: theme.primaryText },
+  counterMsg: { fontSize: 12, color: theme.secondaryText },
+  counterStatus: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: theme.secondaryText,
   },
 
-  primaryBtn: {
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: theme.primary,
+  offerActions: { flexDirection: "row", gap: 8, marginTop: 4 },
+  actionBtn: {
+    flex: 1,
+    height: 36,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  primaryText: {
-    color: "white",
+  btnPrimary: { backgroundColor: theme.primary },
+  btnPrimaryText: { color: "white", fontWeight: "900", fontSize: 13 },
+  btnSecondary: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  btnSecondaryText: {
+    color: theme.primaryText,
     fontWeight: "900",
-    fontSize: 16,
+    fontSize: 13,
   },
 
+  noOffersBox: {
+    backgroundColor: theme.bg,
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  noOffersText: { fontSize: 14, fontWeight: "700", color: theme.secondaryText },
+
+  ownerActions: { marginHorizontal: 16, marginTop: 12, gap: 10 },
   dangerBtn: {
     height: 48,
     borderRadius: 16,
@@ -71,22 +356,66 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  dangerText: {
-    color: theme.danger,
-    fontWeight: "900",
+  dangerText: { color: theme.danger, fontWeight: "900" },
+  primaryBtn: {
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  primaryBtnText: { color: "white", fontWeight: "900", fontSize: 15 },
 
-  closed: {
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  closedBanner: {
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: theme.border,
+    borderRadius: 14,
   },
+  closedText: { color: theme.secondaryText, fontWeight: "700" },
 
-  closedText: {
+  filtersRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  filterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  filterChipActive: {
+    backgroundColor: theme.accentSoft,
+    borderColor: theme.primary,
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: "800",
     color: theme.secondaryText,
-    fontWeight: "700",
+  },
+  filterChipTextActive: { color: theme.primaryText },
+
+  withdrawnBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  withdrawnBannerText: {
+    flex: 1,
+    color: theme.danger,
+    fontWeight: "800",
+    fontSize: 11,
   },
 });

@@ -71,8 +71,23 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: 18,
-    padding: 14,
+    padding: 12,
     marginTop: 12,
+    gap: 10,
+  },
+  cardInner: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cardThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    backgroundColor: theme.border,
+  },
+  cardContent: {
+    flex: 1,
+    gap: 4,
   },
 
   topRow: {
@@ -143,22 +158,27 @@ export const styles = StyleSheet.create({
   },
 
   title: {
-    marginTop: 10,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
     color: theme.primaryText,
   },
-  desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
 
-  metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    alignItems: "center",
+  },
   metaStrong: { fontWeight: "900", color: theme.primaryText },
   metaMuted: { color: theme.secondaryText },
 
   footerRow: {
-    marginTop: 12,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    paddingTop: 10,
   },
   smallMuted: { fontSize: 12, color: theme.secondaryText },
 
@@ -200,4 +220,21 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   deleteText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  topLeft: { flexDirection: "row", gap: 6, alignItems: "center" },
+
+  offeringTag: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  offeringTagText: { fontSize: 11, fontWeight: "900", color: "#166534" },
+  seekingTag: {
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  seekingTagText: { fontSize: 11, fontWeight: "900", color: "#1e40af" },
 });

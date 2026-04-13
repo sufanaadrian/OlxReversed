@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Image,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -16,10 +17,55 @@ import {
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 import { styles } from "./my-offers.styles";
+
+const scheduleKeys: Record<string, string> = {
+  anytime: "scheduleAnytime",
+  weekdays: "scheduleWeekdays",
+  weekends: "scheduleWeekends",
+  specific_date: "scheduleSpecificDate",
+};
+
+const durationKeys: Record<string, string> = {
+  few_hours: "durationHours",
+  full_day: "durationDay",
+  multi_day: "durationMultiDay",
+  recurring: "durationRecurring",
+};
+
+const workModeKeys: Record<string, string> = {
+  onsite: "workOnsite",
+  remote: "workRemote",
+  hybrid: "workHybrid",
+};
+
+const experienceKeys: Record<string, string> = {
+  any: "experienceAny",
+  beginner: "experienceBeginner",
+  experienced: "experienceExperienced",
+  expert: "experienceExpert",
+};
+
+const equipmentKeys: Record<string, string> = {
+  not_needed: "equipmentNotNeeded",
+  pro_provides: "equipmentPro",
+  client_provides: "equipmentClient",
+};
+
+const postingAsKeys: Record<string, string> = {
+  seeking: "postingSeeking",
+  offering: "postingOffering",
+};
+
+const budgetTypeKeys: Record<string, string> = {
+  per_hour: "budgetPerHour",
+  per_day: "budgetPerDay",
+  fixed: "budgetFixed",
+};
 
 if (
   Platform.OS === "android" &&
@@ -44,7 +90,20 @@ type RequestRow = {
   location: string | null;
   created_at: string;
   status: string;
-  profiles?: { email: string | null } | null;
+  open_budget: boolean | null;
+  posting_as: string | null;
+  budget_type: string | null;
+  timeline: string | null;
+  duration: string | null;
+  workers_needed: number | null;
+  work_mode: string | null;
+  experience_level: string | null;
+  equipment: string | null;
+  preferred_schedule: string | null;
+  scheduled_date: string | null;
+  special_requirements: string | null;
+  photos: string[] | null;
+  profiles?: { display_name: string | null } | null;
 };
 
 type OfferRow = {
@@ -94,6 +153,16 @@ export default function MyOffersScreen() {
   };
   const toggleOlderThread = (requestId: string) => {
     setOpenOlderThreads((prev) => ({ ...prev, [requestId]: !prev[requestId] }));
+  };
+
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerVisible, setViewerVisible] = useState(false);
+
+  const openViewer = (images: string[], index: number) => {
+    setViewerImages(images);
+    setViewerIndex(index);
+    setViewerVisible(true);
   };
 
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
@@ -156,7 +225,20 @@ export default function MyOffersScreen() {
           location,
           created_at,
           status,
-          profiles!requests_user_id_fkey ( email )
+          open_budget,
+          posting_as,
+          budget_type,
+          timeline,
+          preferred_schedule,
+          duration,
+          workers_needed,
+          work_mode,
+          experience_level,
+          equipment,
+          scheduled_date,
+          special_requirements,
+          photos,
+          profiles!requests_user_id_fkey ( display_name )
         )
       `,
         )
@@ -835,7 +917,8 @@ export default function MyOffersScreen() {
                     {/* Posted by — only when expanded */}
                     {isDetailsOpen && (
                       <Text style={styles.postedBy}>
-                        {t("postedBy")} {request.profiles?.email ?? "unknown"}
+                        {t("postedBy")}{" "}
+                        {request.profiles?.display_name ?? "unknown"}
                       </Text>
                     )}
 
@@ -852,6 +935,121 @@ export default function MyOffersScreen() {
                       <Text style={styles.location}>📍 {request.location}</Text>
                     )}
 
+                    {/* Detail grid — only when expanded */}
+                    {isDetailsOpen &&
+                      (() => {
+                        const rows: { label: string; value: string }[] = [];
+                        if (
+                          request.posting_as &&
+                          postingAsKeys[request.posting_as]
+                        )
+                          rows.push({
+                            label: t("postingAs"),
+                            value: t(postingAsKeys[request.posting_as]),
+                          });
+                        if (
+                          request.preferred_schedule &&
+                          scheduleKeys[request.preferred_schedule]
+                        )
+                          rows.push({
+                            label: t("preferredSchedule"),
+                            value: t(scheduleKeys[request.preferred_schedule]),
+                          });
+                        if (
+                          request.preferred_schedule === "specific_date" &&
+                          request.scheduled_date
+                        )
+                          rows.push({
+                            label: t("scheduledDate"),
+                            value: request.scheduled_date,
+                          });
+                        if (request.duration && durationKeys[request.duration])
+                          rows.push({
+                            label: t("durationLabel"),
+                            value: t(durationKeys[request.duration]),
+                          });
+                        if (request.workers_needed != null)
+                          rows.push({
+                            label: t("workersLabel"),
+                            value: String(request.workers_needed),
+                          });
+                        if (
+                          request.work_mode &&
+                          workModeKeys[request.work_mode]
+                        )
+                          rows.push({
+                            label: t("workModeLabel"),
+                            value: t(workModeKeys[request.work_mode]),
+                          });
+                        if (
+                          request.experience_level &&
+                          experienceKeys[request.experience_level]
+                        )
+                          rows.push({
+                            label: t("experienceLabel"),
+                            value: t(experienceKeys[request.experience_level]),
+                          });
+                        if (
+                          request.equipment &&
+                          equipmentKeys[request.equipment]
+                        )
+                          rows.push({
+                            label: t("equipmentLabel"),
+                            value: t(equipmentKeys[request.equipment]),
+                          });
+                        return (
+                          <>
+                            {rows.length > 0 && (
+                              <View style={styles.detailGrid}>
+                                {rows.map((d, i) => (
+                                  <View key={i} style={styles.detailGridItem}>
+                                    <Text style={styles.detailGridLabel}>
+                                      {d.label}
+                                    </Text>
+                                    <Text style={styles.detailGridValue}>
+                                      {d.value}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                            {!!request.special_requirements && (
+                              <View style={styles.specialReqBox}>
+                                <Text style={styles.detailGridLabel}>
+                                  {t("specialRequirementsLabel")}
+                                </Text>
+                                <Text style={styles.specialReqText}>
+                                  {request.special_requirements}
+                                </Text>
+                              </View>
+                            )}
+                          </>
+                        );
+                      })()}
+
+                    {/* Photos — only when expanded */}
+                    {isDetailsOpen &&
+                      request.photos &&
+                      request.photos.length > 0 && (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.photoRow}
+                        >
+                          {request.photos.map((uri, i) => (
+                            <Pressable
+                              key={i}
+                              onPress={() => openViewer(request.photos!, i)}
+                            >
+                              <Image
+                                source={{ uri }}
+                                style={styles.photoThumb}
+                              />
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      )}
+
                     {/* Budget + swipe status pills */}
                     <View style={styles.metaRow}>
                       <View style={styles.basePill}>
@@ -859,8 +1057,13 @@ export default function MyOffersScreen() {
                           {t("budgetLabel")}:{" "}
                         </Text>
                         <Text style={styles.pillText}>
-                          {formatPrice(request.budget_min)} –{" "}
-                          {formatPrice(request.budget_max)}
+                          {request.open_budget
+                            ? t("openBudget")
+                            : request.budget_type &&
+                                request.budget_type !== "range" &&
+                                budgetTypeKeys[request.budget_type]
+                              ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
+                              : `${formatPrice(request.budget_min)} – ${formatPrice(request.budget_max)}`}
                         </Text>
                       </View>
                       <View
@@ -1329,6 +1532,13 @@ export default function MyOffersScreen() {
           })}
         </ScrollView>
       )}
+
+      <ImageViewer
+        images={viewerImages}
+        visible={viewerVisible}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }

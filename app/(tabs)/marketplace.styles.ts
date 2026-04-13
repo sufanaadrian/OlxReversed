@@ -14,7 +14,7 @@ export const theme = {
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.bg },
 
-  header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
   searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   searchBox: {
     flex: 1,
@@ -56,7 +56,7 @@ export const styles = StyleSheet.create({
   chipText: { color: theme.secondaryText, fontSize: 13 },
   chipTextSelected: { color: theme.primaryText, fontWeight: "700" },
 
-  swipeArea: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
+  swipeArea: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
   emptyState: {
     flex: 1,
     backgroundColor: theme.surface,
@@ -90,7 +90,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   progressPill: {
     paddingVertical: 6,
@@ -137,50 +137,89 @@ export const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    height: "88%",
+    height: "94%",
     backgroundColor: theme.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: theme.border,
     overflow: "hidden",
   },
-  cardContent: { flex: 1, padding: 16 },
 
+  // Photo thumbnails (inside scrollable card body)
+  thumbRow: { gap: 8, paddingVertical: 4 },
+  thumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: theme.border,
+  },
+
+  // Scrollable card body
+  cardScroll: { flex: 1 },
+  cardBody: { padding: 14, gap: 10 },
+
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
   badge: {
-    alignSelf: "flex-start",
     backgroundColor: theme.accentSoft,
     borderRadius: 999,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 10,
-    marginBottom: 10,
+  },
+  badgeSeeking: {
+    backgroundColor: "#DBEAFE",
+  },
+  badgeOffering: {
+    backgroundColor: "#DCFCE7",
   },
   badgeText: { fontSize: 12, color: theme.primaryText, fontWeight: "700" },
+  badgeTextSeeking: { color: "#1e40af" },
+  badgeTextOffering: { color: "#166534" },
+  badgeOutline: {
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+  },
+  badgeOutlineText: {
+    fontSize: 11,
+    color: theme.secondaryText,
+    fontWeight: "700",
+  },
 
   title: {
     fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
-    marginBottom: 4,
   },
 
   postedBy: {
     fontSize: 12,
     color: theme.secondaryText,
-    marginBottom: 10,
     fontWeight: "700",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 2,
   },
 
   desc: {
     fontSize: 14,
     color: theme.secondaryText,
     lineHeight: 20,
-    marginBottom: 14,
   },
 
-  details: { marginTop: "auto", gap: 10 },
+  details: { gap: 8, paddingBottom: 8 },
   detailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  detailText: { fontSize: 14, color: theme.primaryText },
-  posted: { fontSize: 12, color: theme.secondaryText, marginTop: 2 },
+  detailText: { fontSize: 14, color: theme.primaryText, flex: 1 },
+  posted: { fontSize: 12, color: theme.secondaryText },
 
   indicatorLeft: {
     position: "absolute",
@@ -202,13 +241,85 @@ export const styles = StyleSheet.create({
   },
   indicatorText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
 
+  expandInline: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.primary,
+    marginTop: 2,
+  },
+
+  detailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailGridItem: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  detailGridLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  detailGridValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primaryText,
+  },
+  detailGridMoreLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.primary,
+    fontStyle: "italic",
+  },
+
+  specialReqBox: {
+    marginTop: 10,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  specialReqText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: theme.primaryText,
+    lineHeight: 18,
+  },
+
+  viewDetailsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    marginTop: 2,
+  },
+  viewDetailsBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+
   actions: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 14,
     paddingHorizontal: 16,
-    paddingBottom: 18,
-    paddingTop: 10,
+    paddingBottom: 14,
+    paddingTop: 4,
   },
   actionBtn: {
     height: 54,

@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,21 +13,18 @@ import {
   View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
-import { styles } from "./my-requests.styles";
+import { styles, theme } from "./my-requests.styles";
 
 type Filter = "all" | "active" | "matched" | "closed";
 
-const categoryTranslationKeys: Record<string, string> = {
-  Vehicles: "vehicles",
-  "Real Estate": "realEstate",
-  Services: "services",
-  "Electronics & Tech": "electronics",
-  "Fashion & Personal": "fashion",
-  Other: "other",
-  All: "all",
+const budgetTypeKeys: Record<string, string> = {
+  per_hour: "budgetPerHour",
+  per_day: "budgetPerDay",
+  fixed: "budgetFixed",
 };
 
 function getStatusLabel(t: any, status: "active" | "matched" | "closed") {
@@ -46,11 +44,18 @@ type RequestRow = {
   title: string;
   description: string;
   category: string;
-  budget_min: number;
-  budget_max: number;
+  budget_min: number | null;
+  budget_max: number | null;
   location: string | null;
   status: "active" | "matched" | "closed";
   created_at: string;
+  open_budget: boolean | null;
+  posting_as: string | null;
+  budget_type: string | null;
+  timeline: string | null;
+  work_mode: string | null;
+  experience_level: string | null;
+  photos: string[] | null;
 };
 
 // ✅ UPDATED: include withdrawn
@@ -93,6 +98,8 @@ export default function MyRequestsScreen() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const openRowRef = useRef<Swipeable | null>(null);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   const load = useCallback(
     async (showSpinner: boolean = true) => {
@@ -114,7 +121,7 @@ export default function MyRequestsScreen() {
       const { data: reqs, error: reqErr } = await supabase
         .from("requests")
         .select(
-          "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at",
+          "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,work_mode,experience_level,photos",
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -307,6 +314,8 @@ export default function MyRequestsScreen() {
       offerCounts.accepted > 0 || counterCounts.accepted > 0;
     const hasPendingCounters = counterCounts.pending > 0;
     const hasWithdrawnOffers = offerCounts.withdrawn > 0;
+    const firstPhoto =
+      item.photos && item.photos.length > 0 ? item.photos[0] : null;
 
     return (
       <Swipeable
@@ -316,69 +325,117 @@ export default function MyRequestsScreen() {
           if (openRowRef.current) openRowRef.current.close();
         }}
         onSwipeableOpen={(direction, swipeable) => {
-          // ✅ FIX: store the opened row so only one stays open
           openRowRef.current = swipeable;
         }}
       >
         <Pressable
           onPress={() =>
             router.push({
-              pathname: "/request/[id]/offers",
+              pathname: "/request/[id]",
               params: { id: item.id },
             } as any)
           }
           style={styles.card}
         >
-          <View style={styles.topRow}>
-            <Text style={styles.categoryPill}>
-              {t(categoryTranslationKeys[item.category] || "other")}
-            </Text>
+          <View style={styles.cardInner}>
+            {/* Thumbnail */}
+            {firstPhoto && (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setViewerImages(item.photos ?? []);
+                  setViewerVisible(true);
+                }}
+              >
+                <Image
+                  source={{ uri: firstPhoto }}
+                  style={styles.cardThumb}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            )}
 
-            <View style={styles.rightBadges}>
-              {offerCounts.total > 0 && (
-                <View style={styles.offerPill}>
-                  <Text style={styles.offerPillText}>
-                    {offerCounts.total}{" "}
-                    {offerCounts.total === 1 ? t("offer") : t("offers")}
+            <View style={styles.cardContent}>
+              {/* Top row: posted-as + status */}
+              <View style={styles.topRow}>
+                {item.posting_as === "offering" ? (
+                  <View style={styles.offeringTag}>
+                    <Text style={styles.offeringTagText}>
+                      {t("postingOffering")}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.seekingTag}>
+                    <Text style={styles.seekingTagText}>
+                      {t("postingSeeking")}
+                    </Text>
+                  </View>
+                )}
+                <View
+                  style={[
+                    styles.statusPill,
+                    item.status === "active"
+                      ? styles.statusOpen
+                      : item.status === "matched"
+                        ? styles.statusNegotiating
+                        : styles.statusClosed,
+                  ]}
+                >
+                  <Text style={styles.statusText}>
+                    {getStatusLabel(t, item.status)}
                   </Text>
                 </View>
-              )}
+              </View>
 
-              <View
-                style={[
-                  styles.statusPill,
-                  item.status === "active"
-                    ? styles.statusOpen
-                    : item.status === "matched"
-                      ? styles.statusNegotiating
-                      : styles.statusClosed,
-                ]}
-              >
-                <Text style={styles.statusText}>
-                  {getStatusLabel(t, item.status)}
+              {/* Title */}
+              <Text style={styles.title} numberOfLines={1}>
+                {item.title}
+              </Text>
+
+              {/* Budget */}
+              <View style={styles.metaRow}>
+                <Feather
+                  name="dollar-sign"
+                  size={13}
+                  color={theme.secondaryText}
+                />
+                <Text style={styles.metaStrong}>
+                  {item.open_budget
+                    ? t("openBudget")
+                    : item.budget_type &&
+                        item.budget_type !== "range" &&
+                        budgetTypeKeys[item.budget_type]
+                      ? `${formatPrice(item.budget_min ?? 0)} ${t(budgetTypeKeys[item.budget_type])}`
+                      : `${formatPrice(item.budget_min ?? 0)} – ${formatPrice(item.budget_max ?? 0)}`}
                 </Text>
+                {!!item.location && (
+                  <>
+                    <Feather
+                      name="map-pin"
+                      size={13}
+                      color={theme.secondaryText}
+                    />
+                    <Text style={styles.metaMuted} numberOfLines={1}>
+                      {item.location}
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
           </View>
 
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.desc} numberOfLines={2}>
-            {item.description}
-          </Text>
-
-          <View style={styles.metaRow}>
-            <Text style={styles.metaStrong}>
-              {formatPrice(item.budget_min)} – {formatPrice(item.budget_max)}
-            </Text>
-            {!!item.location && (
-              <Text style={styles.metaMuted}>• {item.location}</Text>
-            )}
-          </View>
-
+          {/* Footer: offers info + action */}
           <View style={styles.footerRow}>
-            <Text style={styles.smallMuted}>
-              {t("postedAt")} {new Date(item.created_at).toLocaleString()}
-            </Text>
+            {offerCounts.total > 0 && (
+              <View style={styles.offerPill}>
+                <Text style={styles.offerPillText}>
+                  {offerCounts.total}{" "}
+                  {offerCounts.total === 1 ? t("offer") : t("offers")}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ flex: 1 }} />
 
             {hasAcceptedDeal ? (
               <Pressable
@@ -394,35 +451,17 @@ export default function MyRequestsScreen() {
                 <Text style={styles.reviewBtnText}>{t("chat")}</Text>
               </Pressable>
             ) : offerCounts.pending > 0 ? (
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push({
-                    pathname: "/request/offers",
-                    params: { id: item.id },
-                  } as any);
-                }}
-                style={styles.reviewBtn}
-              >
+              <View style={styles.reviewBtn}>
                 <Text style={styles.reviewBtnText}>
                   {t("review")} ({offerCounts.pending})
                 </Text>
-              </Pressable>
+              </View>
             ) : hasPendingCounters ? (
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push({
-                    pathname: "/request/offers",
-                    params: { id: item.id },
-                  } as any);
-                }}
-                style={styles.viewBtn}
-              >
+              <View style={styles.viewBtn}>
                 <Text style={styles.viewBtnText}>
                   {t("counterPending")} ({counterCounts.pending})
                 </Text>
-              </Pressable>
+              </View>
             ) : hasWithdrawnOffers ? (
               <Text style={styles.smallMuted}>
                 {t("withdrawnOffers")} ({offerCounts.withdrawn})
@@ -524,6 +563,14 @@ export default function MyRequestsScreen() {
           }
         />
       )}
+
+      {/* Fullscreen image viewer */}
+      <ImageViewer
+        images={viewerImages}
+        visible={viewerVisible}
+        initialIndex={0}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }

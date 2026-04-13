@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { Alert } from "react-native"; // add at top if missing
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -14,9 +15,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
-import { useApp } from "../../src/context/useApp";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./marketplace.styles";
 
@@ -55,7 +56,64 @@ type RequestRow = {
   status: "active" | "closed";
   created_at: string;
   location: string | null;
-  profiles?: { email: string | null } | null; // ✅ joined from profiles
+  open_budget: boolean | null;
+  posting_as: string | null;
+  budget_type: string | null;
+  timeline: string | null;
+  preferred_schedule: string | null;
+  duration: string | null;
+  workers_needed: number | null;
+  work_mode: string | null;
+  experience_level: string | null;
+  equipment: string | null;
+  scheduled_date: string | null;
+  special_requirements: string | null;
+  photos: string[] | null;
+  profiles?: { display_name: string | null } | null;
+};
+
+const scheduleKeys: Record<string, string> = {
+  anytime: "scheduleAnytime",
+  weekdays: "scheduleWeekdays",
+  weekends: "scheduleWeekends",
+  specific_date: "scheduleSpecificDate",
+};
+
+const durationKeys: Record<string, string> = {
+  few_hours: "durationHours",
+  full_day: "durationDay",
+  multi_day: "durationMultiDay",
+  recurring: "durationRecurring",
+};
+
+const workModeKeys: Record<string, string> = {
+  onsite: "workOnsite",
+  remote: "workRemote",
+  hybrid: "workHybrid",
+};
+
+const experienceKeys: Record<string, string> = {
+  any: "experienceAny",
+  beginner: "experienceBeginner",
+  experienced: "experienceExperienced",
+  expert: "experienceExpert",
+};
+
+const budgetTypeKeys: Record<string, string> = {
+  per_hour: "budgetPerHour",
+  per_day: "budgetPerDay",
+  fixed: "budgetFixed",
+};
+
+const equipmentKeys: Record<string, string> = {
+  not_needed: "equipmentNotNeeded",
+  pro_provides: "equipmentPro",
+  client_provides: "equipmentClient",
+};
+
+const postingAsKeys: Record<string, string> = {
+  seeking: "postingSeeking",
+  offering: "postingOffering",
 };
 
 const { width } = Dimensions.get("window");
@@ -63,8 +121,6 @@ const SWIPE_THRESHOLD = Math.min(120, width * 0.28);
 
 export default function MarketplaceScreen() {
   const t = useTranslation();
-  // keep your app-context action for now
-  const { addInterestedRequest } = useApp();
 
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,8 +169,21 @@ export default function MarketplaceScreen() {
     created_at,
     location,
     user_id,
+    open_budget,
+    posting_as,
+    budget_type,
+    timeline,
+    preferred_schedule,
+    duration,
+    workers_needed,
+    work_mode,
+    experience_level,
+    equipment,
+    scheduled_date,
+    special_requirements,
+    photos,
     profiles!requests_user_id_fkey (
-      email
+      display_name
     )
   `,
       )
@@ -146,7 +215,7 @@ export default function MarketplaceScreen() {
     setRequests((data ?? []) as any);
     setCurrentIndex(0);
     setLoading(false);
-  }, []);
+  }, [t]);
 
   // Refresh when you come back from the modal (or any time this tab focuses)
   useFocusEffect(
@@ -332,6 +401,9 @@ function RequestCard({
 }) {
   const { formatPrice } = useCurrency();
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const [expanded, setExpanded] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const rotate = translate.x.interpolate({
     inputRange: [-200, 0, 200],
@@ -352,7 +424,8 @@ function RequestCard({
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, g) => Math.abs(g.dx) > 6,
+      onMoveShouldSetPanResponder: (_evt, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove: Animated.event(
         [null, { dx: translate.x, dy: translate.y }],
         { useNativeDriver: false },
@@ -393,8 +466,53 @@ function RequestCard({
   ).current;
 
   const progress = total === 0 ? 0 : (remaining / total) * 100;
+  const postedBy = request.profiles?.display_name ?? null;
+  const photos = request.photos ?? [];
 
-  const email = request.profiles?.email ?? "unknown";
+  const budgetText = request.open_budget
+    ? t("openBudget")
+    : request.budget_type &&
+        request.budget_type !== "range" &&
+        budgetTypeKeys[request.budget_type]
+      ? `${formatPrice(request.budget_min)} ${t(budgetTypeKeys[request.budget_type])}`
+      : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`;
+
+  const detailRows: { label: string; value: string }[] = [];
+  if (request.preferred_schedule && scheduleKeys[request.preferred_schedule])
+    detailRows.push({
+      label: t("preferredSchedule"),
+      value: t(scheduleKeys[request.preferred_schedule]),
+    });
+  if (request.preferred_schedule === "specific_date" && request.scheduled_date)
+    detailRows.push({
+      label: t("scheduledDate"),
+      value: request.scheduled_date,
+    });
+  if (request.duration && durationKeys[request.duration])
+    detailRows.push({
+      label: t("durationLabel"),
+      value: t(durationKeys[request.duration]),
+    });
+  if (request.workers_needed != null)
+    detailRows.push({
+      label: t("workersLabel"),
+      value: String(request.workers_needed),
+    });
+  if (request.work_mode && workModeKeys[request.work_mode])
+    detailRows.push({
+      label: t("workModeLabel"),
+      value: t(workModeKeys[request.work_mode]),
+    });
+  if (request.experience_level && experienceKeys[request.experience_level])
+    detailRows.push({
+      label: t("experienceLabel"),
+      value: t(experienceKeys[request.experience_level]),
+    });
+  if (request.equipment && equipmentKeys[request.equipment])
+    detailRows.push({
+      label: t("equipmentLabel"),
+      value: t(equipmentKeys[request.equipment]),
+    });
 
   return (
     <View style={styles.cardWrap}>
@@ -405,7 +523,6 @@ function RequestCard({
             {remaining} {t("remaining_left")}
           </Text>
         </View>
-
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
@@ -429,22 +546,77 @@ function RequestCard({
             },
           ]}
         >
-          <View style={styles.cardContent}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {t(categoryTranslationKeys[request.category] || "other")}
-              </Text>
+          {/* Scrollable content */}
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.cardBody}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+          >
+            {/* Photo strip at top */}
+            {photos.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbRow}
+              >
+                {photos.map((uri, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => {
+                      setViewerIndex(i);
+                      setViewerVisible(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={styles.thumb}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Badges */}
+            <View style={styles.badgeRow}>
+              <View
+                style={[
+                  styles.badge,
+                  request.posting_as === "offering"
+                    ? styles.badgeOffering
+                    : styles.badgeSeeking,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeText,
+                    request.posting_as === "offering"
+                      ? styles.badgeTextOffering
+                      : styles.badgeTextSeeking,
+                  ]}
+                >
+                  {request.posting_as === "offering"
+                    ? t("postingOffering")
+                    : t("postingSeeking")}
+                </Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {t(categoryTranslationKeys[request.category] || "other")}
+                </Text>
+              </View>
             </View>
 
+            {/* Title */}
             <Text style={styles.title}>{request.title}</Text>
+            {!!postedBy && (
+              <Text style={styles.postedBy}>
+                {t("postedBy")} {postedBy}
+              </Text>
+            )}
 
-            {/* ✅ Posted by email */}
-            <Text style={styles.postedBy}>
-              {t("postedBy")} {email}
-            </Text>
-
-            <Text style={styles.desc}>{request.description}</Text>
-
+            {/* Budget + location */}
             <View style={styles.details}>
               <View style={styles.detailRow}>
                 <Feather
@@ -452,12 +624,8 @@ function RequestCard({
                   size={16}
                   color={theme.secondaryText}
                 />
-                <Text style={styles.detailText}>
-                  {formatPrice(request.budget_min)} –{" "}
-                  {formatPrice(request.budget_max)}
-                </Text>
+                <Text style={styles.detailText}>{budgetText}</Text>
               </View>
-
               {!!request.location && (
                 <View style={styles.detailRow}>
                   <Feather
@@ -468,13 +636,73 @@ function RequestCard({
                   <Text style={styles.detailText}>{request.location}</Text>
                 </View>
               )}
+            </View>
 
+            {/* Description — truncated when collapsed */}
+            {!!request.description && (
+              <Pressable onPress={() => setExpanded((prev) => !prev)}>
+                <Text style={styles.desc} numberOfLines={expanded ? 0 : 1}>
+                  {request.description}
+                </Text>
+                <Text style={styles.expandInline}>
+                  {expanded ? t("showLess") : t("showMore")}
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Detail info — max 3 rows, indicator if more exist */}
+            {detailRows.length > 0 &&
+              (() => {
+                const PREVIEW = 3;
+                const preview = detailRows.slice(0, PREVIEW);
+                const hiddenCount =
+                  detailRows.length -
+                  PREVIEW +
+                  (request.special_requirements ? 1 : 0);
+                return (
+                  <>
+                    <View style={styles.detailGrid}>
+                      {preview.map((d, i) => (
+                        <View key={i} style={styles.detailGridItem}>
+                          <Text style={styles.detailGridLabel}>{d.label}</Text>
+                          <Text style={styles.detailGridValue}>{d.value}</Text>
+                        </View>
+                      ))}
+                      {hiddenCount > 0 && (
+                        <View style={styles.detailGridItem}>
+                          <Text style={styles.detailGridMoreLabel}>
+                            +{hiddenCount} {t("moreDetails")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                );
+              })()}
+
+            {/* Posted date */}
+            <View style={styles.detailRow}>
+              <Feather name="clock" size={16} color={theme.secondaryText} />
               <Text style={styles.posted}>
                 {t("posted")}{" "}
                 {new Date(request.created_at).toLocaleDateString()}
               </Text>
             </View>
-          </View>
+          </ScrollView>
+
+          {/* View full details — pinned at bottom of card */}
+          <Pressable
+            style={styles.viewDetailsBtn}
+            onPress={() =>
+              router.push({
+                pathname: "/request/[id]",
+                params: { id: request.id },
+              } as any)
+            }
+          >
+            <Text style={styles.viewDetailsBtnText}>{t("showDetails")}</Text>
+            <Feather name="arrow-right" size={14} color={theme.primary} />
+          </Pressable>
 
           {/* Swipe indicators */}
           <Animated.View
@@ -482,7 +710,6 @@ function RequestCard({
           >
             <Text style={styles.indicatorText}>{t("skip")}</Text>
           </Animated.View>
-
           <Animated.View
             style={[styles.indicatorRight, { opacity: rightOpacity }]}
           >
@@ -490,6 +717,14 @@ function RequestCard({
           </Animated.View>
         </Animated.View>
       </View>
+
+      {/* Fullscreen image viewer */}
+      <ImageViewer
+        images={photos}
+        visible={viewerVisible}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }

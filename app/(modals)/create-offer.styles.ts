@@ -10,7 +10,7 @@ export const theme = {
 };
 
 export const styles = StyleSheet.create({
-  page: { flex: 1, paddingHorizontal: 16, paddingTop: 14, gap: 10 },
+  page: { flex: 1, paddingHorizontal: 16, paddingTop: 8, gap: 10 },
 
   headerRow: {
     flexDirection: "row",
