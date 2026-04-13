@@ -45,7 +45,7 @@ const workModeKeys: Record<string, string> = {
 
 const experienceKeys: Record<string, string> = {
   any: "experienceAny",
-  beginner: "experianceBeginner",
+  beginner: "experienceBeginner",
   experienced: "experienceExperienced",
   expert: "experienceExpert",
 };
