@@ -341,7 +341,9 @@ export default function CreateRequestModal() {
                 );
               })}
             </ScrollView>
-            <Text style={styles.label}>{t("offeringBudgetType")}</Text>
+            <Text style={styles.label}>
+              {isOffering ? t("offeringBudgetType") : t("budgetType")}
+            </Text>
 
             {isOffering && (
               <>
