@@ -23,10 +23,11 @@ import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 import { styles } from "./my-offers.styles";
 
-const timelineKeys: Record<string, string> = {
-  asap: "timelineAsap",
-  specific_date: "timelineDate",
-  flexible: "timelineFlexible",
+const scheduleKeys: Record<string, string> = {
+  anytime: "scheduleAnytime",
+  weekdays: "scheduleWeekdays",
+  weekends: "scheduleWeekends",
+  specific_date: "scheduleSpecificDate",
 };
 
 const durationKeys: Record<string, string> = {
@@ -47,6 +48,17 @@ const experienceKeys: Record<string, string> = {
   beginner: "experianceBeginner",
   experienced: "experienceExperienced",
   expert: "experienceExpert",
+};
+
+const equipmentKeys: Record<string, string> = {
+  not_needed: "equipmentNotNeeded",
+  pro_provides: "equipmentPro",
+  client_provides: "equipmentClient",
+};
+
+const postingAsKeys: Record<string, string> = {
+  seeking: "postingSeeking",
+  offering: "postingOffering",
 };
 
 const budgetTypeKeys: Record<string, string> = {
@@ -86,6 +98,10 @@ type RequestRow = {
   workers_needed: number | null;
   work_mode: string | null;
   experience_level: string | null;
+  equipment: string | null;
+  preferred_schedule: string | null;
+  scheduled_date: string | null;
+  special_requirements: string | null;
   photos: string[] | null;
   profiles?: { display_name: string | null } | null;
 };
@@ -213,10 +229,15 @@ export default function MyOffersScreen() {
           posting_as,
           budget_type,
           timeline,
+          preferred_schedule,
           duration,
           workers_needed,
           work_mode,
           experience_level,
+          equipment,
+          preferred_schedule,
+          scheduled_date,
+          special_requirements,
           photos,
           profiles!requests_user_id_fkey ( display_name )
         )
@@ -919,17 +940,36 @@ export default function MyOffersScreen() {
                     {isDetailsOpen &&
                       (() => {
                         const rows: { label: string; value: string }[] = [];
-                        if (request.timeline && timelineKeys[request.timeline])
+                        if (
+                          request.posting_as &&
+                          postingAsKeys[request.posting_as]
+                        )
                           rows.push({
-                            label: t("timelineLabel"),
-                            value: t(timelineKeys[request.timeline]),
+                            label: t("postingAs"),
+                            value: t(postingAsKeys[request.posting_as]),
+                          });
+                        if (
+                          request.preferred_schedule &&
+                          scheduleKeys[request.preferred_schedule]
+                        )
+                          rows.push({
+                            label: t("preferredSchedule"),
+                            value: t(scheduleKeys[request.preferred_schedule]),
+                          });
+                        if (
+                          request.preferred_schedule === "specific_date" &&
+                          request.scheduled_date
+                        )
+                          rows.push({
+                            label: t("scheduledDate"),
+                            value: request.scheduled_date,
                           });
                         if (request.duration && durationKeys[request.duration])
                           rows.push({
                             label: t("durationLabel"),
                             value: t(durationKeys[request.duration]),
                           });
-                        if ((request.workers_needed ?? 1) > 1)
+                        if (request.workers_needed != null)
                           rows.push({
                             label: t("workersLabel"),
                             value: String(request.workers_needed),
@@ -944,27 +984,47 @@ export default function MyOffersScreen() {
                           });
                         if (
                           request.experience_level &&
-                          request.experience_level !== "any" &&
                           experienceKeys[request.experience_level]
                         )
                           rows.push({
                             label: t("experienceLabel"),
                             value: t(experienceKeys[request.experience_level]),
                           });
-                        if (rows.length === 0) return null;
+                        if (
+                          request.equipment &&
+                          equipmentKeys[request.equipment]
+                        )
+                          rows.push({
+                            label: t("equipmentLabel"),
+                            value: t(equipmentKeys[request.equipment]),
+                          });
                         return (
-                          <View style={styles.detailGrid}>
-                            {rows.map((d, i) => (
-                              <View key={i} style={styles.detailGridItem}>
+                          <>
+                            {rows.length > 0 && (
+                              <View style={styles.detailGrid}>
+                                {rows.map((d, i) => (
+                                  <View key={i} style={styles.detailGridItem}>
+                                    <Text style={styles.detailGridLabel}>
+                                      {d.label}
+                                    </Text>
+                                    <Text style={styles.detailGridValue}>
+                                      {d.value}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                            {!!request.special_requirements && (
+                              <View style={styles.specialReqBox}>
                                 <Text style={styles.detailGridLabel}>
-                                  {d.label}
+                                  {t("specialRequirementsLabel")}
                                 </Text>
-                                <Text style={styles.detailGridValue}>
-                                  {d.value}
+                                <Text style={styles.specialReqText}>
+                                  {request.special_requirements}
                                 </Text>
                               </View>
-                            ))}
-                          </View>
+                            )}
+                          </>
                         );
                       })()}
 

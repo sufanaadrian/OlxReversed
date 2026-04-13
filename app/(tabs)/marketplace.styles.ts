@@ -169,7 +169,15 @@ export const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
   },
+  badgeSeeking: {
+    backgroundColor: "#DBEAFE",
+  },
+  badgeOffering: {
+    backgroundColor: "#DCFCE7",
+  },
   badgeText: { fontSize: 12, color: theme.primaryText, fontWeight: "700" },
+  badgeTextSeeking: { color: "#1e40af" },
+  badgeTextOffering: { color: "#166534" },
   badgeOutline: {
     borderRadius: 999,
     paddingVertical: 5,
@@ -265,6 +273,28 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     color: theme.primaryText,
+  },
+  detailGridMoreLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.primary,
+    fontStyle: "italic",
+  },
+
+  specialReqBox: {
+    marginTop: 10,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  specialReqText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: theme.primaryText,
+    lineHeight: 18,
   },
 
   viewDetailsBtn: {

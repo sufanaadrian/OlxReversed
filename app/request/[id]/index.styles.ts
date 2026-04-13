@@ -190,6 +190,22 @@ export const styles = StyleSheet.create({
     color: theme.primaryText,
   },
 
+  specialReqBox: {
+    marginTop: 10,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  specialReqText: {
+    marginTop: 4,
+    fontSize: 13,
+    color: theme.primaryText,
+    lineHeight: 18,
+  },
+
   offersHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

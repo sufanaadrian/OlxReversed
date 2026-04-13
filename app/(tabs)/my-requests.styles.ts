@@ -230,4 +230,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   offeringTagText: { fontSize: 11, fontWeight: "900", color: "#166534" },
+  seekingTag: {
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  seekingTagText: { fontSize: 11, fontWeight: "900", color: "#1e40af" },
 });

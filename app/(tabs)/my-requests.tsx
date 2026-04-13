@@ -365,7 +365,11 @@ export default function MyRequestsScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <View />
+                  <View style={styles.seekingTag}>
+                    <Text style={styles.seekingTagText}>
+                      {t("postingSeeking")}
+                    </Text>
+                  </View>
                 )}
                 <View
                   style={[

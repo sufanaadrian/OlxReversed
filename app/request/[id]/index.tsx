@@ -41,6 +41,10 @@ type RequestRow = {
   workers_needed: number | null;
   work_mode: string | null;
   experience_level: string | null;
+  equipment: string | null;
+  preferred_schedule: string | null;
+  scheduled_date: string | null;
+  special_requirements: string | null;
   photos: string[] | null;
 };
 
@@ -99,6 +103,24 @@ const timelineKeys: Record<string, string> = {
   asap: "timelineAsap",
   specific_date: "timelineDate",
   flexible: "timelineFlexible",
+};
+
+const scheduleKeys: Record<string, string> = {
+  anytime: "scheduleAnytime",
+  weekdays: "scheduleWeekdays",
+  weekends: "scheduleWeekends",
+  specific_date: "scheduleSpecificDate",
+};
+
+const equipmentKeys: Record<string, string> = {
+  not_needed: "equipmentNotNeeded",
+  pro_provides: "equipmentPro",
+  client_provides: "equipmentClient",
+};
+
+const postingAsKeys: Record<string, string> = {
+  seeking: "postingSeeking",
+  offering: "postingOffering",
 };
 
 const durationKeys: Record<string, string> = {
@@ -169,7 +191,7 @@ export default function RequestDetailScreen() {
     const { data, error } = await supabase
       .from("requests")
       .select(
-        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,duration,workers_needed,work_mode,experience_level,photos",
+        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,preferred_schedule,scheduled_date,duration,workers_needed,work_mode,experience_level,equipment,special_requirements,photos",
       )
       .eq("id", id)
       .single();
@@ -424,17 +446,23 @@ export default function RequestDetailScreen() {
     detailBadges.push(t(budgetTypeKeys[request.budget_type]));
 
   const detailRows: { label: string; value: string }[] = [];
-  if (request.timeline && timelineKeys[request.timeline])
+
+  if (request.preferred_schedule && scheduleKeys[request.preferred_schedule])
     detailRows.push({
-      label: t("timelineLabel"),
-      value: t(timelineKeys[request.timeline]),
+      label: t("preferredSchedule"),
+      value: t(scheduleKeys[request.preferred_schedule]),
+    });
+  if (request.preferred_schedule === "specific_date" && request.scheduled_date)
+    detailRows.push({
+      label: t("scheduledDate"),
+      value: request.scheduled_date,
     });
   if (request.duration && durationKeys[request.duration])
     detailRows.push({
       label: t("durationLabel"),
       value: t(durationKeys[request.duration]),
     });
-  if ((request.workers_needed ?? 1) > 1)
+  if (request.workers_needed != null)
     detailRows.push({
       label: t("workersLabel"),
       value: String(request.workers_needed),
@@ -444,23 +472,20 @@ export default function RequestDetailScreen() {
       label: t("workModeLabel"),
       value: t(workModeKeys[request.work_mode]),
     });
-  if (
-    request.experience_level &&
-    request.experience_level !== "any" &&
-    experienceKeys[request.experience_level]
-  )
+  if (request.experience_level && experienceKeys[request.experience_level])
     detailRows.push({
       label: t("experienceLabel"),
       value: t(experienceKeys[request.experience_level]),
     });
-  if (
-    request.budget_type &&
-    request.budget_type !== "range" &&
-    budgetTypeKeys[request.budget_type]
-  )
+  if (request.budget_type && budgetTypeKeys[request.budget_type])
     detailRows.push({
       label: t("budgetTypeLabel"),
       value: t(budgetTypeKeys[request.budget_type]),
+    });
+  if (request.equipment && equipmentKeys[request.equipment])
+    detailRows.push({
+      label: t("equipmentLabel"),
+      value: t(equipmentKeys[request.equipment]),
     });
 
   return (
@@ -657,17 +682,29 @@ export default function RequestDetailScreen() {
           )}
 
           {/* ── Detail info (labeled grid) ── */}
-          {detailRows.length > 0 && (
+          {(detailRows.length > 0 || !!request.special_requirements) && (
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>{t("showDetails")}</Text>
-              <View style={styles.detailGrid}>
-                {detailRows.map((d, i) => (
-                  <View key={i} style={styles.detailGridItem}>
-                    <Text style={styles.detailGridLabel}>{d.label}</Text>
-                    <Text style={styles.detailGridValue}>{d.value}</Text>
-                  </View>
-                ))}
-              </View>
+              {detailRows.length > 0 && (
+                <View style={styles.detailGrid}>
+                  {detailRows.map((d, i) => (
+                    <View key={i} style={styles.detailGridItem}>
+                      <Text style={styles.detailGridLabel}>{d.label}</Text>
+                      <Text style={styles.detailGridValue}>{d.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {!!request.special_requirements && (
+                <View style={styles.specialReqBox}>
+                  <Text style={styles.detailGridLabel}>
+                    {t("specialRequirementsLabel")}
+                  </Text>
+                  <Text style={styles.specialReqText}>
+                    {request.special_requirements}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 

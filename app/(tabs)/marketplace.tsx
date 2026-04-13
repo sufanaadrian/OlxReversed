@@ -60,18 +60,23 @@ type RequestRow = {
   posting_as: string | null;
   budget_type: string | null;
   timeline: string | null;
+  preferred_schedule: string | null;
   duration: string | null;
   workers_needed: number | null;
   work_mode: string | null;
   experience_level: string | null;
+  equipment: string | null;
+  scheduled_date: string | null;
+  special_requirements: string | null;
   photos: string[] | null;
   profiles?: { display_name: string | null } | null;
 };
 
-const timelineKeys: Record<string, string> = {
-  asap: "timelineAsap",
-  specific_date: "timelineDate",
-  flexible: "timelineFlexible",
+const scheduleKeys: Record<string, string> = {
+  anytime: "scheduleAnytime",
+  weekdays: "scheduleWeekdays",
+  weekends: "scheduleWeekends",
+  specific_date: "scheduleSpecificDate",
 };
 
 const durationKeys: Record<string, string> = {
@@ -98,6 +103,17 @@ const budgetTypeKeys: Record<string, string> = {
   per_hour: "budgetPerHour",
   per_day: "budgetPerDay",
   fixed: "budgetFixed",
+};
+
+const equipmentKeys: Record<string, string> = {
+  not_needed: "equipmentNotNeeded",
+  pro_provides: "equipmentPro",
+  client_provides: "equipmentClient",
+};
+
+const postingAsKeys: Record<string, string> = {
+  seeking: "postingSeeking",
+  offering: "postingOffering",
 };
 
 const { width } = Dimensions.get("window");
@@ -157,10 +173,14 @@ export default function MarketplaceScreen() {
     posting_as,
     budget_type,
     timeline,
+    preferred_schedule,
     duration,
     workers_needed,
     work_mode,
     experience_level,
+    equipment,
+    scheduled_date,
+    special_requirements,
     photos,
     profiles!requests_user_id_fkey (
       display_name
@@ -458,17 +478,22 @@ function RequestCard({
       : `${formatPrice(request.budget_min)} \u2013 ${formatPrice(request.budget_max)}`;
 
   const detailRows: { label: string; value: string }[] = [];
-  if (request.timeline && timelineKeys[request.timeline])
+  if (request.preferred_schedule && scheduleKeys[request.preferred_schedule])
     detailRows.push({
-      label: t("timelineLabel"),
-      value: t(timelineKeys[request.timeline]),
+      label: t("preferredSchedule"),
+      value: t(scheduleKeys[request.preferred_schedule]),
+    });
+  if (request.preferred_schedule === "specific_date" && request.scheduled_date)
+    detailRows.push({
+      label: t("scheduledDate"),
+      value: request.scheduled_date,
     });
   if (request.duration && durationKeys[request.duration])
     detailRows.push({
       label: t("durationLabel"),
       value: t(durationKeys[request.duration]),
     });
-  if ((request.workers_needed ?? 1) > 1)
+  if (request.workers_needed != null)
     detailRows.push({
       label: t("workersLabel"),
       value: String(request.workers_needed),
@@ -478,14 +503,15 @@ function RequestCard({
       label: t("workModeLabel"),
       value: t(workModeKeys[request.work_mode]),
     });
-  if (
-    request.experience_level &&
-    request.experience_level !== "any" &&
-    experienceKeys[request.experience_level]
-  )
+  if (request.experience_level && experienceKeys[request.experience_level])
     detailRows.push({
       label: t("experienceLabel"),
       value: t(experienceKeys[request.experience_level]),
+    });
+  if (request.equipment && equipmentKeys[request.equipment])
+    detailRows.push({
+      label: t("equipmentLabel"),
+      value: t(equipmentKeys[request.equipment]),
     });
 
   return (
@@ -554,13 +580,27 @@ function RequestCard({
 
             {/* Badges */}
             <View style={styles.badgeRow}>
-              {request.posting_as === "offering" && (
-                <View style={[styles.badge, { backgroundColor: "#DCFCE7" }]}>
-                  <Text style={[styles.badgeText, { color: "#166534" }]}>
-                    {t("postingOffering")}
-                  </Text>
-                </View>
-              )}
+              <View
+                style={[
+                  styles.badge,
+                  request.posting_as === "offering"
+                    ? styles.badgeOffering
+                    : styles.badgeSeeking,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeText,
+                    request.posting_as === "offering"
+                      ? styles.badgeTextOffering
+                      : styles.badgeTextSeeking,
+                  ]}
+                >
+                  {request.posting_as === "offering"
+                    ? t("postingOffering")
+                    : t("postingSeeking")}
+                </Text>
+              </View>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {t(categoryTranslationKeys[request.category] || "other")}
@@ -601,7 +641,7 @@ function RequestCard({
             {/* Description — truncated when collapsed */}
             {!!request.description && (
               <Pressable onPress={() => setExpanded((prev) => !prev)}>
-                <Text style={styles.desc} numberOfLines={expanded ? 0 : 3}>
+                <Text style={styles.desc} numberOfLines={expanded ? 0 : 1}>
                   {request.description}
                 </Text>
                 <Text style={styles.expandInline}>
@@ -610,17 +650,35 @@ function RequestCard({
               </Pressable>
             )}
 
-            {/* Detail info — labeled rows, readable for new users */}
-            {detailRows.length > 0 && (
-              <View style={styles.detailGrid}>
-                {detailRows.map((d, i) => (
-                  <View key={i} style={styles.detailGridItem}>
-                    <Text style={styles.detailGridLabel}>{d.label}</Text>
-                    <Text style={styles.detailGridValue}>{d.value}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            {/* Detail info — max 3 rows, indicator if more exist */}
+            {detailRows.length > 0 &&
+              (() => {
+                const PREVIEW = 3;
+                const preview = detailRows.slice(0, PREVIEW);
+                const hiddenCount =
+                  detailRows.length -
+                  PREVIEW +
+                  (request.special_requirements ? 1 : 0);
+                return (
+                  <>
+                    <View style={styles.detailGrid}>
+                      {preview.map((d, i) => (
+                        <View key={i} style={styles.detailGridItem}>
+                          <Text style={styles.detailGridLabel}>{d.label}</Text>
+                          <Text style={styles.detailGridValue}>{d.value}</Text>
+                        </View>
+                      ))}
+                      {hiddenCount > 0 && (
+                        <View style={styles.detailGridItem}>
+                          <Text style={styles.detailGridMoreLabel}>
+                            +{hiddenCount} {t("moreDetails")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                );
+              })()}
 
             {/* Posted date */}
             <View style={styles.detailRow}>

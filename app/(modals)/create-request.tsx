@@ -37,12 +37,11 @@ const categoryTranslationKeys: Record<string, string> = {
   Other: "other",
 };
 
-type Timeline = "asap" | "specific_date" | "flexible";
 type Duration = "few_hours" | "full_day" | "multi_day" | "recurring";
 type WorkMode = "onsite" | "remote" | "hybrid";
 type Experience = "any" | "beginner" | "experienced" | "expert";
 type Equipment = "not_needed" | "pro_provides" | "client_provides";
-type Schedule = "anytime" | "weekdays" | "weekends";
+type Schedule = "anytime" | "weekdays" | "weekends" | "specific_date";
 type PostingMode = "seeking" | "offering";
 type BudgetType = "range" | "per_hour" | "per_day" | "fixed";
 
@@ -68,7 +67,6 @@ export default function CreateRequestModal() {
   const [location, setLocation] = useState("");
 
   // ── Job Specifics ────────────────────────────────────────────────
-  const [timeline, setTimeline] = useState<Timeline>("asap");
   const [scheduledDate, setScheduledDate] = useState("");
   const [duration, setDuration] = useState<Duration>("few_hours");
   const [workers, setWorkers] = useState(1);
@@ -200,11 +198,13 @@ export default function CreateRequestModal() {
         status: "active",
         posting_as: postingAs,
         budget_type: openBudget ? null : budgetType,
-        timeline,
+        timeline: null,
         scheduled_date:
-          timeline === "specific_date" ? scheduledDate.trim() || null : null,
-        duration,
-        workers_needed: workers,
+          preferredSchedule === "specific_date"
+            ? scheduledDate.trim() || null
+            : null,
+        duration: isOffering ? duration : null,
+        workers_needed: isOffering ? workers : null,
         work_mode: workMode,
         experience_level: experience,
         equipment,
@@ -262,7 +262,10 @@ export default function CreateRequestModal() {
                   styles.modeCard,
                   postingAs === "seeking" && styles.modeCardActive,
                 ]}
-                onPress={() => setPostingAs("seeking")}
+                onPress={() => {
+                  setPostingAs("seeking");
+                  setBudgetType("range");
+                }}
               >
                 <Text style={styles.modeIcon}>🔍</Text>
                 <Text style={styles.modeTitle}>{t("postingSeeking")}</Text>
@@ -338,44 +341,46 @@ export default function CreateRequestModal() {
                 );
               })}
             </ScrollView>
+            <Text style={styles.label}>{t("offeringBudgetType")}</Text>
 
-            <Text style={styles.label}>
-              {isOffering ? t("offeringBudgetType") : t("budgetType")}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {(["range", "per_hour", "per_day", "fixed"] as BudgetType[]).map(
-                (v) => (
-                  <Pressable
-                    key={v}
-                    style={[
-                      styles.chip,
-                      !openBudget && budgetType === v && styles.chipActive,
-                      openBudget && { opacity: 0.4 },
-                    ]}
-                    onPress={() => {
-                      if (!openBudget) setBudgetType(v);
-                    }}
-                  >
-                    <Text
+            {isOffering && (
+              <>
+                <View style={styles.chipsWrap}>
+                  {(
+                    ["range", "per_hour", "per_day", "fixed"] as BudgetType[]
+                  ).map((v) => (
+                    <Pressable
+                      key={v}
                       style={[
-                        styles.chipText,
-                        !openBudget &&
-                          budgetType === v &&
-                          styles.chipTextActive,
+                        styles.chip,
+                        !openBudget && budgetType === v && styles.chipActive,
+                        openBudget && { opacity: 0.4 },
                       ]}
+                      onPress={() => {
+                        if (!openBudget) setBudgetType(v);
+                      }}
                     >
-                      {v === "range"
-                        ? t("budgetTypeRange")
-                        : v === "per_hour"
-                          ? t("budgetPerHour")
-                          : v === "per_day"
-                            ? t("budgetPerDay")
-                            : t("budgetFixed")}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-            </View>
+                      <Text
+                        style={[
+                          styles.chipText,
+                          !openBudget &&
+                            budgetType === v &&
+                            styles.chipTextActive,
+                        ]}
+                      >
+                        {v === "range"
+                          ? t("budgetTypeRange")
+                          : v === "per_hour"
+                            ? t("budgetPerHour")
+                            : v === "per_day"
+                              ? t("budgetPerDay")
+                              : t("budgetFixed")}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
 
             {!openBudget && budgetType === "range" && (
               <View style={[styles.budgetRow, { marginTop: 10 }]}>
@@ -446,107 +451,66 @@ export default function CreateRequestModal() {
             />
           </View>
 
-          {/* ── Section 2: Job Specifics ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("jobSectionSpecifics")}</Text>
+          {/* ── Section 2: Job Specifics (offering mode only) ── */}
+          {isOffering && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                {t("jobSectionSpecifics")}
+              </Text>
 
-            <Text style={[styles.label, styles.labelFirst]}>
-              {isOffering ? t("offeringTimeline") : t("timeline")}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {(["asap", "specific_date", "flexible"] as Timeline[]).map(
-                (v) => (
+              <Text style={[styles.label, styles.labelFirst]}>
+                {t("offeringDuration")}
+              </Text>
+              <View style={styles.chipsWrap}>
+                {(
+                  [
+                    "few_hours",
+                    "full_day",
+                    "multi_day",
+                    "recurring",
+                  ] as Duration[]
+                ).map((v) => (
                   <Pressable
                     key={v}
-                    style={[styles.chip, timeline === v && styles.chipActive]}
-                    onPress={() => setTimeline(v)}
+                    style={[styles.chip, duration === v && styles.chipActive]}
+                    onPress={() => setDuration(v)}
                   >
                     <Text
                       style={[
                         styles.chipText,
-                        timeline === v && styles.chipTextActive,
+                        duration === v && styles.chipTextActive,
                       ]}
                     >
-                      {v === "asap"
-                        ? t("timelineAsap")
-                        : v === "specific_date"
-                          ? t("timelineDate")
-                          : t("timelineFlexible")}
+                      {v === "few_hours"
+                        ? t("durationHours")
+                        : v === "full_day"
+                          ? t("durationDay")
+                          : v === "multi_day"
+                            ? t("durationMultiDay")
+                            : t("durationRecurring")}
                     </Text>
                   </Pressable>
-                ),
-              )}
-            </View>
+                ))}
+              </View>
 
-            {timeline === "specific_date" && (
-              <>
-                <Text style={styles.label}>{t("scheduledDate")}</Text>
-                <TextInput
-                  value={scheduledDate}
-                  onChangeText={setScheduledDate}
-                  placeholder={t("scheduledDatePlaceholder")}
-                  placeholderTextColor={theme.secondaryText}
-                  style={styles.input}
-                />
-              </>
-            )}
-
-            <Text style={styles.label}>
-              {isOffering ? t("offeringDuration") : t("duration")}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {(
-                [
-                  "few_hours",
-                  "full_day",
-                  "multi_day",
-                  "recurring",
-                ] as Duration[]
-              ).map((v) => (
+              <Text style={styles.label}>{t("workersNeeded")}</Text>
+              <View style={styles.stepperRow}>
                 <Pressable
-                  key={v}
-                  style={[styles.chip, duration === v && styles.chipActive]}
-                  onPress={() => setDuration(v)}
+                  style={styles.stepperBtn}
+                  onPress={() => setWorkers((v) => Math.max(1, v - 1))}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      duration === v && styles.chipTextActive,
-                    ]}
-                  >
-                    {v === "few_hours"
-                      ? t("durationHours")
-                      : v === "full_day"
-                        ? t("durationDay")
-                        : v === "multi_day"
-                          ? t("durationMultiDay")
-                          : t("durationRecurring")}
-                  </Text>
+                  <Text style={styles.stepperBtnText}>−</Text>
                 </Pressable>
-              ))}
+                <Text style={styles.stepperValue}>{workers}</Text>
+                <Pressable
+                  style={styles.stepperBtn}
+                  onPress={() => setWorkers((v) => Math.min(20, v + 1))}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </Pressable>
+              </View>
             </View>
-
-            {!isOffering && (
-              <>
-                <Text style={styles.label}>{t("workersNeeded")}</Text>
-                <View style={styles.stepperRow}>
-                  <Pressable
-                    style={styles.stepperBtn}
-                    onPress={() => setWorkers((v) => Math.max(1, v - 1))}
-                  >
-                    <Text style={styles.stepperBtnText}>−</Text>
-                  </Pressable>
-                  <Text style={styles.stepperValue}>{workers}</Text>
-                  <Pressable
-                    style={styles.stepperBtn}
-                    onPress={() => setWorkers((v) => Math.min(20, v + 1))}
-                  >
-                    <Text style={styles.stepperBtnText}>+</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-          </View>
+          )}
 
           {/* ── Section 3: Context ── */}
           <View style={styles.section}>
@@ -642,7 +606,14 @@ export default function CreateRequestModal() {
               {isOffering ? t("offeringAvailability") : t("preferredSchedule")}
             </Text>
             <View style={styles.chipsWrap}>
-              {(["anytime", "weekdays", "weekends"] as Schedule[]).map((v) => (
+              {(
+                [
+                  "anytime",
+                  "weekdays",
+                  "weekends",
+                  "specific_date",
+                ] as Schedule[]
+              ).map((v) => (
                 <Pressable
                   key={v}
                   style={[
@@ -661,11 +632,26 @@ export default function CreateRequestModal() {
                       ? t("scheduleAnytime")
                       : v === "weekdays"
                         ? t("scheduleWeekdays")
-                        : t("scheduleWeekends")}
+                        : v === "weekends"
+                          ? t("scheduleWeekends")
+                          : t("scheduleSpecificDate")}
                   </Text>
                 </Pressable>
               ))}
             </View>
+
+            {preferredSchedule === "specific_date" && (
+              <>
+                <Text style={styles.label}>{t("scheduledDate")}</Text>
+                <TextInput
+                  value={scheduledDate}
+                  onChangeText={setScheduledDate}
+                  placeholder={t("scheduledDatePlaceholder")}
+                  placeholderTextColor={theme.secondaryText}
+                  style={styles.input}
+                />
+              </>
+            )}
 
             <Text style={styles.label}>{t("specialRequirements")}</Text>
             <TextInput
