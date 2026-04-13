@@ -235,7 +235,6 @@ export default function MyOffersScreen() {
           work_mode,
           experience_level,
           equipment,
-          preferred_schedule,
           scheduled_date,
           special_requirements,
           photos,
