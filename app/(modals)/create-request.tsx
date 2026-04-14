@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -49,6 +49,8 @@ const MAX_PHOTOS = 5;
 
 export default function CreateRequestModal() {
   const t = useTranslation();
+  const { requestId } = useLocalSearchParams<{ requestId?: string }>();
+  const isEditMode = !!requestId;
 
   // ── Posting mode ──────────────────────────────────────────────────
   const [postingAs, setPostingAs] = useState<PostingMode>("seeking");
@@ -82,6 +84,46 @@ export default function CreateRequestModal() {
   // ── Photos ───────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // ── Populate from DB in edit mode ────────────────────────────────
+  useEffect(() => {
+    if (!requestId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (error || !data) {
+        Alert.alert(t("error"), error?.message ?? t("requestNotFound"));
+        router.back();
+        return;
+      }
+      setPostingAs((data.posting_as as PostingMode) ?? "seeking");
+      setTitle(data.title ?? "");
+      setDescription(data.description ?? "");
+      setCategory((data.category as (typeof categories)[number]) ?? "Services");
+      setOpenBudget(data.open_budget ?? false);
+      const type = (data.budget_type as BudgetType) ?? "range";
+      setBudgetType(type);
+      if (type === "range") {
+        setBudgetMin(data.budget_min != null ? String(data.budget_min) : "");
+        setBudgetMax(data.budget_max != null ? String(data.budget_max) : "");
+      } else {
+        setBudgetAmount(data.budget_min != null ? String(data.budget_min) : "");
+      }
+      setLocation(data.location ?? "");
+      setDuration((data.duration as Duration) ?? "few_hours");
+      setWorkers(data.workers_needed ?? 1);
+      setWorkMode((data.work_mode as WorkMode) ?? "onsite");
+      setExperience((data.experience_level as Experience) ?? "any");
+      setEquipment((data.equipment as Equipment) ?? "not_needed");
+      setPreferredSchedule((data.preferred_schedule as Schedule) ?? "anytime");
+      setScheduledDate(data.scheduled_date ?? "");
+      setSpecialRequirements(data.special_requirements ?? "");
+      setPhotos(data.photos ?? []);
+    })();
+  }, [requestId, t]);
 
   const canSubmit = useMemo(() => {
     if (!title.trim()) return false;
@@ -163,15 +205,14 @@ export default function CreateRequestModal() {
   };
 
   const submit = async () => {
-    const guard = await requireAuth("/create-request");
-    if (!guard.ok) return;
-
     setLoading(true);
     try {
-      const photoUrls: string[] =
-        photos.length > 0 ? await Promise.all(photos.map(uploadPhoto)) : [];
+      const photoUrls: string[] = await Promise.all(
+        photos.map((uri) =>
+          uri.startsWith("https://") ? Promise.resolve(uri) : uploadPhoto(uri),
+        ),
+      );
 
-      // Build budget values based on selected type
       let bMin: number | null = null;
       let bMax: number | null = null;
       if (!openBudget) {
@@ -185,17 +226,14 @@ export default function CreateRequestModal() {
         }
       }
 
-      const { error } = await supabase.from("requests").insert({
-        user_id: guard.userId,
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         category,
-        type: "service",
         budget_min: bMin,
         budget_max: bMax,
         open_budget: openBudget,
         location: location.trim() || null,
-        status: "active",
         posting_as: postingAs,
         budget_type: openBudget ? null : budgetType,
         timeline: null,
@@ -211,7 +249,24 @@ export default function CreateRequestModal() {
         preferred_schedule: preferredSchedule,
         special_requirements: specialRequirements.trim() || null,
         photos: photoUrls,
-      });
+      };
+
+      let error;
+      if (isEditMode) {
+        ({ error } = await supabase
+          .from("requests")
+          .update(payload)
+          .eq("id", requestId));
+      } else {
+        const guard = await requireAuth("/create-request");
+        if (!guard.ok) return;
+        ({ error } = await supabase.from("requests").insert({
+          ...payload,
+          user_id: guard.userId,
+          type: "service",
+          status: "active",
+        }));
+      }
 
       if (error) throw error;
       router.back();
@@ -233,7 +288,9 @@ export default function CreateRequestModal() {
           <Pressable onPress={() => router.back()} style={styles.headerBtn}>
             <Text style={styles.headerBtnText}>{t("cancel")}</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>{t("postARequest")}</Text>
+          <Text style={styles.headerTitle}>
+            {isEditMode ? t("editRequest") : t("postARequest")}
+          </Text>
           <Pressable
             onPress={submit}
             disabled={!canSubmit || loading}
@@ -243,7 +300,13 @@ export default function CreateRequestModal() {
             ]}
           >
             <Text style={styles.headerBtnPrimaryText}>
-              {loading ? t("posting") : t("post")}
+              {loading
+                ? isEditMode
+                  ? t("saving")
+                  : t("posting")
+                : isEditMode
+                  ? t("saveChanges")
+                  : t("post")}
             </Text>
           </Pressable>
         </View>
@@ -716,7 +779,13 @@ export default function CreateRequestModal() {
             ]}
           >
             <Text style={styles.submitBtnText}>
-              {loading ? t("uploadingPhotos") : t("postARequest")}
+              {loading
+                ? isEditMode
+                  ? t("saving")
+                  : t("uploadingPhotos")
+                : isEditMode
+                  ? t("saveChanges")
+                  : t("postARequest")}
             </Text>
           </Pressable>
         </ScrollView>

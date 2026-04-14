@@ -248,6 +248,13 @@ export default function MyRequestsScreen() {
       },
     ]);
   };
+  const openEditRequest = (req: RequestRow) => {
+    openRowRef.current?.close();
+    router.push({
+      pathname: "/(modals)/create-request",
+      params: { requestId: req.id },
+    } as any);
+  };
 
   const deleteRequest = async (req: RequestRow) => {
     openRowRef.current?.close();
@@ -291,7 +298,12 @@ export default function MyRequestsScreen() {
           ]}
         >
           <Feather name="trash-2" size={18} color="white" />
-          <Text style={styles.deleteText}>{t("delete")}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => openEditRequest(req)}
+          style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.9 }]}
+        >
+          <Feather name="edit-2" size={18} color="white" />
         </Pressable>
       </View>
     );

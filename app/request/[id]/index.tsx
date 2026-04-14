@@ -982,6 +982,18 @@ export default function RequestDetailScreen() {
           {/* ── Owner actions ── */}
           {isOwner && (
             <View style={styles.ownerActions}>
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(modals)/create-request",
+                    params: { requestId: request.id },
+                  } as any)
+                }
+              >
+                <Text style={styles.primaryBtnText}>{t("editRequest")}</Text>
+              </Pressable>
+
               <Pressable style={styles.dangerBtn} onPress={deleteRequest}>
                 <Text style={styles.dangerText}>{t("deleteRequest")}</Text>
               </Pressable>
