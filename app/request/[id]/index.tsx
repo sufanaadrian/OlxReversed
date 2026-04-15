@@ -934,26 +934,28 @@ export default function RequestDetailScreen() {
                         </View>
                       )}
 
-                      {isPending && !isWithdrawn && (
-                        <View style={styles.offerActions}>
-                          <Pressable
-                            onPress={() => openRejectMenu(offer)}
-                            style={[styles.actionBtn, styles.btnSecondary]}
-                          >
-                            <Text style={styles.btnSecondaryText}>
-                              {t("reject")}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => acceptOffer(offer.id)}
-                            style={[styles.actionBtn, styles.btnPrimary]}
-                          >
-                            <Text style={styles.btnPrimaryText}>
-                              {t("accept")}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      )}
+                      {isPending &&
+                        !isWithdrawn &&
+                        latestCounter?.status !== "pending" && (
+                          <View style={styles.offerActions}>
+                            <Pressable
+                              onPress={() => openRejectMenu(offer)}
+                              style={[styles.actionBtn, styles.btnSecondary]}
+                            >
+                              <Text style={styles.btnSecondaryText}>
+                                {t("reject")}
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => acceptOffer(offer.id)}
+                              style={[styles.actionBtn, styles.btnPrimary]}
+                            >
+                              <Text style={styles.btnPrimaryText}>
+                                {t("accept")}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        )}
 
                       {isAccepted && (
                         <View style={styles.offerActions}>

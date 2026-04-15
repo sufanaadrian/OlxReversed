@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    View,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
 import { useCurrency } from "../../../src/context/CurrencyContext";
@@ -473,26 +473,30 @@ export default function RequestOffersScreen() {
                     </View>
                   )}
 
-                  {/* ✅ Actions only if pending AND not withdrawn */}
-                  {isPending && !isWithdrawn && (
-                    <View style={styles.actionsRow}>
-                      <Pressable
-                        onPress={() => openRejectMenu(o)}
-                        style={[styles.btn, styles.btnSecondary]}
-                      >
-                        <Text style={styles.btnSecondaryText}>
-                          {t("reject")}
-                        </Text>
-                      </Pressable>
+                  {/* Actions only if pending, not withdrawn, and no counter offer is awaiting seller response */}
+                  {isPending &&
+                    !isWithdrawn &&
+                    latestCounter?.status !== "pending" && (
+                      <View style={styles.actionsRow}>
+                        <Pressable
+                          onPress={() => openRejectMenu(o)}
+                          style={[styles.btn, styles.btnSecondary]}
+                        >
+                          <Text style={styles.btnSecondaryText}>
+                            {t("reject")}
+                          </Text>
+                        </Pressable>
 
-                      <Pressable
-                        onPress={() => acceptOffer(o.id)}
-                        style={[styles.btn, styles.btnPrimary]}
-                      >
-                        <Text style={styles.btnPrimaryText}>{t("accept")}</Text>
-                      </Pressable>
-                    </View>
-                  )}
+                        <Pressable
+                          onPress={() => acceptOffer(o.id)}
+                          style={[styles.btn, styles.btnPrimary]}
+                        >
+                          <Text style={styles.btnPrimaryText}>
+                            {t("accept")}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    )}
 
                   {isAccepted && (
                     <View style={styles.actionsRow}>
