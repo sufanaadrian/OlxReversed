@@ -137,6 +137,8 @@ export const translations = {
     deleteRequestConfirm: "Delete request?",
     deleteRequestMsg:
       "This will permanently delete your request (and its offers).",
+    editRequest: "Edit request",
+    saveChanges: "Save",
     deleteConfirm: "Are you sure you want to delete this request?",
     title: "Title",
     category: "Category",
@@ -617,6 +619,8 @@ export const translations = {
     deleteRequestConfirm: "Șterge cererea?",
     deleteRequestMsg:
       "Aceasta va șterge permanent cererea ta (și ofertele acesteia).",
+    editRequest: "Editează cererea",
+    saveChanges: "Salvează",
     deleteConfirm: "Ești sigur că vrei să ștergi această cerere?",
     title: "Titlu",
     category: "Categorie",
