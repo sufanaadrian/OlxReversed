@@ -118,8 +118,18 @@ export const styles = StyleSheet.create({
   },
   desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
 
-  slotsBox: {
+  slotsWrap: {
     marginTop: 8,
+    gap: 4,
+  },
+  slotsLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  slotsBox: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,

@@ -395,18 +395,30 @@ export default function ChatScreen() {
       // Current slots for this offer
       const { data: oSlots } = await supabase
         .from("offer_slots")
-        .select(
-          "availability_id,request_availability!inner(day_of_week,start_time,end_time)",
-        )
+        .select("availability_id")
         .eq("offer_id", accepted.id);
 
-      setCurrentOfferSlots(
-        (oSlots ?? []).map((s: any) => ({
-          day_of_week: s.request_availability.day_of_week,
-          start_time: s.request_availability.start_time,
-          end_time: s.request_availability.end_time,
-        })),
-      );
+      if (oSlots && oSlots.length > 0) {
+        const oAvailIds = oSlots.map((s: any) => s.availability_id);
+        const { data: oAvail } = await supabase
+          .from("request_availability")
+          .select("id,day_of_week,start_time,end_time")
+          .in("id", oAvailIds);
+
+        const oAvailMap = new Map((oAvail ?? []).map((a: any) => [a.id, a]));
+        setCurrentOfferSlots(
+          oSlots
+            .map((s: any) => oAvailMap.get(s.availability_id))
+            .filter(Boolean)
+            .map((a: any) => ({
+              day_of_week: a.day_of_week,
+              start_time: a.start_time,
+              end_time: a.end_time,
+            })),
+        );
+      } else {
+        setCurrentOfferSlots([]);
+      }
 
       // All availability slots for the request
       const { data: avail } = await supabase
@@ -429,22 +441,38 @@ export default function ChatScreen() {
 
       const pendingReq = changeReqs?.[0] ?? null;
       if (pendingReq) {
-        const { data: changeSlots } = await supabase
+        const { data: cSlots } = await supabase
           .from("schedule_change_slots")
-          .select(
-            "availability_id,request_availability!inner(day_of_week,start_time,end_time)",
-          )
+          .select("availability_id")
           .eq("change_request_id", pendingReq.id);
+
+        let parsedSlots: any[] = [];
+        if (cSlots && cSlots.length > 0) {
+          const cAvailIds = cSlots.map((s: any) => s.availability_id);
+          const { data: cAvail } = await supabase
+            .from("request_availability")
+            .select("id,day_of_week,start_time,end_time")
+            .in("id", cAvailIds);
+
+          const cAvailMap = new Map((cAvail ?? []).map((a: any) => [a.id, a]));
+          parsedSlots = cSlots
+            .map((s: any) => {
+              const a = cAvailMap.get(s.availability_id);
+              if (!a) return null;
+              return {
+                availability_id: s.availability_id,
+                day_of_week: a.day_of_week,
+                start_time: a.start_time,
+                end_time: a.end_time,
+              };
+            })
+            .filter(Boolean);
+        }
 
         setPendingChangeRequest({
           id: pendingReq.id,
           requested_by: pendingReq.requested_by,
-          slots: (changeSlots ?? []).map((s: any) => ({
-            availability_id: s.availability_id,
-            day_of_week: s.request_availability.day_of_week,
-            start_time: s.request_availability.start_time,
-            end_time: s.request_availability.end_time,
-          })),
+          slots: parsedSlots,
         });
       } else {
         setPendingChangeRequest(null);
@@ -631,10 +659,11 @@ export default function ChatScreen() {
     };
   }, [requestId, meId]);
 
-  const statusLabel = useMemo(
-    () => (request ? getRequestStatusLabel(request.status, t) : ""),
-    [request, t],
-  );
+  const statusLabel = useMemo(() => {
+    if (!request) return "";
+    if (acceptedOffer?.closed_at) return t("closed");
+    return getRequestStatusLabel(request.status, t);
+  }, [request, acceptedOffer, t]);
 
   const canChat = useMemo(() => {
     if (!acceptedOffer) return false;
@@ -1412,7 +1441,7 @@ export default function ChatScreen() {
                 styles.statusPill,
                 request.status === "open" || request.status === "active"
                   ? styles.pillOpen
-                  : request.status === "matched"
+                  : request.status === "matched" && !acceptedOffer?.closed_at
                     ? styles.pillNegotiating
                     : styles.pillClosed,
               ]}
@@ -1488,6 +1517,7 @@ export default function ChatScreen() {
     );
   }, [
     request,
+    acceptedOffer,
     finalPrice,
     statusLabel,
     closeCTA,

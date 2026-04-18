@@ -378,11 +378,22 @@ export const styles = StyleSheet.create({
 
   // ─── Offer time slot chips ───────────────────────────────────
   offerSlotsRow: {
+    marginTop: 6,
+    marginBottom: 2,
+    gap: 4,
+  },
+  offerSlotsLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  offerSlotsChips: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 5,
-    marginTop: 4,
-    marginBottom: 2,
   },
   offerSlotChip: {
     backgroundColor: theme.accentSoft,

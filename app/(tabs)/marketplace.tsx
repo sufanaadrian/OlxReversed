@@ -4,22 +4,22 @@ import { router } from "expo-router";
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    PanResponder,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { ImageViewer } from "../../src/components/ImageViewer";
 import {
-    SchedulePicker,
-    WeekSchedule,
-    emptyWeek,
+  SchedulePicker,
+  WeekSchedule,
+  emptyWeek,
 } from "../../src/components/SchedulePicker";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
@@ -58,7 +58,7 @@ type RequestRow = {
   budget_min: number;
   budget_max: number;
   type: "product" | "service";
-  status: "active" | "closed";
+  status: "active" | "matched" | "closed";
   created_at: string;
   location: string | null;
   open_budget: boolean | null;
@@ -195,7 +195,7 @@ export default function MarketplaceScreen() {
     )
   `,
       )
-      .eq("status", "active")
+      .in("status", ["active", "matched"])
       .order("created_at", { ascending: false });
 
     // ✅ hide my own requests in marketplace

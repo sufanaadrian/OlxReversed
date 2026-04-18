@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -101,9 +101,9 @@ export default function CreateOfferModal() {
     // Determine statuses: check which slots have pending/accepted offers
     const slotIds = (slots ?? []).map((s: any) => s.id);
     if (slotIds.length > 0) {
-      const { data: offerSlots } = await supabase
+      const { data: offerSlotRows } = await supabase
         .from("offer_slots")
-        .select("availability_id,offer_id,offers!inner(status)")
+        .select("availability_id,offer_id")
         .in("availability_id", slotIds);
 
       const statusMap: Record<string, "available" | "pending" | "booked"> = {};
@@ -113,13 +113,27 @@ export default function CreateOfferModal() {
           : "available";
       }
 
-      for (const os of (offerSlots ?? []) as any[]) {
-        const aid = os.availability_id;
-        const offerStatus = os.offers?.status;
-        if (offerStatus === "accepted") {
-          statusMap[aid] = "booked";
-        } else if (offerStatus === "pending" && statusMap[aid] !== "booked") {
-          statusMap[aid] = "pending";
+      if (offerSlotRows && offerSlotRows.length > 0) {
+        const relatedOfferIds = [
+          ...new Set(offerSlotRows.map((os: any) => os.offer_id)),
+        ];
+        const { data: relatedOffers } = await supabase
+          .from("offers")
+          .select("id,status")
+          .in("id", relatedOfferIds);
+
+        const offerStatusMap = new Map(
+          (relatedOffers ?? []).map((o: any) => [o.id, o.status]),
+        );
+
+        for (const os of offerSlotRows as any[]) {
+          const aid = os.availability_id;
+          const offerStatus = offerStatusMap.get(os.offer_id);
+          if (offerStatus === "accepted") {
+            statusMap[aid] = "booked";
+          } else if (offerStatus === "pending" && statusMap[aid] !== "booked") {
+            statusMap[aid] = "pending";
+          }
         }
       }
 
@@ -134,17 +148,39 @@ export default function CreateOfferModal() {
     }, [loadLatestOffer, loadAvailability]),
   );
 
+  // Pre-populate fields from existing offer (edit mode)
+  useEffect(() => {
+    if (!latestOffer) return;
+    setPrice(String(latestOffer.price));
+    setDescription(latestOffer.description ?? "");
+  }, [latestOffer]);
+
+  // Load previously selected slots for this offer
+  useEffect(() => {
+    if (!latestOffer) return;
+    const fetchSlots = async () => {
+      const { data: slotsRaw } = await supabase
+        .from("offer_slots")
+        .select("availability_id")
+        .eq("offer_id", latestOffer.id);
+      if (slotsRaw && slotsRaw.length > 0) {
+        setSelectedSlotIds(slotsRaw.map((s: any) => s.availability_id));
+      }
+    };
+    fetchSlots();
+  }, [latestOffer]);
+
   const canSend = useMemo(() => {
     // No offer yet → can send
     if (!latestOffer) return true;
 
-    // Pending exists → cannot send another
-    if (latestOffer.status === "pending") return false;
+    // Pending exists → can edit (update)
+    if (latestOffer.status === "pending") return true;
 
     // Rejected → can send again
     if (latestOffer.status === "rejected") return true;
 
-    // Accepted → usually block (deal already agreed)
+    // Accepted → block (deal already agreed)
     if (latestOffer.status === "accepted") return false;
 
     return true;
@@ -186,6 +222,41 @@ export default function CreateOfferModal() {
     }
 
     setLoading(true);
+
+    let offerId: string;
+
+    if (latestOffer && latestOffer.status === "pending") {
+      // Edit existing pending offer
+      const { error } = await supabase
+        .from("offers")
+        .update({ price: p, description: description.trim() })
+        .eq("id", latestOffer.id);
+
+      if (error) {
+        setLoading(false);
+        Alert.alert(t("error"), error.message);
+        return;
+      }
+
+      offerId = latestOffer.id;
+
+      // Replace slots: delete old, insert new
+      await supabase.from("offer_slots").delete().eq("offer_id", offerId);
+      if (selectedSlotIds.length > 0) {
+        const { error: slotErr } = await supabase.from("offer_slots").insert(
+          selectedSlotIds.map((aid) => ({
+            offer_id: offerId,
+            availability_id: aid,
+          })),
+        );
+        if (slotErr) console.log("offer_slots update error:", slotErr);
+      }
+
+      setLoading(false);
+      Alert.alert(t("sent"), t("offerSent"));
+      router.back();
+      return;
+    }
 
     // Insert NEW offer row every time (history)
     const { data: insertedOffer, error } = await supabase
@@ -326,7 +397,11 @@ export default function CreateOfferModal() {
             disabled={!canSend || loading}
           >
             <Text style={styles.ctaText}>
-              {loading ? t("sending") : t("sendOffer")}
+              {loading
+                ? t("sending")
+                : latestOffer?.status === "pending"
+                  ? t("editOffer")
+                  : t("sendOffer")}
             </Text>
           </Pressable>
         </ScrollView>

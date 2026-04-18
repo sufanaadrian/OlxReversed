@@ -335,20 +335,42 @@ export default function MyOffersScreen() {
       // 4) offer slots for my offers
       const myOfferIds = (offerData ?? []).map((o: any) => o.id);
       if (myOfferIds.length > 0) {
-        const { data: slotsData } = await supabase
+        const { data: slotsData, error: slotsErr } = await supabase
           .from("offer_slots")
-          .select(
-            "offer_id,request_availability!inner(day_of_week,start_time,end_time)",
-          )
+          .select("offer_id,availability_id")
           .in("offer_id", myOfferIds);
 
-        const mapped: OfferSlotInfo[] = (slotsData ?? []).map((s: any) => ({
-          offer_id: s.offer_id,
-          day_of_week: s.request_availability.day_of_week,
-          start_time: s.request_availability.start_time,
-          end_time: s.request_availability.end_time,
-        }));
-        setOfferSlots(mapped);
+        if (slotsErr) {
+          console.log("offer_slots query error:", slotsErr);
+          setOfferSlots([]);
+        } else if (slotsData && slotsData.length > 0) {
+          const availIds = [
+            ...new Set(slotsData.map((s: any) => s.availability_id)),
+          ];
+          const { data: availData } = await supabase
+            .from("request_availability")
+            .select("id,day_of_week,start_time,end_time")
+            .in("id", availIds);
+
+          const availMap = new Map(
+            (availData ?? []).map((a: any) => [a.id, a]),
+          );
+          const mapped: OfferSlotInfo[] = [];
+          for (const s of slotsData as any[]) {
+            const a = availMap.get(s.availability_id);
+            if (a) {
+              mapped.push({
+                offer_id: s.offer_id,
+                day_of_week: a.day_of_week,
+                start_time: a.start_time,
+                end_time: a.end_time,
+              });
+            }
+          }
+          setOfferSlots(mapped);
+        } else {
+          setOfferSlots([]);
+        }
       } else {
         setOfferSlots([]);
       }
@@ -1178,15 +1200,20 @@ export default function MyOffersScreen() {
                         if (slots.length === 0) return null;
                         return (
                           <View style={styles.offerSlotsRow}>
-                            {slots.map((s, i) => (
-                              <View key={i} style={styles.offerSlotChip}>
-                                <Text style={styles.offerSlotChipText}>
-                                  {t(DAY_KEYS_OFFERS[s.day_of_week])}{" "}
-                                  {fmtTime(s.start_time)} –{" "}
-                                  {fmtTime(s.end_time)}
-                                </Text>
-                              </View>
-                            ))}
+                            <Text style={styles.offerSlotsLabel}>
+                              {t("scheduledSlots")}
+                            </Text>
+                            <View style={styles.offerSlotsChips}>
+                              {slots.map((s, i) => (
+                                <View key={i} style={styles.offerSlotChip}>
+                                  <Text style={styles.offerSlotChipText}>
+                                    {t(DAY_KEYS_OFFERS[s.day_of_week])}{" "}
+                                    {fmtTime(s.start_time)} –{" "}
+                                    {fmtTime(s.end_time)}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
                           </View>
                         );
                       })()}

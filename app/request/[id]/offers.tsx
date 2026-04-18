@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    View,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
 import { useCurrency } from "../../../src/context/CurrencyContext";
@@ -155,20 +155,40 @@ export default function RequestOffersScreen() {
     // Load offer slots with availability info
     const offerIds = (off ?? []).map((o: any) => o.id);
     if (offerIds.length > 0) {
-      const { data: slots } = await supabase
+      const { data: slotsRaw, error: slotsErr } = await supabase
         .from("offer_slots")
-        .select(
-          "offer_id,request_availability!inner(day_of_week,start_time,end_time)",
-        )
+        .select("offer_id,availability_id")
         .in("offer_id", offerIds);
 
-      const mapped: OfferSlotInfo[] = (slots ?? []).map((s: any) => ({
-        offer_id: s.offer_id,
-        day_of_week: s.request_availability.day_of_week,
-        start_time: s.request_availability.start_time,
-        end_time: s.request_availability.end_time,
-      }));
-      setOfferSlots(mapped);
+      if (slotsErr) {
+        console.log("offer_slots query error:", slotsErr);
+        setOfferSlots([]);
+      } else if (slotsRaw && slotsRaw.length > 0) {
+        const availIds = [
+          ...new Set(slotsRaw.map((s: any) => s.availability_id)),
+        ];
+        const { data: availData } = await supabase
+          .from("request_availability")
+          .select("id,day_of_week,start_time,end_time")
+          .in("id", availIds);
+
+        const availMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
+        const mapped: OfferSlotInfo[] = [];
+        for (const s of slotsRaw as any[]) {
+          const a = availMap.get(s.availability_id);
+          if (a) {
+            mapped.push({
+              offer_id: s.offer_id,
+              day_of_week: a.day_of_week,
+              start_time: a.start_time,
+              end_time: a.end_time,
+            });
+          }
+        }
+        setOfferSlots(mapped);
+      } else {
+        setOfferSlots([]);
+      }
     } else {
       setOfferSlots([]);
     }
@@ -484,16 +504,21 @@ export default function RequestOffersScreen() {
                     const slots = offerSlots.filter((s) => s.offer_id === o.id);
                     if (slots.length === 0) return null;
                     return (
-                      <View style={styles.slotsBox}>
-                        {slots.map((s, i) => (
-                          <View key={i} style={styles.slotChip}>
-                            <Text style={styles.slotChipText}>
-                              {t(DAY_KEYS[s.day_of_week])}{" "}
-                              {formatTime(s.start_time)} –{" "}
-                              {formatTime(s.end_time)}
-                            </Text>
-                          </View>
-                        ))}
+                      <View style={styles.slotsWrap}>
+                        <Text style={styles.slotsLabel}>
+                          {t("scheduledSlots")}
+                        </Text>
+                        <View style={styles.slotsBox}>
+                          {slots.map((s, i) => (
+                            <View key={i} style={styles.slotChip}>
+                              <Text style={styles.slotChipText}>
+                                {t(DAY_KEYS[s.day_of_week])}{" "}
+                                {formatTime(s.start_time)} –{" "}
+                                {formatTime(s.end_time)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                       </View>
                     );
                   })()}
