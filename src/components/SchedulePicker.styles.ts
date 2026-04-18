@@ -281,4 +281,62 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 12,
   },
+
+  // ── Read-only compact layout ─────────────────────────────────────
+  readOnlyWrap: {
+    gap: 8,
+  },
+  readOnlyDay: {
+    gap: 4,
+  },
+  readOnlyDayLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  readOnlySlots: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  readOnlyChip: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  readOnlyChipBooked: {
+    backgroundColor: theme.dangerSoft,
+  },
+  readOnlyChipPending: {
+    backgroundColor: theme.amberSoft,
+  },
+  readOnlyChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+  readOnlyChipTextBooked: {
+    color: theme.danger,
+  },
+  readOnlyChipTextPending: {
+    color: theme.amber,
+  },
+  readOnlyStatusText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: theme.danger,
+    textTransform: "uppercase",
+  },
+  readOnlyStatusTextPending: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: theme.amber,
+    textTransform: "uppercase",
+  },
 });

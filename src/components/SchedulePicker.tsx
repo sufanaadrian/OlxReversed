@@ -344,134 +344,142 @@ export function SchedulePicker({
     onChange?.(next);
   };
 
+  // ── Read-only compact chip layout ────────────────────────────────
+  if (readOnly) {
+    const activeDays = value.filter((d) => d.enabled && d.slots.length > 0);
+    if (activeDays.length === 0) return null;
+    return (
+      <View style={styles.readOnlyWrap}>
+        {activeDays.map((day) => (
+          <View key={day.dayIndex} style={styles.readOnlyDay}>
+            <Text style={styles.readOnlyDayLabel}>
+              {t(DAY_KEYS[day.dayIndex])}
+            </Text>
+            <View style={styles.readOnlySlots}>
+              {day.slots.map((slot) => {
+                const status = slotStatuses?.[slot.id];
+                return (
+                  <View
+                    key={slot.id}
+                    style={[
+                      styles.readOnlyChip,
+                      status === "booked" && styles.readOnlyChipBooked,
+                      status === "pending" && styles.readOnlyChipPending,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.readOnlyChipText,
+                        status === "booked" && styles.readOnlyChipTextBooked,
+                        status === "pending" && styles.readOnlyChipTextPending,
+                      ]}
+                    >
+                      {slot.start} – {slot.end}
+                    </Text>
+                    {status === "booked" && (
+                      <Text style={styles.readOnlyStatusText}>
+                        {t("slotBooked")}
+                      </Text>
+                    )}
+                    {status === "pending" && (
+                      <Text style={styles.readOnlyStatusTextPending}>
+                        {t("slotPending")}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  // ── Editable mode ──────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       {/* Presets */}
-      {!readOnly && (
-        <View style={styles.presetsRow}>
-          {PRESETS.map((p) => (
-            <Pressable
-              key={p.key}
-              style={styles.presetChip}
-              onPress={() => applyPreset(p)}
-            >
-              <Text style={styles.presetChipText}>{t(p.key)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
+      <View style={styles.presetsRow}>
+        {PRESETS.map((p) => (
+          <Pressable
+            key={p.key}
+            style={styles.presetChip}
+            onPress={() => applyPreset(p)}
+          >
+            <Text style={styles.presetChipText}>{t(p.key)}</Text>
+          </Pressable>
+        ))}
+      </View>
 
       {/* Days */}
-      {(readOnly
-        ? value.filter((d) => d.enabled && d.slots.length > 0)
-        : value
-      ).map((day) => (
+      {value.map((day) => (
         <View key={day.dayIndex} style={styles.dayRow}>
           <Pressable
             style={[styles.dayHeader, day.enabled && styles.dayHeaderActive]}
             onPress={() => toggleDay(day.dayIndex)}
-            disabled={readOnly}
           >
             <Text
               style={[styles.dayLabel, day.enabled && styles.dayLabelActive]}
             >
               {t(DAY_KEYS[day.dayIndex])}
             </Text>
-            {!readOnly && (
+            <View
+              style={[styles.dayToggle, day.enabled && styles.dayToggleActive]}
+            >
               <View
                 style={[
-                  styles.dayToggle,
-                  day.enabled && styles.dayToggleActive,
+                  styles.dayToggleThumb,
+                  day.enabled && styles.dayToggleThumbActive,
                 ]}
-              >
-                <View
-                  style={[
-                    styles.dayToggleThumb,
-                    day.enabled && styles.dayToggleThumbActive,
-                  ]}
-                />
-              </View>
-            )}
+              />
+            </View>
           </Pressable>
 
           {day.enabled && day.slots.length > 0 && (
             <View style={styles.slotsWrap}>
-              {day.slots.map((slot) => {
-                const status = slotStatuses?.[slot.id];
-                return (
-                  <View key={slot.id} style={styles.slotRow}>
-                    <Pressable
-                      style={styles.slotTimeBtn}
-                      onPress={() =>
-                        openTimePicker(
-                          day.dayIndex,
-                          slot.id,
-                          "start",
-                          slot.start,
-                        )
-                      }
-                      disabled={readOnly}
-                    >
-                      <Text style={styles.slotTimeText}>{slot.start}</Text>
-                    </Pressable>
+              {day.slots.map((slot) => (
+                <View key={slot.id} style={styles.slotRow}>
+                  <Pressable
+                    style={styles.slotTimeBtn}
+                    onPress={() =>
+                      openTimePicker(day.dayIndex, slot.id, "start", slot.start)
+                    }
+                  >
+                    <Text style={styles.slotTimeText}>{slot.start}</Text>
+                  </Pressable>
 
-                    <Text style={styles.slotDash}>–</Text>
+                  <Text style={styles.slotDash}>–</Text>
 
-                    <Pressable
-                      style={styles.slotTimeBtn}
-                      onPress={() =>
-                        openTimePicker(day.dayIndex, slot.id, "end", slot.end)
-                      }
-                      disabled={readOnly}
-                    >
-                      <Text style={styles.slotTimeText}>{slot.end}</Text>
-                    </Pressable>
+                  <Pressable
+                    style={styles.slotTimeBtn}
+                    onPress={() =>
+                      openTimePicker(day.dayIndex, slot.id, "end", slot.end)
+                    }
+                  >
+                    <Text style={styles.slotTimeText}>{slot.end}</Text>
+                  </Pressable>
 
-                    {status === "booked" && (
-                      <View style={styles.bookedPill}>
-                        <Text style={styles.bookedText}>{t("slotBooked")}</Text>
-                      </View>
-                    )}
-                    {status === "pending" && (
-                      <View style={styles.pendingPill}>
-                        <Text style={styles.pendingText}>
-                          {t("slotPending")}
-                        </Text>
-                      </View>
-                    )}
-                    {status === "available" && readOnly && (
-                      <View style={styles.availablePill}>
-                        <Text style={styles.availableText}>
-                          {t("slotAvailable")}
-                        </Text>
-                      </View>
-                    )}
-
-                    {!readOnly && (
-                      <Pressable
-                        style={styles.removeSlotBtn}
-                        onPress={() => removeSlot(day.dayIndex, slot.id)}
-                      >
-                        <Text style={styles.removeSlotText}>✕</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-              {!readOnly && (
-                <Pressable
-                  style={styles.addSlotBtn}
-                  onPress={() => addSlot(day.dayIndex)}
-                >
-                  <Text style={styles.addSlotText}>+ {t("addTimeSlot")}</Text>
-                </Pressable>
-              )}
+                  <Pressable
+                    style={styles.removeSlotBtn}
+                    onPress={() => removeSlot(day.dayIndex, slot.id)}
+                  >
+                    <Text style={styles.removeSlotText}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable
+                style={styles.addSlotBtn}
+                onPress={() => addSlot(day.dayIndex)}
+              >
+                <Text style={styles.addSlotText}>+ {t("addTimeSlot")}</Text>
+              </Pressable>
             </View>
           )}
         </View>
       ))}
 
-      {!value.some((d) => d.enabled) && !readOnly && (
+      {!value.some((d) => d.enabled) && (
         <Text style={styles.emptyHint}>{t("scheduleEmptyHint")}</Text>
       )}
 

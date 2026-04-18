@@ -3,17 +3,22 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import { ImageViewer } from "../../src/components/ImageViewer";
+import {
+    SchedulePicker,
+    WeekSchedule,
+    emptyWeek,
+} from "../../src/components/SchedulePicker";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
@@ -96,6 +101,9 @@ export default function MyRequestsScreen() {
     Map<string, CounterCounts>
   >(new Map());
   const [filter, setFilter] = useState<Filter>("all");
+  const [availabilityMap, setAvailabilityMap] = useState<
+    Map<string, WeekSchedule>
+  >(new Map());
 
   const openRowRef = useRef<Swipeable | null>(null);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
@@ -204,6 +212,29 @@ export default function MyRequestsScreen() {
         });
       });
       setCounterCountsByRequestId(counterMap);
+
+      // Load availability for all requests
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,request_id,day_of_week,start_time,end_time,is_booked")
+        .in("request_id", ids)
+        .order("day_of_week")
+        .order("start_time");
+
+      const availMap = new Map<string, WeekSchedule>();
+      (avail ?? []).forEach((row: any) => {
+        if (!availMap.has(row.request_id))
+          availMap.set(row.request_id, emptyWeek());
+        const week = availMap.get(row.request_id)!;
+        const day = week[row.day_of_week];
+        day.enabled = true;
+        day.slots.push({
+          id: row.id,
+          start: row.start_time.slice(0, 5),
+          end: row.end_time.slice(0, 5),
+        });
+      });
+      setAvailabilityMap(availMap);
 
       if (showSpinner) setLoading(false);
     },
@@ -435,6 +466,13 @@ export default function MyRequestsScreen() {
               </View>
             </View>
           </View>
+
+          {/* Availability */}
+          {availabilityMap.has(item.id) && (
+            <View style={styles.availWrap}>
+              <SchedulePicker value={availabilityMap.get(item.id)!} readOnly />
+            </View>
+          )}
 
           {/* Footer: offers info + action */}
           <View style={styles.footerRow}>

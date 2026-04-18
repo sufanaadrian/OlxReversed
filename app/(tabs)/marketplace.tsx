@@ -4,18 +4,23 @@ import { router } from "expo-router";
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    PanResponder,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { ImageViewer } from "../../src/components/ImageViewer";
+import {
+    SchedulePicker,
+    WeekSchedule,
+    emptyWeek,
+} from "../../src/components/SchedulePicker";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
@@ -124,6 +129,9 @@ export default function MarketplaceScreen() {
 
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [availabilityMap, setAvailabilityMap] = useState<
+    Map<string, WeekSchedule>
+  >(new Map());
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
@@ -212,8 +220,37 @@ export default function MarketplaceScreen() {
       return;
     }
 
-    setRequests((data ?? []) as any);
+    const reqList = (data ?? []) as any as RequestRow[];
+    setRequests(reqList);
     setCurrentIndex(0);
+
+    // Load availability for all requests
+    if (reqList.length > 0) {
+      const ids = reqList.map((r) => r.id);
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,request_id,day_of_week,start_time,end_time,is_booked")
+        .in("request_id", ids)
+        .order("day_of_week")
+        .order("start_time");
+
+      const map = new Map<string, WeekSchedule>();
+      (avail ?? []).forEach((row: any) => {
+        if (!map.has(row.request_id)) map.set(row.request_id, emptyWeek());
+        const week = map.get(row.request_id)!;
+        const day = week[row.day_of_week];
+        day.enabled = true;
+        day.slots.push({
+          id: row.id,
+          start: row.start_time.slice(0, 5),
+          end: row.end_time.slice(0, 5),
+        });
+      });
+      setAvailabilityMap(map);
+    } else {
+      setAvailabilityMap(new Map());
+    }
+
     setLoading(false);
   }, [t]);
 
@@ -354,6 +391,7 @@ export default function MarketplaceScreen() {
             total={filteredRequests.length}
             onSwipe={handleSwipe}
             t={t}
+            availability={availabilityMap.get(currentRequest.id)}
           />
         )}
       </View>
@@ -392,12 +430,14 @@ function RequestCard({
   total,
   onSwipe,
   t,
+  availability,
 }: {
   request: RequestRow;
   remaining: number;
   total: number;
   onSwipe: (direction: "left" | "right") => void;
   t: (key: string) => string;
+  availability?: WeekSchedule;
 }) {
   const { formatPrice } = useCurrency();
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -679,6 +719,9 @@ function RequestCard({
                   </>
                 );
               })()}
+
+            {/* Availability schedule */}
+            {availability && <SchedulePicker value={availability} readOnly />}
 
             {/* Posted date */}
             <View style={styles.detailRow}>
