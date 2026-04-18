@@ -3,19 +3,19 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  Image,
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  UIManager,
-  View,
+    Alert,
+    Image,
+    LayoutAnimation,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    UIManager,
+    View,
 } from "react-native";
 import ReanimatedSwipeable, {
-  type SwipeableMethods,
+    type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { ImageViewer } from "../../src/components/ImageViewer";
 import { useCurrency } from "../../src/context/CurrencyContext";
@@ -128,6 +128,27 @@ type CounterOfferRow = {
   created_at: string;
 };
 
+type OfferSlotInfo = {
+  offer_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
+const DAY_KEYS_OFFERS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+function fmtTime(t: string): string {
+  return t.slice(0, 5);
+}
+
 export default function MyOffersScreen() {
   const t = useTranslation();
   const { formatPrice } = useCurrency();
@@ -185,6 +206,7 @@ export default function MyOffersScreen() {
 
   const [offers, setOffers] = useState<OfferRow[]>([]);
   const [counterOffers, setCounterOffers] = useState<CounterOfferRow[]>([]);
+  const [offerSlots, setOfferSlots] = useState<OfferSlotInfo[]>([]);
 
   // ✅ store the currently open row so we can close it
   const openRowRef = useRef<SwipeableMethods | null>(null);
@@ -309,6 +331,27 @@ export default function MyOffersScreen() {
       }
 
       setCounterOffers((counterData ?? []) as CounterOfferRow[]);
+
+      // 4) offer slots for my offers
+      const myOfferIds = (offerData ?? []).map((o: any) => o.id);
+      if (myOfferIds.length > 0) {
+        const { data: slotsData } = await supabase
+          .from("offer_slots")
+          .select(
+            "offer_id,request_availability!inner(day_of_week,start_time,end_time)",
+          )
+          .in("offer_id", myOfferIds);
+
+        const mapped: OfferSlotInfo[] = (slotsData ?? []).map((s: any) => ({
+          offer_id: s.offer_id,
+          day_of_week: s.request_availability.day_of_week,
+          start_time: s.request_availability.start_time,
+          end_time: s.request_availability.end_time,
+        }));
+        setOfferSlots(mapped);
+      } else {
+        setOfferSlots([]);
+      }
 
       if (showSpinner) setLoading(false);
     },
@@ -1124,6 +1167,29 @@ export default function MyOffersScreen() {
                         </Text>
                       </View>
                     )}
+
+                    {/* Selected time slots */}
+                    {latestOffer &&
+                      latestOffer.status !== "withdrawn" &&
+                      (() => {
+                        const slots = offerSlots.filter(
+                          (s) => s.offer_id === latestOffer.id,
+                        );
+                        if (slots.length === 0) return null;
+                        return (
+                          <View style={styles.offerSlotsRow}>
+                            {slots.map((s, i) => (
+                              <View key={i} style={styles.offerSlotChip}>
+                                <Text style={styles.offerSlotChipText}>
+                                  {t(DAY_KEYS_OFFERS[s.day_of_week])}{" "}
+                                  {fmtTime(s.start_time)} –{" "}
+                                  {fmtTime(s.end_time)}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })()}
 
                     {/* ─── Accepted offer summary ─── */}
                     {latestOffer &&

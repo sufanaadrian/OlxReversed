@@ -26,6 +26,10 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
+import {
+  AvailabilitySlot,
+  SlotSelector,
+} from "../../../src/components/SlotSelector";
 import { useCurrency } from "../../../src/context/CurrencyContext";
 import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
@@ -163,6 +167,18 @@ const getRequestStatusLabel = (
 const formatHM = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+const DAY_KEYS_CHAT = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+const fmtSlotTime = (t_: string) => t_.slice(0, 5);
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const requestId = id ?? "";
@@ -191,6 +207,24 @@ export default function ChatScreen() {
   const [meId, setMeId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<ProfileRow | null>(null);
   const pendingPickerAction = useRef<null | (() => Promise<void>)>(null);
+
+  // Schedule change state
+  const [scheduleChangeOpen, setScheduleChangeOpen] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [selectedChangeSlots, setSelectedChangeSlots] = useState<string[]>([]);
+  const [pendingChangeRequest, setPendingChangeRequest] = useState<{
+    id: string;
+    requested_by: string;
+    slots: {
+      availability_id: string;
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+    }[];
+  } | null>(null);
+  const [currentOfferSlots, setCurrentOfferSlots] = useState<
+    { day_of_week: number; start_time: string; end_time: string }[]
+  >([]);
 
   const runPendingPicker = useCallback(async () => {
     const fn = pendingPickerAction.current;
@@ -355,6 +389,67 @@ export default function ChatScreen() {
 
     setMessages((msgs ?? []) as any);
     setLoading(false);
+
+    // Load offer slots and availability for schedule changes
+    if (accepted) {
+      // Current slots for this offer
+      const { data: oSlots } = await supabase
+        .from("offer_slots")
+        .select(
+          "availability_id,request_availability!inner(day_of_week,start_time,end_time)",
+        )
+        .eq("offer_id", accepted.id);
+
+      setCurrentOfferSlots(
+        (oSlots ?? []).map((s: any) => ({
+          day_of_week: s.request_availability.day_of_week,
+          start_time: s.request_availability.start_time,
+          end_time: s.request_availability.end_time,
+        })),
+      );
+
+      // All availability slots for the request
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,day_of_week,start_time,end_time,is_booked")
+        .eq("request_id", requestId)
+        .order("day_of_week")
+        .order("start_time");
+
+      setAvailableSlots((avail ?? []) as AvailabilitySlot[]);
+
+      // Any pending schedule change request
+      const { data: changeReqs } = await supabase
+        .from("schedule_change_requests")
+        .select("id,requested_by,status")
+        .eq("offer_id", accepted.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const pendingReq = changeReqs?.[0] ?? null;
+      if (pendingReq) {
+        const { data: changeSlots } = await supabase
+          .from("schedule_change_slots")
+          .select(
+            "availability_id,request_availability!inner(day_of_week,start_time,end_time)",
+          )
+          .eq("change_request_id", pendingReq.id);
+
+        setPendingChangeRequest({
+          id: pendingReq.id,
+          requested_by: pendingReq.requested_by,
+          slots: (changeSlots ?? []).map((s: any) => ({
+            availability_id: s.availability_id,
+            day_of_week: s.request_availability.day_of_week,
+            start_time: s.request_availability.start_time,
+            end_time: s.request_availability.end_time,
+          })),
+        });
+      } else {
+        setPendingChangeRequest(null);
+      }
+    }
 
     // Mark read when opening chat
     if (uid) await markAsRead(accepted.id, uid);
@@ -629,6 +724,73 @@ export default function ChatScreen() {
       });
     }, 1200);
   };
+
+  // -------- Schedule change --------
+
+  const proposeScheduleChange = useCallback(async () => {
+    if (!acceptedOffer || !meId || selectedChangeSlots.length === 0) return;
+
+    const { data: req, error: reqErr } = await supabase
+      .from("schedule_change_requests")
+      .insert({
+        offer_id: acceptedOffer.id,
+        requested_by: meId,
+      })
+      .select("id")
+      .single();
+
+    if (reqErr || !req) {
+      Alert.alert(t("error"), reqErr?.message ?? "Unknown error");
+      return;
+    }
+
+    const slotRows = selectedChangeSlots.map((aid) => ({
+      change_request_id: req.id,
+      availability_id: aid,
+    }));
+
+    await supabase.from("schedule_change_slots").insert(slotRows);
+
+    // Update existing offer_slots to the new selection
+    await supabase
+      .from("offer_slots")
+      .delete()
+      .eq("offer_id", acceptedOffer.id);
+
+    const newSlotRows = selectedChangeSlots.map((aid) => ({
+      offer_id: acceptedOffer.id,
+      availability_id: aid,
+    }));
+    await supabase.from("offer_slots").insert(newSlotRows);
+
+    setScheduleChangeOpen(false);
+    setSelectedChangeSlots([]);
+    await load();
+  }, [acceptedOffer, meId, selectedChangeSlots, t, load]);
+
+  const acceptScheduleChange = useCallback(async () => {
+    if (!pendingChangeRequest) return;
+
+    await supabase
+      .from("schedule_change_requests")
+      .update({ status: "accepted" })
+      .eq("id", pendingChangeRequest.id);
+
+    setPendingChangeRequest(null);
+    await load();
+  }, [pendingChangeRequest, load]);
+
+  const rejectScheduleChange = useCallback(async () => {
+    if (!pendingChangeRequest || !acceptedOffer) return;
+
+    await supabase
+      .from("schedule_change_requests")
+      .update({ status: "rejected" })
+      .eq("id", pendingChangeRequest.id);
+
+    setPendingChangeRequest(null);
+    await load();
+  }, [pendingChangeRequest, acceptedOffer, load]);
 
   // -------- Close deal handshake --------
   const confirmClose = useCallback(async () => {
@@ -1119,6 +1281,111 @@ export default function ChatScreen() {
     undoCloseRequest,
   ]);
 
+  const scheduleCTA = useMemo(() => {
+    if (!acceptedOffer || acceptedOffer.closed_at || !meId) return null;
+    if (availableSlots.length === 0) return null;
+
+    // Show current scheduled slots
+    const hasCurrentSlots = currentOfferSlots.length > 0;
+
+    // Pending change request from other user
+    if (pendingChangeRequest && pendingChangeRequest.requested_by !== meId) {
+      return (
+        <View style={styles.scheduleChangeBox}>
+          <Text style={styles.scheduleChangeTitle}>
+            {t("scheduleChangeRequested")}
+          </Text>
+          <View style={styles.scheduleChangeSlots}>
+            {pendingChangeRequest.slots.map((s, i) => (
+              <View key={i} style={styles.scheduleChangeChip}>
+                <Text style={styles.scheduleChangeChipText}>
+                  {t(DAY_KEYS_CHAT[s.day_of_week])} {fmtSlotTime(s.start_time)}{" "}
+                  – {fmtSlotTime(s.end_time)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.closeRow}>
+            <Pressable style={styles.closeBtn} onPress={acceptScheduleChange}>
+              <Text style={styles.closeBtnText}>{t("accept")}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.closeBtn, styles.closeBtnGhost]}
+              onPress={rejectScheduleChange}
+            >
+              <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
+                {t("reject")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    // Pending change request from me
+    if (pendingChangeRequest && pendingChangeRequest.requested_by === meId) {
+      return (
+        <View style={styles.scheduleChangeBox}>
+          <Text style={styles.scheduleChangeTitle}>
+            {t("scheduleChangeWaiting")}
+          </Text>
+          <View style={styles.scheduleChangeSlots}>
+            {pendingChangeRequest.slots.map((s, i) => (
+              <View key={i} style={styles.scheduleChangeChip}>
+                <Text style={styles.scheduleChangeChipText}>
+                  {t(DAY_KEYS_CHAT[s.day_of_week])} {fmtSlotTime(s.start_time)}{" "}
+                  – {fmtSlotTime(s.end_time)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.scheduleChangeBox}>
+        {hasCurrentSlots && (
+          <>
+            <Text style={styles.scheduleChangeTitle}>
+              {t("scheduledSlots")}
+            </Text>
+            <View style={styles.scheduleChangeSlots}>
+              {currentOfferSlots.map((s, i) => (
+                <View key={i} style={styles.scheduleChangeChip}>
+                  <Text style={styles.scheduleChangeChipText}>
+                    {t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                    {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+        <Pressable
+          style={[styles.closeBtn, styles.closeBtnGhost]}
+          onPress={() => {
+            setSelectedChangeSlots([]);
+            setScheduleChangeOpen(true);
+          }}
+        >
+          <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
+            {t("changeSchedule")}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }, [
+    acceptedOffer,
+    meId,
+    availableSlots,
+    currentOfferSlots,
+    pendingChangeRequest,
+    t,
+    acceptScheduleChange,
+    rejectScheduleChange,
+  ]);
+
   const contextBox = useMemo(() => {
     if (!request) return null;
     const showPrice = typeof finalPrice === "number";
@@ -1216,6 +1483,7 @@ export default function ChatScreen() {
         )}
 
         {closeCTA}
+        {scheduleCTA}
       </Pressable>
     );
   }, [
@@ -1223,6 +1491,7 @@ export default function ChatScreen() {
     finalPrice,
     statusLabel,
     closeCTA,
+    scheduleCTA,
     contextExpanded,
     formatPrice,
     t,
@@ -1536,6 +1805,65 @@ export default function ChatScreen() {
                     resizeMode="contain"
                   />
                 ) : null}
+              </Pressable>
+            </Modal>
+
+            {/* Schedule change modal */}
+            <Modal
+              visible={scheduleChangeOpen}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setScheduleChangeOpen(false)}
+            >
+              <Pressable
+                style={styles.viewerBackdrop}
+                onPress={() => setScheduleChangeOpen(false)}
+              >
+                <Pressable
+                  style={styles.scheduleChangeModal}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <Text style={styles.scheduleChangeModalTitle}>
+                    {t("changeSchedule")}
+                  </Text>
+                  <Text style={styles.scheduleChangeModalHint}>
+                    {t("selectTimeSlotsHint")}
+                  </Text>
+
+                  <SlotSelector
+                    slots={availableSlots}
+                    selected={selectedChangeSlots}
+                    onToggle={(id) =>
+                      setSelectedChangeSlots((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((x) => x !== id)
+                          : [...prev, id],
+                      )
+                    }
+                  />
+
+                  <View style={styles.closeRow}>
+                    <Pressable
+                      style={styles.closeBtn}
+                      onPress={proposeScheduleChange}
+                      disabled={selectedChangeSlots.length === 0}
+                    >
+                      <Text style={styles.closeBtnText}>
+                        {t("proposeChange")}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.closeBtn, styles.closeBtnGhost]}
+                      onPress={() => setScheduleChangeOpen(false)}
+                    >
+                      <Text
+                        style={[styles.closeBtnText, styles.closeBtnTextGhost]}
+                      >
+                        {t("cancel")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
               </Pressable>
             </Modal>
           </>

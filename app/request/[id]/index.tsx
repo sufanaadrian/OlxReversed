@@ -771,7 +771,7 @@ export default function RequestDetailScreen() {
 
           {/* ── Availability Schedule ── */}
           {hasAvailability && (
-            <View style={styles.detailGrid}>
+            <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>
                 {t("availabilitySchedule")}
               </Text>

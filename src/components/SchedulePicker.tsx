@@ -8,7 +8,7 @@ import { styles } from "./SchedulePicker.styles";
 export type TimeSlot = {
   id: string;
   start: string; // "HH:MM"
-  end: string;   // "HH:MM"
+  end: string; // "HH:MM"
 };
 
 export type DaySchedule = {
@@ -55,18 +55,36 @@ type Preset = {
 };
 
 const PRESETS: Preset[] = [
-  { key: "presetMornings", days: [0, 1, 2, 3, 4], slots: [{ start: "08:00", end: "12:00" }] },
-  { key: "presetAfternoons", days: [0, 1, 2, 3, 4], slots: [{ start: "13:00", end: "17:00" }] },
-  { key: "presetFullWeekdays", days: [0, 1, 2, 3, 4], slots: [{ start: "08:00", end: "17:00" }] },
-  { key: "presetWeekends", days: [5, 6], slots: [{ start: "09:00", end: "15:00" }] },
-  { key: "presetEvenings", days: [0, 1, 2, 3, 4], slots: [{ start: "18:00", end: "21:00" }] },
+  {
+    key: "presetMornings",
+    days: [0, 1, 2, 3, 4],
+    slots: [{ start: "08:00", end: "12:00" }],
+  },
+  {
+    key: "presetAfternoons",
+    days: [0, 1, 2, 3, 4],
+    slots: [{ start: "13:00", end: "17:00" }],
+  },
+  {
+    key: "presetFullWeekdays",
+    days: [0, 1, 2, 3, 4],
+    slots: [{ start: "08:00", end: "17:00" }],
+  },
+  {
+    key: "presetWeekends",
+    days: [5, 6],
+    slots: [{ start: "09:00", end: "15:00" }],
+  },
+  {
+    key: "presetEvenings",
+    days: [0, 1, 2, 3, 4],
+    slots: [{ start: "18:00", end: "21:00" }],
+  },
 ];
 
 // ── Time picker ──────────────────────────────────────────────────────
 
-const HOURS = Array.from({ length: 24 }, (_, i) =>
-  String(i).padStart(2, "0"),
-);
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "15", "30", "45"];
 
 type TimePickerProps = {
@@ -77,7 +95,13 @@ type TimePickerProps = {
   onCancel: () => void;
 };
 
-function TimePicker({ visible, title, initial, onConfirm, onCancel }: TimePickerProps) {
+function TimePicker({
+  visible,
+  title,
+  initial,
+  onConfirm,
+  onCancel,
+}: TimePickerProps) {
   const t = useTranslation();
   const [hour, setHour] = useState(initial.split(":")[0] ?? "08");
   const [minute, setMinute] = useState(initial.split(":")[1] ?? "00");
@@ -90,14 +114,30 @@ function TimePicker({ visible, title, initial, onConfirm, onCancel }: TimePicker
   }, [visible, initial]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
       <Pressable style={styles.pickerBackdrop} onPress={onCancel}>
-        <Pressable style={styles.pickerCard} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.pickerCard}
+          onPress={(e) => e.stopPropagation()}
+        >
           <Text style={styles.pickerTitle}>{title}</Text>
 
           {/* Hour grid */}
           <View style={{ gap: 4 }}>
-            <Text style={{ fontSize: 11, fontWeight: "800", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "800",
+                color: "#64748B",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               {t("scheduleHour")}
             </Text>
             <ScrollView
@@ -108,7 +148,10 @@ function TimePicker({ visible, title, initial, onConfirm, onCancel }: TimePicker
               {HOURS.map((h) => (
                 <Pressable
                   key={h}
-                  style={[styles.pickerDigitBtn, h === hour && styles.pickerDigitBtnActive]}
+                  style={[
+                    styles.pickerDigitBtn,
+                    h === hour && styles.pickerDigitBtnActive,
+                  ]}
                   onPress={() => setHour(h)}
                 >
                   <Text style={styles.pickerDigitText}>{h}</Text>
@@ -119,14 +162,26 @@ function TimePicker({ visible, title, initial, onConfirm, onCancel }: TimePicker
 
           {/* Minute chips */}
           <View style={{ gap: 4 }}>
-            <Text style={{ fontSize: 11, fontWeight: "800", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "800",
+                color: "#64748B",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               {t("scheduleMinute")}
             </Text>
             <View style={{ flexDirection: "row", gap: 6 }}>
               {MINUTES.map((m) => (
                 <Pressable
                   key={m}
-                  style={[styles.pickerDigitBtn, { flex: 1 }, m === minute && styles.pickerDigitBtnActive]}
+                  style={[
+                    styles.pickerDigitBtn,
+                    { flex: 1 },
+                    m === minute && styles.pickerDigitBtnActive,
+                  ]}
                   onPress={() => setMinute(m)}
                 >
                   <Text style={styles.pickerDigitText}>{m}</Text>
@@ -136,7 +191,14 @@ function TimePicker({ visible, title, initial, onConfirm, onCancel }: TimePicker
           </View>
 
           {/* Preview */}
-          <Text style={{ textAlign: "center", fontSize: 28, fontWeight: "900", color: "#020617" }}>
+          <Text
+            style={{
+              textAlign: "center",
+              fontSize: 28,
+              fontWeight: "900",
+              color: "#020617",
+            }}
+          >
             {hour}:{minute}
           </Text>
 
@@ -167,7 +229,12 @@ type Props = {
   slotStatuses?: Record<string, "available" | "pending" | "booked">;
 };
 
-export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Props) {
+export function SchedulePicker({
+  value,
+  onChange,
+  readOnly,
+  slotStatuses,
+}: Props) {
   const t = useTranslation();
 
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -187,9 +254,10 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
         return {
           ...d,
           enabled,
-          slots: enabled && d.slots.length === 0
-            ? [{ id: uid(), start: "08:00", end: "17:00" }]
-            : d.slots,
+          slots:
+            enabled && d.slots.length === 0
+              ? [{ id: uid(), start: "08:00", end: "17:00" }]
+              : d.slots,
         };
       });
       onChange?.(next);
@@ -206,7 +274,10 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
         const newStart = lastSlot ? lastSlot.end : "08:00";
         const newEndH = Math.min(23, Number(newStart.split(":")[0]) + 2);
         const newEnd = `${String(newEndH).padStart(2, "0")}:${newStart.split(":")[1]}`;
-        return { ...d, slots: [...d.slots, { id: uid(), start: newStart, end: newEnd }] };
+        return {
+          ...d,
+          slots: [...d.slots, { id: uid(), start: newStart, end: newEnd }],
+        };
       });
       onChange?.(next);
     },
@@ -226,7 +297,12 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
     [value, onChange, readOnly],
   );
 
-  const openTimePicker = (dayIndex: number, slotId: string, field: "start" | "end", currentVal: string) => {
+  const openTimePicker = (
+    dayIndex: number,
+    slotId: string,
+    field: "start" | "end",
+    currentVal: string,
+  ) => {
     if (readOnly) return;
     setPickerTarget({ dayIndex, slotId, field });
     setPickerInitial(currentVal);
@@ -240,7 +316,9 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
       if (d.dayIndex !== dayIndex) return d;
       return {
         ...d,
-        slots: d.slots.map((s) => (s.id === slotId ? { ...s, [field]: time } : s)),
+        slots: d.slots.map((s) =>
+          s.id === slotId ? { ...s, [field]: time } : s,
+        ),
       };
     });
     onChange?.(next);
@@ -251,11 +329,16 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
   const applyPreset = (preset: Preset) => {
     if (readOnly) return;
     const next = value.map((d) => {
-      if (!preset.days.includes(d.dayIndex)) return { ...d, enabled: false, slots: [] };
+      if (!preset.days.includes(d.dayIndex))
+        return { ...d, enabled: false, slots: [] };
       return {
         ...d,
         enabled: true,
-        slots: preset.slots.map((s) => ({ id: uid(), start: s.start, end: s.end })),
+        slots: preset.slots.map((s) => ({
+          id: uid(),
+          start: s.start,
+          end: s.end,
+        })),
       };
     });
     onChange?.(next);
@@ -267,7 +350,11 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
       {!readOnly && (
         <View style={styles.presetsRow}>
           {PRESETS.map((p) => (
-            <Pressable key={p.key} style={styles.presetChip} onPress={() => applyPreset(p)}>
+            <Pressable
+              key={p.key}
+              style={styles.presetChip}
+              onPress={() => applyPreset(p)}
+            >
               <Text style={styles.presetChipText}>{t(p.key)}</Text>
             </Pressable>
           ))}
@@ -275,19 +362,34 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
       )}
 
       {/* Days */}
-      {value.map((day) => (
+      {(readOnly
+        ? value.filter((d) => d.enabled && d.slots.length > 0)
+        : value
+      ).map((day) => (
         <View key={day.dayIndex} style={styles.dayRow}>
           <Pressable
             style={[styles.dayHeader, day.enabled && styles.dayHeaderActive]}
             onPress={() => toggleDay(day.dayIndex)}
             disabled={readOnly}
           >
-            <Text style={[styles.dayLabel, day.enabled && styles.dayLabelActive]}>
+            <Text
+              style={[styles.dayLabel, day.enabled && styles.dayLabelActive]}
+            >
               {t(DAY_KEYS[day.dayIndex])}
             </Text>
             {!readOnly && (
-              <View style={[styles.dayToggle, day.enabled && styles.dayToggleActive]}>
-                <View style={[styles.dayToggleThumb, day.enabled && styles.dayToggleThumbActive]} />
+              <View
+                style={[
+                  styles.dayToggle,
+                  day.enabled && styles.dayToggleActive,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.dayToggleThumb,
+                    day.enabled && styles.dayToggleThumbActive,
+                  ]}
+                />
               </View>
             )}
           </Pressable>
@@ -300,7 +402,14 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
                   <View key={slot.id} style={styles.slotRow}>
                     <Pressable
                       style={styles.slotTimeBtn}
-                      onPress={() => openTimePicker(day.dayIndex, slot.id, "start", slot.start)}
+                      onPress={() =>
+                        openTimePicker(
+                          day.dayIndex,
+                          slot.id,
+                          "start",
+                          slot.start,
+                        )
+                      }
                       disabled={readOnly}
                     >
                       <Text style={styles.slotTimeText}>{slot.start}</Text>
@@ -310,7 +419,9 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
 
                     <Pressable
                       style={styles.slotTimeBtn}
-                      onPress={() => openTimePicker(day.dayIndex, slot.id, "end", slot.end)}
+                      onPress={() =>
+                        openTimePicker(day.dayIndex, slot.id, "end", slot.end)
+                      }
                       disabled={readOnly}
                     >
                       <Text style={styles.slotTimeText}>{slot.end}</Text>
@@ -323,17 +434,24 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
                     )}
                     {status === "pending" && (
                       <View style={styles.pendingPill}>
-                        <Text style={styles.pendingText}>{t("slotPending")}</Text>
+                        <Text style={styles.pendingText}>
+                          {t("slotPending")}
+                        </Text>
                       </View>
                     )}
                     {status === "available" && readOnly && (
                       <View style={styles.availablePill}>
-                        <Text style={styles.availableText}>{t("slotAvailable")}</Text>
+                        <Text style={styles.availableText}>
+                          {t("slotAvailable")}
+                        </Text>
                       </View>
                     )}
 
                     {!readOnly && (
-                      <Pressable style={styles.removeSlotBtn} onPress={() => removeSlot(day.dayIndex, slot.id)}>
+                      <Pressable
+                        style={styles.removeSlotBtn}
+                        onPress={() => removeSlot(day.dayIndex, slot.id)}
+                      >
                         <Text style={styles.removeSlotText}>✕</Text>
                       </Pressable>
                     )}
@@ -341,7 +459,10 @@ export function SchedulePicker({ value, onChange, readOnly, slotStatuses }: Prop
                 );
               })}
               {!readOnly && (
-                <Pressable style={styles.addSlotBtn} onPress={() => addSlot(day.dayIndex)}>
+                <Pressable
+                  style={styles.addSlotBtn}
+                  onPress={() => addSlot(day.dayIndex)}
+                >
                   <Text style={styles.addSlotText}>+ {t("addTimeSlot")}</Text>
                 </Pressable>
               )}

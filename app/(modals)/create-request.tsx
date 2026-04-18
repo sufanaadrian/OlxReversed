@@ -740,53 +740,7 @@ export default function CreateRequestModal() {
             <Text style={styles.label}>
               {isOffering ? t("offeringAvailability") : t("preferredSchedule")}
             </Text>
-            <View style={styles.chipsWrap}>
-              {(
-                [
-                  "anytime",
-                  "weekdays",
-                  "weekends",
-                  "specific_date",
-                ] as Schedule[]
-              ).map((v) => (
-                <Pressable
-                  key={v}
-                  style={[
-                    styles.chip,
-                    preferredSchedule === v && styles.chipActive,
-                  ]}
-                  onPress={() => setPreferredSchedule(v)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      preferredSchedule === v && styles.chipTextActive,
-                    ]}
-                  >
-                    {v === "anytime"
-                      ? t("scheduleAnytime")
-                      : v === "weekdays"
-                        ? t("scheduleWeekdays")
-                        : v === "weekends"
-                          ? t("scheduleWeekends")
-                          : t("scheduleSpecificDate")}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {preferredSchedule === "specific_date" && (
-              <>
-                <Text style={styles.label}>{t("scheduledDate")}</Text>
-                <TextInput
-                  value={scheduledDate}
-                  onChangeText={setScheduledDate}
-                  placeholder={t("scheduledDatePlaceholder")}
-                  placeholderTextColor={theme.secondaryText}
-                  style={styles.input}
-                />
-              </>
-            )}
+            <SchedulePicker value={schedule} onChange={setSchedule} />
 
             <Text style={styles.label}>{t("specialRequirements")}</Text>
             <TextInput
@@ -799,18 +753,7 @@ export default function CreateRequestModal() {
             />
           </View>
 
-          {/* ── Section 4: Availability Schedule ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("jobSectionSchedule")}</Text>
-            <Text style={[styles.label, styles.labelFirst]}>
-              {isOffering
-                ? t("scheduleOfferingHint")
-                : t("scheduleSeekingHint")}
-            </Text>
-            <SchedulePicker value={schedule} onChange={setSchedule} />
-          </View>
-
-          {/* ── Section 5: Photos ── */}
+          {/* ── Section 4: Photos ── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t("jobSectionPhotos")}</Text>
             <View style={styles.photoGrid}>

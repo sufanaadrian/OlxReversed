@@ -118,6 +118,24 @@ export const styles = StyleSheet.create({
   },
   desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
 
+  slotsBox: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  slotChip: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  slotChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+
   counterBox: {
     marginTop: 10,
     backgroundColor: theme.bg,

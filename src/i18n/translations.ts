@@ -510,6 +510,11 @@ export const translations = {
     scheduleOfferingHint: "When can you do this job?",
     selectTimeSlots: "Select time slots",
     selectTimeSlotsHint: "Pick the slots that work for you",
+    scheduledSlots: "Scheduled slots",
+    changeSchedule: "Change schedule",
+    scheduleChangeRequested: "Schedule change requested",
+    scheduleChangeWaiting: "Waiting for schedule change confirmation",
+    proposeChange: "Propose change",
   },
   ro: {
     // Navigation & Tabs
@@ -1030,5 +1035,10 @@ export const translations = {
     scheduleOfferingHint: "Când poți face acest job?",
     selectTimeSlots: "Selectează intervale",
     selectTimeSlotsHint: "Alege intervalele care ți se potrivesc",
+    scheduledSlots: "Intervale programate",
+    changeSchedule: "Schimbă programul",
+    scheduleChangeRequested: "Schimbare de program solicitată",
+    scheduleChangeWaiting: "Se așteaptă confirmarea schimbării de program",
+    proposeChange: "Propune schimbare",
   },
 };
