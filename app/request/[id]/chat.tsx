@@ -179,6 +179,16 @@ const DAY_KEYS_CHAT = [
 
 const fmtSlotTime = (t_: string) => t_.slice(0, 5);
 
+const fmtSlotDate = (date: string | null): string => {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+};
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const requestId = id ?? "";
@@ -220,10 +230,16 @@ export default function ChatScreen() {
       day_of_week: number;
       start_time: string;
       end_time: string;
+      date: string | null;
     }[];
   } | null>(null);
   const [currentOfferSlots, setCurrentOfferSlots] = useState<
-    { day_of_week: number; start_time: string; end_time: string }[]
+    {
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+      date: string | null;
+    }[]
   >([]);
 
   const runPendingPicker = useCallback(async () => {
@@ -402,7 +418,7 @@ export default function ChatScreen() {
         const oAvailIds = oSlots.map((s: any) => s.availability_id);
         const { data: oAvail } = await supabase
           .from("request_availability")
-          .select("id,day_of_week,start_time,end_time")
+          .select("id,day_of_week,start_time,end_time,date")
           .in("id", oAvailIds);
 
         const oAvailMap = new Map((oAvail ?? []).map((a: any) => [a.id, a]));
@@ -414,6 +430,7 @@ export default function ChatScreen() {
               day_of_week: a.day_of_week,
               start_time: a.start_time,
               end_time: a.end_time,
+              date: a.date ?? null,
             })),
         );
       } else {
@@ -423,7 +440,7 @@ export default function ChatScreen() {
       // All availability slots for the request
       const { data: avail } = await supabase
         .from("request_availability")
-        .select("id,day_of_week,start_time,end_time,is_booked")
+        .select("id,day_of_week,start_time,end_time,is_booked,date")
         .eq("request_id", requestId)
         .order("day_of_week")
         .order("start_time");
@@ -451,7 +468,7 @@ export default function ChatScreen() {
           const cAvailIds = cSlots.map((s: any) => s.availability_id);
           const { data: cAvail } = await supabase
             .from("request_availability")
-            .select("id,day_of_week,start_time,end_time")
+            .select("id,day_of_week,start_time,end_time,date")
             .in("id", cAvailIds);
 
           const cAvailMap = new Map((cAvail ?? []).map((a: any) => [a.id, a]));
@@ -464,6 +481,7 @@ export default function ChatScreen() {
                 day_of_week: a.day_of_week,
                 start_time: a.start_time,
                 end_time: a.end_time,
+                date: a.date ?? null,
               };
             })
             .filter(Boolean);
@@ -1328,8 +1346,10 @@ export default function ChatScreen() {
             {pendingChangeRequest.slots.map((s, i) => (
               <View key={i} style={styles.scheduleChangeChip}>
                 <Text style={styles.scheduleChangeChipText}>
-                  {t(DAY_KEYS_CHAT[s.day_of_week])} {fmtSlotTime(s.start_time)}{" "}
-                  – {fmtSlotTime(s.end_time)}
+                  {s.date
+                    ? fmtSlotDate(s.date)
+                    : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                  {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
                 </Text>
               </View>
             ))}
@@ -1362,8 +1382,10 @@ export default function ChatScreen() {
             {pendingChangeRequest.slots.map((s, i) => (
               <View key={i} style={styles.scheduleChangeChip}>
                 <Text style={styles.scheduleChangeChipText}>
-                  {t(DAY_KEYS_CHAT[s.day_of_week])} {fmtSlotTime(s.start_time)}{" "}
-                  – {fmtSlotTime(s.end_time)}
+                  {s.date
+                    ? fmtSlotDate(s.date)
+                    : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                  {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
                 </Text>
               </View>
             ))}
@@ -1383,7 +1405,9 @@ export default function ChatScreen() {
               {currentOfferSlots.map((s, i) => (
                 <View key={i} style={styles.scheduleChangeChip}>
                   <Text style={styles.scheduleChangeChipText}>
-                    {t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                    {s.date
+                      ? fmtSlotDate(s.date)
+                      : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
                     {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
                   </Text>
                 </View>

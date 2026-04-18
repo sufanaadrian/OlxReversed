@@ -229,7 +229,7 @@ export default function MarketplaceScreen() {
       const ids = reqList.map((r) => r.id);
       const { data: avail } = await supabase
         .from("request_availability")
-        .select("id,request_id,day_of_week,start_time,end_time,is_booked")
+        .select("id,request_id,day_of_week,start_time,end_time,is_booked,date")
         .in("request_id", ids)
         .order("day_of_week")
         .order("start_time");
@@ -244,6 +244,7 @@ export default function MarketplaceScreen() {
           id: row.id,
           start: row.start_time.slice(0, 5),
           end: row.end_time.slice(0, 5),
+          date: row.date ?? undefined,
         });
       });
       setAvailabilityMap(map);

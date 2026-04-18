@@ -55,6 +55,7 @@ type OfferSlotInfo = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  date: string | null;
 };
 
 const DAY_KEYS = [
@@ -69,6 +70,16 @@ const DAY_KEYS = [
 
 function formatTime(t: string): string {
   return t.slice(0, 5);
+}
+
+function fmtSlotDate(date: string | null): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function RequestOffersScreen() {
@@ -169,7 +180,7 @@ export default function RequestOffersScreen() {
         ];
         const { data: availData } = await supabase
           .from("request_availability")
-          .select("id,day_of_week,start_time,end_time")
+          .select("id,day_of_week,start_time,end_time,date")
           .in("id", availIds);
 
         const availMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
@@ -182,6 +193,7 @@ export default function RequestOffersScreen() {
               day_of_week: a.day_of_week,
               start_time: a.start_time,
               end_time: a.end_time,
+              date: a.date ?? null,
             });
           }
         }
@@ -512,7 +524,9 @@ export default function RequestOffersScreen() {
                           {slots.map((s, i) => (
                             <View key={i} style={styles.slotChip}>
                               <Text style={styles.slotChipText}>
-                                {t(DAY_KEYS[s.day_of_week])}{" "}
+                                {s.date
+                                  ? fmtSlotDate(s.date)
+                                  : t(DAY_KEYS[s.day_of_week])}{" "}
                                 {formatTime(s.start_time)} –{" "}
                                 {formatTime(s.end_time)}
                               </Text>

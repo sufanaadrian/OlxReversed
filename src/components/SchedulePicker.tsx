@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useTranslation } from "../context/LanguageContext";
 import { styles } from "./SchedulePicker.styles";
@@ -9,6 +9,7 @@ export type TimeSlot = {
   id: string;
   start: string; // "HH:MM"
   end: string; // "HH:MM"
+  date?: string; // "YYYY-MM-DD" — if set, this is a date-specific slot
 };
 
 export type DaySchedule = {
@@ -44,6 +45,42 @@ export function emptyWeek(): WeekSchedule {
 
 export function weekHasSlots(week: WeekSchedule): boolean {
   return week.some((d) => d.enabled && d.slots.length > 0);
+}
+
+/** Check if any slot in the schedule has a date */
+function hasDatedSlots(week: WeekSchedule): boolean {
+  return week.some((d) => d.slots.some((s) => !!s.date));
+}
+
+/** Format "YYYY-MM-DD" → short locale label like "Mon, Apr 20" */
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Group all dated slots into a flat list sorted by date */
+function collectDatedSlots(
+  week: WeekSchedule,
+): { date: string; slot: TimeSlot; dayIndex: number }[] {
+  const out: { date: string; slot: TimeSlot; dayIndex: number }[] = [];
+  for (const day of week) {
+    if (!day.enabled) continue;
+    for (const slot of day.slots) {
+      if (slot.date) {
+        out.push({ date: slot.date, slot, dayIndex: day.dayIndex });
+      }
+    }
+  }
+  out.sort((a, b) => {
+    const cmp = a.date.localeCompare(b.date);
+    if (cmp !== 0) return cmp;
+    return a.slot.start.localeCompare(b.slot.start);
+  });
+  return out;
 }
 
 // ── Quick presets ────────────────────────────────────────────────────
@@ -219,6 +256,219 @@ function TimePicker({
   );
 }
 
+// ── Calendar mini-view for date-specific schedules ───────────────────
+
+const CAL_DAY_KEYS = [
+  "mondayShort",
+  "tuesdayShort",
+  "wednesdayShort",
+  "thursdayShort",
+  "fridayShort",
+  "saturdayShort",
+  "sundayShort",
+] as const;
+
+function localISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+type CalProps = {
+  value: WeekSchedule;
+  slotStatuses?: Record<string, "available" | "pending" | "booked">;
+  t: (key: string) => string;
+};
+
+function ScheduleCalendar({ value, slotStatuses, t }: CalProps) {
+  const dated = useMemo(() => collectDatedSlots(value), [value]);
+
+  // Build a map: dateStr → slots
+  const dateMap = useMemo(() => {
+    const m = new Map<
+      string,
+      { slot: TimeSlot; status: "available" | "pending" | "booked" }[]
+    >();
+    for (const entry of dated) {
+      const status = slotStatuses?.[entry.slot.id] ?? "available";
+      if (!m.has(entry.date)) m.set(entry.date, []);
+      m.get(entry.date)!.push({ slot: entry.slot, status });
+    }
+    return m;
+  }, [dated, slotStatuses]);
+
+  // Determine initial month from the first dated slot
+  const firstDate =
+    dated.length > 0 ? new Date(dated[0].date + "T00:00:00") : new Date();
+  const [viewYear, setViewYear] = useState(firstDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(firstDate.getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(
+    dated.length > 0 ? dated[0].date : null,
+  );
+
+  if (dated.length === 0) return null;
+
+  const goBack = () => {
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+  const goForward = () => {
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  // Build calendar grid
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  // Monday=0, convert from JS Sunday=0
+  const startDow = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthLabel = firstOfMonth.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  // Get best status for a date (booked > pending > available)
+  const getDateStatus = (
+    dateStr: string,
+  ): "available" | "pending" | "booked" | null => {
+    const slots = dateMap.get(dateStr);
+    if (!slots) return null;
+    if (slots.some((s) => s.status === "booked")) return "booked";
+    if (slots.some((s) => s.status === "pending")) return "pending";
+    return "available";
+  };
+
+  const selectedSlots = selectedDate ? (dateMap.get(selectedDate) ?? []) : [];
+
+  return (
+    <View style={styles.calWrap}>
+      {/* Month nav */}
+      <View style={styles.calHeader}>
+        <Pressable onPress={goBack} style={styles.calNavBtn}>
+          <Text style={styles.calNavText}>‹</Text>
+        </Pressable>
+        <Text style={styles.calMonthLabel}>{monthLabel}</Text>
+        <Pressable onPress={goForward} style={styles.calNavBtn}>
+          <Text style={styles.calNavText}>›</Text>
+        </Pressable>
+      </View>
+
+      {/* Day-of-week header */}
+      <View style={styles.calRow}>
+        {CAL_DAY_KEYS.map((k) => (
+          <View key={k} style={styles.calCell}>
+            <Text style={styles.calDowLabel}>{t(k)}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Day cells */}
+      {Array.from({ length: cells.length / 7 }, (_, week) => (
+        <View key={week} style={styles.calRow}>
+          {cells.slice(week * 7, week * 7 + 7).map((day, ci) => {
+            if (day === null) {
+              return <View key={`e${ci}`} style={styles.calCell} />;
+            }
+            const dateStr = localISO(new Date(viewYear, viewMonth, day));
+            const status = getDateStatus(dateStr);
+            const isSelected = dateStr === selectedDate;
+
+            return (
+              <Pressable
+                key={day}
+                style={[
+                  styles.calCell,
+                  status !== null && styles.calCellHasSlots,
+                  isSelected && styles.calCellSelected,
+                ]}
+                onPress={() => {
+                  if (status !== null) setSelectedDate(dateStr);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.calDayText,
+                    status !== null && styles.calDayTextActive,
+                    isSelected && styles.calDayTextSelected,
+                  ]}
+                >
+                  {day}
+                </Text>
+                {status !== null && (
+                  <View
+                    style={[
+                      styles.calDot,
+                      status === "booked" && styles.calDotBooked,
+                      status === "pending" && styles.calDotPending,
+                      status === "available" && styles.calDotAvailable,
+                    ]}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+
+      {/* Selected date details */}
+      {selectedDate && selectedSlots.length > 0 && (
+        <View style={styles.calDetail}>
+          <Text style={styles.calDetailDate}>
+            {formatDateLabel(selectedDate)}
+          </Text>
+          <View style={styles.readOnlySlots}>
+            {selectedSlots.map(({ slot, status }) => (
+              <View
+                key={slot.id}
+                style={[
+                  styles.readOnlyChip,
+                  status === "booked" && styles.readOnlyChipBooked,
+                  status === "pending" && styles.readOnlyChipPending,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.readOnlyChipText,
+                    status === "booked" && styles.readOnlyChipTextBooked,
+                    status === "pending" && styles.readOnlyChipTextPending,
+                  ]}
+                >
+                  {slot.start} – {slot.end}
+                </Text>
+                {status === "booked" && (
+                  <Text style={styles.readOnlyStatusText}>
+                    {t("slotBooked")}
+                  </Text>
+                )}
+                {status === "pending" && (
+                  <Text style={styles.readOnlyStatusTextPending}>
+                    {t("slotPending")}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────
 
 type Props = {
@@ -348,6 +598,15 @@ export function SchedulePicker({
   if (readOnly) {
     const activeDays = value.filter((d) => d.enabled && d.slots.length > 0);
     if (activeDays.length === 0) return null;
+
+    // ── Date-specific display — calendar mini-view ────────────────
+    if (hasDatedSlots(value)) {
+      return (
+        <ScheduleCalendar value={value} slotStatuses={slotStatuses} t={t} />
+      );
+    }
+
+    // ── Weekday-only display (no dates — backward compat) ──────────
     return (
       <View style={styles.readOnlyWrap}>
         {activeDays.map((day) => (

@@ -339,4 +339,103 @@ export const styles = StyleSheet.create({
     color: theme.amber,
     textTransform: "uppercase",
   },
+
+  // ── Calendar mini-view ───────────────────────────────────────────
+  calWrap: {
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 12,
+    gap: 6,
+  },
+  calHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  calNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: theme.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calNavText: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: theme.primaryText,
+    lineHeight: 22,
+  },
+  calMonthLabel: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: theme.primaryText,
+    textTransform: "capitalize",
+  },
+  calRow: {
+    flexDirection: "row",
+  },
+  calCell: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    gap: 2,
+  },
+  calCellHasSlots: {
+    borderRadius: 8,
+  },
+  calCellSelected: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 8,
+  },
+  calDowLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  calDayText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.secondaryText,
+  },
+  calDayTextActive: {
+    color: theme.primaryText,
+    fontWeight: "800",
+  },
+  calDayTextSelected: {
+    color: theme.primary,
+    fontWeight: "900",
+  },
+  calDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  calDotAvailable: {
+    backgroundColor: theme.success,
+  },
+  calDotPending: {
+    backgroundColor: theme.amber,
+  },
+  calDotBooked: {
+    backgroundColor: theme.danger,
+  },
+  calDetail: {
+    marginTop: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: theme.border,
+    gap: 6,
+  },
+  calDetailDate: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: theme.primary,
+  },
 });

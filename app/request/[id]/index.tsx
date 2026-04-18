@@ -98,7 +98,18 @@ type OfferSlotInfo = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  date: string | null;
 };
+
+function fmtSlotDate(date: string | null): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 const categoryTranslationKeys: Record<string, string> = {
   Vehicles: "vehicles",
@@ -279,7 +290,7 @@ export default function RequestDetailScreen() {
           ];
           const { data: availData } = await supabase
             .from("request_availability")
-            .select("id,day_of_week,start_time,end_time")
+            .select("id,day_of_week,start_time,end_time,date")
             .in("id", availIds);
 
           const aMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
@@ -292,6 +303,7 @@ export default function RequestDetailScreen() {
                 day_of_week: a.day_of_week,
                 start_time: a.start_time,
                 end_time: a.end_time,
+                date: a.date ?? null,
               });
           }
           setOfferSlots(mapped);
@@ -316,7 +328,7 @@ export default function RequestDetailScreen() {
     // Load availability schedule
     const { data: avail } = await supabase
       .from("request_availability")
-      .select("id,day_of_week,start_time,end_time,is_booked")
+      .select("id,day_of_week,start_time,end_time,is_booked,date")
       .eq("request_id", id)
       .order("day_of_week")
       .order("start_time");
@@ -331,6 +343,7 @@ export default function RequestDetailScreen() {
           id: row.id as string,
           start: (row.start_time as string).slice(0, 5),
           end: (row.end_time as string).slice(0, 5),
+          date: (row as any).date ?? undefined,
         });
         statusMap[row.id as string] = (row.is_booked as boolean)
           ? "booked"
@@ -1045,7 +1058,9 @@ export default function RequestDetailScreen() {
                               {slots.map((s, i) => (
                                 <View key={i} style={styles.offerSlotChip}>
                                   <Text style={styles.offerSlotChipText}>
-                                    {t(DAY_KEYS_INDEX[s.day_of_week])}{" "}
+                                    {s.date
+                                      ? fmtSlotDate(s.date)
+                                      : t(DAY_KEYS_INDEX[s.day_of_week])}{" "}
                                     {s.start_time.slice(0, 5)} –{" "}
                                     {s.end_time.slice(0, 5)}
                                   </Text>

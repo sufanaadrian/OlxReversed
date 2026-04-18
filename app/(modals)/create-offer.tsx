@@ -86,7 +86,7 @@ export default function CreateOfferModal() {
 
     const { data: slots, error } = await supabase
       .from("request_availability")
-      .select("id,day_of_week,start_time,end_time,is_booked")
+      .select("id,day_of_week,start_time,end_time,is_booked,date")
       .eq("request_id", requestId)
       .order("day_of_week")
       .order("start_time");
