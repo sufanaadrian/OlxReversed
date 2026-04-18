@@ -1,8 +1,19 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Screen } from "../../src/components/Screen";
+import {
+  AvailabilitySlot,
+  SlotSelector,
+} from "../../src/components/SlotSelector";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
@@ -31,6 +42,13 @@ export default function CreateOfferModal() {
   const [description, setDescription] = useState("");
 
   const [latestOffer, setLatestOffer] = useState<OfferRow | null>(null);
+
+  // Availability slots from the request
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
+  const [slotStatuses, setSlotStatuses] = useState<
+    Record<string, "available" | "pending" | "booked">
+  >({});
 
   const loadLatestOffer = useCallback(async () => {
     setChecking(true);
@@ -63,10 +81,57 @@ export default function CreateOfferModal() {
     setChecking(false);
   }, [requestId]);
 
+  const loadAvailability = useCallback(async () => {
+    if (!requestId) return;
+
+    const { data: slots, error } = await supabase
+      .from("request_availability")
+      .select("id,day_of_week,start_time,end_time,is_booked")
+      .eq("request_id", requestId)
+      .order("day_of_week")
+      .order("start_time");
+
+    if (error) {
+      console.log("loadAvailability error:", error);
+      return;
+    }
+
+    setAvailableSlots((slots ?? []) as AvailabilitySlot[]);
+
+    // Determine statuses: check which slots have pending/accepted offers
+    const slotIds = (slots ?? []).map((s: any) => s.id);
+    if (slotIds.length > 0) {
+      const { data: offerSlots } = await supabase
+        .from("offer_slots")
+        .select("availability_id,offer_id,offers!inner(status)")
+        .in("availability_id", slotIds);
+
+      const statusMap: Record<string, "available" | "pending" | "booked"> = {};
+      for (const s of slots ?? []) {
+        statusMap[(s as any).id] = (s as any).is_booked
+          ? "booked"
+          : "available";
+      }
+
+      for (const os of (offerSlots ?? []) as any[]) {
+        const aid = os.availability_id;
+        const offerStatus = os.offers?.status;
+        if (offerStatus === "accepted") {
+          statusMap[aid] = "booked";
+        } else if (offerStatus === "pending" && statusMap[aid] !== "booked") {
+          statusMap[aid] = "pending";
+        }
+      }
+
+      setSlotStatuses(statusMap);
+    }
+  }, [requestId]);
+
   useFocusEffect(
     useCallback(() => {
       loadLatestOffer();
-    }, [loadLatestOffer]),
+      loadAvailability();
+    }, [loadLatestOffer, loadAvailability]),
   );
 
   const canSend = useMemo(() => {
@@ -123,13 +188,17 @@ export default function CreateOfferModal() {
     setLoading(true);
 
     // Insert NEW offer row every time (history)
-    const { error } = await supabase.from("offers").insert({
-      request_id: requestId,
-      user_id: uid,
-      price: p,
-      description: description.trim(),
-      status: "pending",
-    });
+    const { data: insertedOffer, error } = await supabase
+      .from("offers")
+      .insert({
+        request_id: requestId,
+        user_id: uid,
+        price: p,
+        description: description.trim(),
+        status: "pending",
+      })
+      .select("id")
+      .single();
 
     setLoading(false);
 
@@ -143,6 +212,18 @@ export default function CreateOfferModal() {
 
       Alert.alert(t("error"), error.message);
       return;
+    }
+
+    // Save selected slots
+    if (insertedOffer && selectedSlotIds.length > 0) {
+      const slotRows = selectedSlotIds.map((aid) => ({
+        offer_id: insertedOffer.id,
+        availability_id: aid,
+      }));
+      const { error: slotErr } = await supabase
+        .from("offer_slots")
+        .insert(slotRows);
+      if (slotErr) console.log("offer_slots insert error:", slotErr);
     }
 
     Alert.alert(t("sent"), t("offerSent"));
@@ -160,68 +241,95 @@ export default function CreateOfferModal() {
           <View style={{ width: 56 }} />
         </View>
 
-        {checking ? (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>{t("checkingOffers")}</Text>
-          </View>
-        ) : latestOffer ? (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              {t("latestOfferStatus")}{" "}
-              <Text style={{ fontWeight: "900" }}>
-                {latestOffer.status.toUpperCase()}
-              </Text>
-            </Text>
-
-            {!canSend && (
-              <Text style={[styles.infoText, { marginTop: 6 }]}>
-                {disabledReason}
-              </Text>
-            )}
-
-            {latestOffer.status === "rejected" && (
-              <Text style={[styles.infoText, { marginTop: 6 }]}>
-                {t("lastOfferRejected")}
-              </Text>
-            )}
-          </View>
-        ) : null}
-
-        <Text style={styles.label}>{t("price")}</Text>
-        <TextInput
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-          placeholder={t("examplePrice")}
-          placeholderTextColor={theme.secondaryText}
-          style={styles.input}
-        />
-
-        <Text style={[styles.label, { marginTop: 12 }]}>
-          {t("description")}
-        </Text>
-        <TextInput
-          value={description}
-          onChangeText={setDescription}
-          placeholder={t("shortMessagePlaceholder")}
-          placeholderTextColor={theme.secondaryText}
-          style={[styles.input, styles.textArea]}
-          multiline
-        />
-
-        <Pressable
-          onPress={onSubmit}
-          style={({ pressed }) => [
-            styles.cta,
-            (!canSend || loading) && styles.ctaDisabled,
-            pressed && { opacity: 0.9 },
-          ]}
-          disabled={!canSend || loading}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.ctaText}>
-            {loading ? t("sending") : t("sendOffer")}
+          {checking ? (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>{t("checkingOffers")}</Text>
+            </View>
+          ) : latestOffer ? (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                {t("latestOfferStatus")}{" "}
+                <Text style={{ fontWeight: "900" }}>
+                  {latestOffer.status.toUpperCase()}
+                </Text>
+              </Text>
+
+              {!canSend && (
+                <Text style={[styles.infoText, { marginTop: 6 }]}>
+                  {disabledReason}
+                </Text>
+              )}
+
+              {latestOffer.status === "rejected" && (
+                <Text style={[styles.infoText, { marginTop: 6 }]}>
+                  {t("lastOfferRejected")}
+                </Text>
+              )}
+            </View>
+          ) : null}
+
+          <Text style={styles.label}>{t("price")}</Text>
+          <TextInput
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="numeric"
+            placeholder={t("examplePrice")}
+            placeholderTextColor={theme.secondaryText}
+            style={styles.input}
+          />
+
+          <Text style={[styles.label, { marginTop: 12 }]}>
+            {t("description")}
           </Text>
-        </Pressable>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t("shortMessagePlaceholder")}
+            placeholderTextColor={theme.secondaryText}
+            style={[styles.input, styles.textArea]}
+            multiline
+          />
+
+          {availableSlots.length > 0 && (
+            <View style={{ marginTop: 20 }}>
+              <Text style={styles.label}>{t("selectTimeSlots")}</Text>
+              <Text style={[styles.infoText, { marginBottom: 8 }]}>
+                {t("selectTimeSlotsHint")}
+              </Text>
+              <SlotSelector
+                slots={availableSlots}
+                selected={selectedSlotIds}
+                onToggle={(id) =>
+                  setSelectedSlotIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((x) => x !== id)
+                      : [...prev, id],
+                  )
+                }
+                slotStatuses={slotStatuses}
+              />
+            </View>
+          )}
+
+          <Pressable
+            onPress={onSubmit}
+            style={({ pressed }) => [
+              styles.cta,
+              (!canSend || loading) && styles.ctaDisabled,
+              pressed && { opacity: 0.9 },
+            ]}
+            disabled={!canSend || loading}
+          >
+            <Text style={styles.ctaText}>
+              {loading ? t("sending") : t("sendOffer")}
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
     </Screen>
   );

@@ -38,7 +38,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type RequestStatus = "active" | "matched" | "closed";
+type RequestStatus = "open" | "active" | "negotiating" | "matched" | "closed";
 
 type RequestRow = {
   id: string;
@@ -46,10 +46,6 @@ type RequestRow = {
   title: string;
   description: string;
   status: RequestStatus;
-  close_requested_by?: string | null;
-  close_confirmed_by?: string | null;
-  close_reason?: "completed" | "cancelled" | null;
-  closed_at?: string | null;
 };
 
 type OfferRow = {
@@ -59,6 +55,10 @@ type OfferRow = {
   status: "pending" | "accepted" | "rejected" | "withdrawn";
   price: number;
   created_at: string;
+  close_requested_by?: string | null;
+  close_confirmed_by?: string | null;
+  close_reason?: "completed" | "cancelled" | null;
+  closed_at?: string | null;
 };
 
 type ProfileRow = {
@@ -155,8 +155,8 @@ const getRequestStatusLabel = (
   s: RequestStatus,
   t: (key: string) => string,
 ) => {
-  if (s === "active") return t("open");
-  if (s === "matched") return t("negotiating");
+  if (s === "open" || s === "active") return t("open");
+  if (s === "negotiating" || s === "matched") return t("negotiating");
   return t("closed");
 };
 
@@ -258,9 +258,7 @@ export default function ChatScreen() {
 
     const { data: req, error: reqErr } = await supabase
       .from("requests")
-      .select(
-        "id,user_id,title,description,status,close_requested_by,close_confirmed_by,close_reason,closed_at",
-      )
+      .select("id,user_id,title,description,status")
       .eq("id", requestId)
       .single();
 
@@ -276,7 +274,9 @@ export default function ChatScreen() {
     // Find the accepted offer for this request (the conversation anchor).
     const { data: off, error: offErr } = await supabase
       .from("offers")
-      .select("id,request_id,user_id,status,price,created_at")
+      .select(
+        "id,request_id,user_id,status,price,created_at,close_requested_by,close_confirmed_by,close_reason,closed_at",
+      )
       .eq("request_id", requestId)
       .eq("status", "accepted")
       .order("created_at", { ascending: false })
@@ -442,7 +442,7 @@ export default function ChatScreen() {
     };
   }, [acceptedOffer?.id, meId, markAsRead]);
 
-  // Realtime: request status / close handshake updates
+  // Realtime: request status updates
   useEffect(() => {
     if (!requestId) return;
 
@@ -466,6 +466,32 @@ export default function ChatScreen() {
       supabase.removeChannel(channel);
     };
   }, [requestId]);
+
+  // Realtime: offer close handshake updates
+  useEffect(() => {
+    const offerId = acceptedOffer?.id;
+    if (!offerId) return;
+
+    const channel = supabase
+      .channel(`offer-close:${offerId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "offers",
+          filter: `id=eq.${offerId}`,
+        },
+        (payload) => {
+          setAcceptedOffer(payload.new as any);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [acceptedOffer?.id]);
 
   // WhatsApp-like: Presence + Typing on a channel per request
   useEffect(() => {
@@ -516,8 +542,9 @@ export default function ChatScreen() {
   );
 
   const canChat = useMemo(() => {
-    if (!request) return false;
     if (!acceptedOffer) return false;
+    if (acceptedOffer.closed_at) return false;
+    if (!request) return false;
     return request.status === "matched" || request.status === "closed";
   }, [request, acceptedOffer]);
 
@@ -605,8 +632,8 @@ export default function ChatScreen() {
 
   // -------- Close deal handshake --------
   const confirmClose = useCallback(async () => {
-    if (!request) return;
-    if (request.status !== "matched") return;
+    if (!request || !acceptedOffer) return;
+    if (acceptedOffer.closed_at) return;
 
     const uid = await refreshMeId();
     if (!uid) {
@@ -614,51 +641,88 @@ export default function ChatScreen() {
       return;
     }
 
-    if (!request.close_requested_by || request.close_requested_by === uid) {
+    if (
+      !acceptedOffer.close_requested_by ||
+      acceptedOffer.close_requested_by === uid
+    ) {
       Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
       return;
     }
 
     setCloseWorking(true);
     try {
-      const { error } = await supabase
-        .from("requests")
+      const now = new Date().toISOString();
+      const { error: offerError } = await supabase
+        .from("offers")
         .update({
           close_confirmed_by: uid,
-          status: "closed",
-          closed_at: new Date().toISOString(),
+          closed_at: now,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
-      if (error) {
-        Alert.alert(t("error"), error.message);
+      if (offerError) {
+        Alert.alert(t("error"), offerError.message);
         return;
+      }
+
+      if (acceptedOffer.close_reason === "cancelled") {
+        // Release booked slots for this offer
+        const { data: offerSlots } = await supabase
+          .from("offer_slots")
+          .select("availability_id")
+          .eq("offer_id", acceptedOffer.id);
+        if (offerSlots && offerSlots.length > 0) {
+          const slotIds = offerSlots.map((s: any) => s.availability_id);
+          await supabase
+            .from("request_availability")
+            .update({ is_booked: false })
+            .in("id", slotIds);
+        }
+
+        // Reset the request so new offers can come in
+        await supabase
+          .from("requests")
+          .update({ status: "open" })
+          .eq("id", request.id);
+      } else {
+        // Deal completed — mark selected slots as booked
+        const { data: offerSlots } = await supabase
+          .from("offer_slots")
+          .select("availability_id")
+          .eq("offer_id", acceptedOffer.id);
+        if (offerSlots && offerSlots.length > 0) {
+          const slotIds = offerSlots.map((s: any) => s.availability_id);
+          await supabase
+            .from("request_availability")
+            .update({ is_booked: true })
+            .in("id", slotIds);
+        }
       }
 
       await load();
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [request, acceptedOffer, t, refreshMeId, load]);
 
   const undoCloseRequest = useCallback(async () => {
-    if (!request) return;
+    if (!acceptedOffer) return;
 
     const uid = await refreshMeId();
     if (!uid) return;
-    if (request.close_requested_by !== uid) return;
+    if (acceptedOffer.close_requested_by !== uid) return;
 
     setCloseWorking(true);
     try {
       const { error } = await supabase
-        .from("requests")
+        .from("offers")
         .update({
           close_requested_by: null,
           close_confirmed_by: null,
           close_reason: null,
           closed_at: null,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
       if (error) {
         Alert.alert(t("error"), error.message);
@@ -668,28 +732,28 @@ export default function ChatScreen() {
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [acceptedOffer, t, refreshMeId, load]);
 
   const dismissCloseRequest = useCallback(async () => {
-    if (!request) return;
+    if (!acceptedOffer) return;
 
     const uid = await refreshMeId();
     if (!uid) return;
 
-    if (!request.close_requested_by) return;
-    if (request.close_requested_by === uid) return;
+    if (!acceptedOffer.close_requested_by) return;
+    if (acceptedOffer.close_requested_by === uid) return;
 
     setCloseWorking(true);
     try {
       const { error } = await supabase
-        .from("requests")
+        .from("offers")
         .update({
           close_requested_by: null,
           close_confirmed_by: null,
           close_reason: null,
           closed_at: null,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
       if (error) {
         Alert.alert(t("error"), error.message);
@@ -699,15 +763,12 @@ export default function ChatScreen() {
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [acceptedOffer, t, refreshMeId, load]);
 
   const requestClose = useCallback(
     async (reason: "completed" | "cancelled") => {
-      if (!request) return;
-      if (request.status !== "matched") {
-        Alert.alert(t("notAllowed"), t("chatOnlyNegotiating"));
-        return;
-      }
+      if (!acceptedOffer) return;
+      if (acceptedOffer.closed_at) return;
 
       const uid = await refreshMeId();
       if (!uid) {
@@ -715,7 +776,10 @@ export default function ChatScreen() {
         return;
       }
 
-      if (request.close_requested_by && request.close_requested_by !== uid) {
+      if (
+        acceptedOffer.close_requested_by &&
+        acceptedOffer.close_requested_by !== uid
+      ) {
         await confirmClose();
         return;
       }
@@ -723,14 +787,14 @@ export default function ChatScreen() {
       setCloseWorking(true);
       try {
         const { error } = await supabase
-          .from("requests")
+          .from("offers")
           .update({
             close_requested_by: uid,
             close_confirmed_by: null,
             close_reason: reason,
             closed_at: null,
           })
-          .eq("id", request.id);
+          .eq("id", acceptedOffer.id);
 
         if (error) {
           Alert.alert(t("error"), error.message);
@@ -742,7 +806,7 @@ export default function ChatScreen() {
         setCloseWorking(false);
       }
     },
-    [request, t, refreshMeId, confirmClose, load],
+    [acceptedOffer, t, refreshMeId, confirmClose, load],
   );
 
   function base64ToUint8Array(base64: string) {
@@ -942,13 +1006,14 @@ export default function ChatScreen() {
   };
 
   const closeCTA = useMemo(() => {
-    if (!request || request.status !== "matched" || !meId) return null;
+    if (!acceptedOffer || acceptedOffer.closed_at || !meId) return null;
 
-    const requestedByMe = request.close_requested_by === meId;
+    const requestedByMe = acceptedOffer.close_requested_by === meId;
     const requestedByOther =
-      !!request.close_requested_by && request.close_requested_by !== meId;
+      !!acceptedOffer.close_requested_by &&
+      acceptedOffer.close_requested_by !== meId;
 
-    if (!request.close_requested_by) {
+    if (!acceptedOffer.close_requested_by) {
       return (
         <View style={styles.closeRow}>
           <Pressable
@@ -976,13 +1041,13 @@ export default function ChatScreen() {
       );
     }
 
-    if (requestedByMe && !request.close_confirmed_by) {
+    if (requestedByMe && !acceptedOffer.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
             {t("waitingConfirmation")} (
             {t(
-              (request.close_reason ?? "completed") === "completed"
+              (acceptedOffer.close_reason ?? "completed") === "completed"
                 ? "completed"
                 : "cancelled",
             ).toUpperCase()}
@@ -1005,13 +1070,13 @@ export default function ChatScreen() {
       );
     }
 
-    if (requestedByOther && !request.close_confirmed_by) {
+    if (requestedByOther && !acceptedOffer.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
             {t("otherUserRequested")}:{" "}
             {t(
-              (request.close_reason ?? "completed") === "completed"
+              (acceptedOffer.close_reason ?? "completed") === "completed"
                 ? "completed"
                 : "cancelled",
             ).toUpperCase()}
@@ -1044,7 +1109,7 @@ export default function ChatScreen() {
 
     return null;
   }, [
-    request,
+    acceptedOffer,
     meId,
     closeWorking,
     t,
@@ -1078,7 +1143,7 @@ export default function ChatScreen() {
             <View
               style={[
                 styles.statusPill,
-                request.status === "active"
+                request.status === "open" || request.status === "active"
                   ? styles.pillOpen
                   : request.status === "matched"
                     ? styles.pillNegotiating
@@ -1286,7 +1351,7 @@ export default function ChatScreen() {
             </Text>
           </View>
 
-          {request?.status === "closed" ? (
+          {request?.status === "closed" || !!acceptedOffer?.closed_at ? (
             <View style={styles.headerIconBtn}>
               <Feather name="lock" size={18} color={theme.secondaryText} />
             </View>
@@ -1380,7 +1445,7 @@ export default function ChatScreen() {
                   placeholder={
                     canChat
                       ? t("writeMessage")
-                      : request?.status === "closed"
+                      : acceptedOffer?.closed_at
                         ? t("dealClosed")
                         : t("chatOnlyNegotiating")
                   }

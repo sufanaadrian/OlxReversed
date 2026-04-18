@@ -14,6 +14,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  emptyWeek,
+  SchedulePicker,
+  WeekSchedule,
+} from "../../src/components/SchedulePicker";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
@@ -85,6 +90,9 @@ export default function CreateRequestModal() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ── Availability schedule ────────────────────────────────────────
+  const [schedule, setSchedule] = useState<WeekSchedule>(emptyWeek());
+
   // ── Populate from DB in edit mode ────────────────────────────────
   useEffect(() => {
     if (!requestId) return;
@@ -122,6 +130,28 @@ export default function CreateRequestModal() {
       setScheduledDate(data.scheduled_date ?? "");
       setSpecialRequirements(data.special_requirements ?? "");
       setPhotos(data.photos ?? []);
+
+      // Load existing availability slots
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,day_of_week,start_time,end_time,is_booked")
+        .eq("request_id", requestId)
+        .order("day_of_week")
+        .order("start_time");
+
+      if (avail && avail.length > 0) {
+        const week = emptyWeek();
+        for (const row of avail) {
+          const day = week[row.day_of_week];
+          day.enabled = true;
+          day.slots.push({
+            id: row.id,
+            start: (row.start_time as string).slice(0, 5),
+            end: (row.end_time as string).slice(0, 5),
+          });
+        }
+        setSchedule(week);
+      }
     })();
   }, [requestId, t]);
 
@@ -252,6 +282,7 @@ export default function CreateRequestModal() {
       };
 
       let error;
+      let insertedRequestId = requestId;
       if (isEditMode) {
         ({ error } = await supabase
           .from("requests")
@@ -260,15 +291,54 @@ export default function CreateRequestModal() {
       } else {
         const guard = await requireAuth("/create-request");
         if (!guard.ok) return;
-        ({ error } = await supabase.from("requests").insert({
-          ...payload,
-          user_id: guard.userId,
-          type: "service",
-          status: "active",
-        }));
+        const { data: inserted, error: insError } = await supabase
+          .from("requests")
+          .insert({
+            ...payload,
+            user_id: guard.userId,
+            type: "service",
+            status: "active",
+          })
+          .select("id")
+          .single();
+        error = insError;
+        if (inserted) insertedRequestId = inserted.id;
       }
 
       if (error) throw error;
+
+      // Save availability schedule
+      if (insertedRequestId) {
+        // In edit mode, remove old non-booked slots and re-insert
+        if (isEditMode) {
+          await supabase
+            .from("request_availability")
+            .delete()
+            .eq("request_id", insertedRequestId)
+            .eq("is_booked", false);
+        }
+
+        const slotsToInsert = schedule
+          .filter((d) => d.enabled && d.slots.length > 0)
+          .flatMap((d) =>
+            d.slots
+              .filter((s) => !s.id.startsWith("slot-") || !isEditMode)
+              .map((s) => ({
+                request_id: insertedRequestId,
+                day_of_week: d.dayIndex,
+                start_time: s.start + ":00",
+                end_time: s.end + ":00",
+              })),
+          );
+
+        if (slotsToInsert.length > 0) {
+          const { error: slotErr } = await supabase
+            .from("request_availability")
+            .insert(slotsToInsert);
+          if (slotErr) console.log("availability insert error:", slotErr);
+        }
+      }
+
       router.back();
     } catch (e: any) {
       Alert.alert(t("couldNotPostRequest"), e?.message ?? "Unknown error");
@@ -729,7 +799,18 @@ export default function CreateRequestModal() {
             />
           </View>
 
-          {/* ── Section 4: Photos ── */}
+          {/* ── Section 4: Availability Schedule ── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("jobSectionSchedule")}</Text>
+            <Text style={[styles.label, styles.labelFirst]}>
+              {isOffering
+                ? t("scheduleOfferingHint")
+                : t("scheduleSeekingHint")}
+            </Text>
+            <SchedulePicker value={schedule} onChange={setSchedule} />
+          </View>
+
+          {/* ── Section 5: Photos ── */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t("jobSectionPhotos")}</Text>
             <View style={styles.photoGrid}>

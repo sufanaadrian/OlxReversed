@@ -14,6 +14,11 @@ import {
   View,
 } from "react-native";
 import { ImageViewer } from "../../../src/components/ImageViewer";
+import {
+  emptyWeek,
+  SchedulePicker,
+  WeekSchedule,
+} from "../../../src/components/SchedulePicker";
 import { Screen } from "../../../src/components/Screen";
 import { useCurrency } from "../../../src/context/CurrencyContext";
 import { useTranslation } from "../../../src/context/LanguageContext";
@@ -176,6 +181,8 @@ export default function RequestDetailScreen() {
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [offerFilter, setOfferFilter] = useState<OfferFilter>("all");
   const [descExpanded, setDescExpanded] = useState(false);
+  const [availSchedule, setAvailSchedule] = useState<WeekSchedule>(emptyWeek());
+  const [hasAvailability, setHasAvailability] = useState(false);
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const photoListRef = useRef<FlatList>(null);
@@ -246,6 +253,36 @@ export default function RequestDetailScreen() {
         .order("created_at", { ascending: false });
 
       setCounters((co ?? []) as CounterOfferRow[]);
+    }
+
+    // Load availability schedule
+    const { data: avail } = await supabase
+      .from("request_availability")
+      .select("id,day_of_week,start_time,end_time,is_booked")
+      .eq("request_id", id)
+      .order("day_of_week")
+      .order("start_time");
+
+    if (avail && avail.length > 0) {
+      const week = emptyWeek();
+      const statusMap: Record<string, "available" | "pending" | "booked"> = {};
+      for (const row of avail) {
+        const day = week[row.day_of_week as number];
+        day.enabled = true;
+        day.slots.push({
+          id: row.id as string,
+          start: (row.start_time as string).slice(0, 5),
+          end: (row.end_time as string).slice(0, 5),
+        });
+        statusMap[row.id as string] = (row.is_booked as boolean)
+          ? "booked"
+          : "available";
+      }
+      setAvailSchedule(week);
+      setHasAvailability(true);
+    } else {
+      setAvailSchedule(emptyWeek());
+      setHasAvailability(false);
     }
 
     setLoading(false);
@@ -729,6 +766,16 @@ export default function RequestDetailScreen() {
                   </Text>
                 </View>
               )}
+            </View>
+          )}
+
+          {/* ── Availability Schedule ── */}
+          {hasAvailability && (
+            <View style={styles.detailGrid}>
+              <Text style={styles.sectionTitle}>
+                {t("availabilitySchedule")}
+              </Text>
+              <SchedulePicker value={availSchedule} readOnly />
             </View>
           )}
 
