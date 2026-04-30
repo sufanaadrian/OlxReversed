@@ -1,3 +1,6 @@
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
@@ -14,6 +17,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  emptyWeek,
+  SchedulePicker,
+  WeekSchedule,
+} from "../../src/components/SchedulePicker";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
@@ -46,6 +54,14 @@ type PostingMode = "seeking" | "offering";
 type BudgetType = "range" | "per_hour" | "per_day" | "fixed";
 
 const MAX_PHOTOS = 5;
+
+/** Format a Date to "YYYY-MM-DD" using local timezone (avoids UTC shift) */
+function localISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function CreateRequestModal() {
   const t = useTranslation();
@@ -85,6 +101,13 @@ export default function CreateRequestModal() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ── Availability schedule ────────────────────────────────────────
+  const [schedule, setSchedule] = useState<WeekSchedule>(emptyWeek());
+  const [scheduleStart, setScheduleStart] = useState("");
+  const [scheduleEnd, setScheduleEnd] = useState("");
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   // ── Populate from DB in edit mode ────────────────────────────────
   useEffect(() => {
     if (!requestId) return;
@@ -122,6 +145,30 @@ export default function CreateRequestModal() {
       setScheduledDate(data.scheduled_date ?? "");
       setSpecialRequirements(data.special_requirements ?? "");
       setPhotos(data.photos ?? []);
+      setScheduleStart(data.schedule_start ?? "");
+      setScheduleEnd(data.schedule_end ?? "");
+
+      // Load existing availability slots
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,day_of_week,start_time,end_time,is_booked,date")
+        .eq("request_id", requestId)
+        .order("day_of_week")
+        .order("start_time");
+
+      if (avail && avail.length > 0) {
+        const week = emptyWeek();
+        for (const row of avail) {
+          const day = week[row.day_of_week];
+          day.enabled = true;
+          day.slots.push({
+            id: row.id,
+            start: (row.start_time as string).slice(0, 5),
+            end: (row.end_time as string).slice(0, 5),
+          });
+        }
+        setSchedule(week);
+      }
     })();
   }, [requestId, t]);
 
@@ -249,9 +296,12 @@ export default function CreateRequestModal() {
         preferred_schedule: preferredSchedule,
         special_requirements: specialRequirements.trim() || null,
         photos: photoUrls,
+        schedule_start: scheduleStart || null,
+        schedule_end: scheduleEnd || null,
       };
 
       let error;
+      let insertedRequestId = requestId;
       if (isEditMode) {
         ({ error } = await supabase
           .from("requests")
@@ -260,15 +310,95 @@ export default function CreateRequestModal() {
       } else {
         const guard = await requireAuth("/create-request");
         if (!guard.ok) return;
-        ({ error } = await supabase.from("requests").insert({
-          ...payload,
-          user_id: guard.userId,
-          type: "service",
-          status: "active",
-        }));
+        const { data: inserted, error: insError } = await supabase
+          .from("requests")
+          .insert({
+            ...payload,
+            user_id: guard.userId,
+            type: "service",
+            status: "active",
+          })
+          .select("id")
+          .single();
+        error = insError;
+        if (inserted) insertedRequestId = inserted.id;
       }
 
       if (error) throw error;
+
+      // Save availability schedule
+      if (insertedRequestId) {
+        // In edit mode, remove old non-booked slots and re-insert
+        if (isEditMode) {
+          await supabase
+            .from("request_availability")
+            .delete()
+            .eq("request_id", insertedRequestId)
+            .eq("is_booked", false);
+        }
+
+        const enabledDays = schedule.filter(
+          (d) => d.enabled && d.slots.length > 0,
+        );
+
+        const slotsToInsert: {
+          request_id: string;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          date: string | null;
+        }[] = [];
+
+        if (scheduleStart && scheduleEnd && enabledDays.length > 0) {
+          // Generate date-specific slots from template × date range
+          // JS getDay(): 0=Sun … 6=Sat → convert to our 0=Mon … 6=Sun
+          const jsToOur = (jsDay: number) => (jsDay === 0 ? 6 : jsDay - 1);
+          const enabledSet = new Set(enabledDays.map((d) => d.dayIndex));
+          const cursor = new Date(scheduleStart + "T00:00:00");
+          const end = new Date(scheduleEnd + "T00:00:00");
+
+          while (cursor <= end) {
+            const ourDay = jsToOur(cursor.getDay());
+            if (enabledSet.has(ourDay)) {
+              const dateStr = localISODate(cursor);
+              const day = schedule[ourDay];
+              for (const s of day.slots) {
+                if (isEditMode && !s.id.startsWith("slot-")) continue;
+                slotsToInsert.push({
+                  request_id: insertedRequestId!,
+                  day_of_week: ourDay,
+                  start_time: s.start + ":00",
+                  end_time: s.end + ":00",
+                  date: dateStr,
+                });
+              }
+            }
+            cursor.setDate(cursor.getDate() + 1);
+          }
+        } else {
+          // No date range → legacy day-of-week-only slots
+          for (const d of enabledDays) {
+            for (const s of d.slots) {
+              if (isEditMode && !s.id.startsWith("slot-")) continue;
+              slotsToInsert.push({
+                request_id: insertedRequestId!,
+                day_of_week: d.dayIndex,
+                start_time: s.start + ":00",
+                end_time: s.end + ":00",
+                date: null,
+              });
+            }
+          }
+        }
+
+        if (slotsToInsert.length > 0) {
+          const { error: slotErr } = await supabase
+            .from("request_availability")
+            .insert(slotsToInsert);
+          if (slotErr) console.log("availability insert error:", slotErr);
+        }
+      }
+
       router.back();
     } catch (e: any) {
       Alert.alert(t("couldNotPostRequest"), e?.message ?? "Unknown error");
@@ -670,52 +800,138 @@ export default function CreateRequestModal() {
             <Text style={styles.label}>
               {isOffering ? t("offeringAvailability") : t("preferredSchedule")}
             </Text>
-            <View style={styles.chipsWrap}>
-              {(
-                [
-                  "anytime",
-                  "weekdays",
-                  "weekends",
-                  "specific_date",
-                ] as Schedule[]
-              ).map((v) => (
+            <SchedulePicker value={schedule} onChange={setSchedule} />
+
+            <Text style={[styles.label, { marginTop: 14 }]}>
+              {t("scheduleDateRange")}
+            </Text>
+            <Text style={styles.hint}>{t("scheduleDateRangeHint")}</Text>
+            <View style={styles.dateRangeRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>{t("startDate")}</Text>
                 <Pressable
-                  key={v}
-                  style={[
-                    styles.chip,
-                    preferredSchedule === v && styles.chipActive,
-                  ]}
-                  onPress={() => setPreferredSchedule(v)}
+                  style={styles.datePickerBtn}
+                  onPress={() => {
+                    setShowEndPicker(false);
+                    setShowStartPicker((v) => !v);
+                  }}
                 >
                   <Text
                     style={[
-                      styles.chipText,
-                      preferredSchedule === v && styles.chipTextActive,
+                      styles.datePickerBtnText,
+                      !scheduleStart && styles.datePickerPlaceholder,
                     ]}
                   >
-                    {v === "anytime"
-                      ? t("scheduleAnytime")
-                      : v === "weekdays"
-                        ? t("scheduleWeekdays")
-                        : v === "weekends"
-                          ? t("scheduleWeekends")
-                          : t("scheduleSpecificDate")}
+                    {scheduleStart
+                      ? new Date(
+                          scheduleStart + "T00:00:00",
+                        ).toLocaleDateString(undefined, {
+                          weekday: "short",
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : t("selectDate")}
                   </Text>
+                  <Text style={styles.datePickerIcon}>📅</Text>
                 </Pressable>
-              ))}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>{t("endDate")}</Text>
+                <Pressable
+                  style={styles.datePickerBtn}
+                  onPress={() => {
+                    setShowStartPicker(false);
+                    setShowEndPicker((v) => !v);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.datePickerBtnText,
+                      !scheduleEnd && styles.datePickerPlaceholder,
+                    ]}
+                  >
+                    {scheduleEnd
+                      ? new Date(scheduleEnd + "T00:00:00").toLocaleDateString(
+                          undefined,
+                          {
+                            weekday: "short",
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          },
+                        )
+                      : t("selectDate")}
+                  </Text>
+                  <Text style={styles.datePickerIcon}>📅</Text>
+                </Pressable>
+              </View>
             </View>
 
-            {preferredSchedule === "specific_date" && (
-              <>
-                <Text style={styles.label}>{t("scheduledDate")}</Text>
-                <TextInput
-                  value={scheduledDate}
-                  onChangeText={setScheduledDate}
-                  placeholder={t("scheduledDatePlaceholder")}
-                  placeholderTextColor={theme.secondaryText}
-                  style={styles.input}
+            {showStartPicker && (
+              <View style={styles.datePickerInline}>
+                <DateTimePicker
+                  value={
+                    scheduleStart
+                      ? new Date(scheduleStart + "T00:00:00")
+                      : new Date()
+                  }
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  minimumDate={new Date()}
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    if (Platform.OS !== "ios") setShowStartPicker(false);
+                    if (date) {
+                      const iso = localISODate(date);
+                      setScheduleStart(iso);
+                      if (scheduleEnd && iso > scheduleEnd) setScheduleEnd("");
+                    }
+                  }}
                 />
-              </>
+                {Platform.OS === "ios" && (
+                  <Pressable
+                    style={styles.datePickerDone}
+                    onPress={() => setShowStartPicker(false)}
+                  >
+                    <Text style={styles.datePickerDoneText}>{t("done")}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {showEndPicker && (
+              <View style={styles.datePickerInline}>
+                <DateTimePicker
+                  value={
+                    scheduleEnd
+                      ? new Date(scheduleEnd + "T00:00:00")
+                      : scheduleStart
+                        ? new Date(scheduleStart + "T00:00:00")
+                        : new Date()
+                  }
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  minimumDate={
+                    scheduleStart
+                      ? new Date(scheduleStart + "T00:00:00")
+                      : new Date()
+                  }
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    if (Platform.OS !== "ios") setShowEndPicker(false);
+                    if (date) {
+                      setScheduleEnd(localISODate(date));
+                    }
+                  }}
+                />
+                {Platform.OS === "ios" && (
+                  <Pressable
+                    style={styles.datePickerDone}
+                    onPress={() => setShowEndPicker(false)}
+                  >
+                    <Text style={styles.datePickerDoneText}>{t("done")}</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
 
             <Text style={styles.label}>{t("specialRequirements")}</Text>

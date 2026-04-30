@@ -50,6 +50,38 @@ type RequestRow = {
   status: string;
 };
 
+type OfferSlotInfo = {
+  offer_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  date: string | null;
+};
+
+const DAY_KEYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+function formatTime(t: string): string {
+  return t.slice(0, 5);
+}
+
+function fmtSlotDate(date: string | null): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function RequestOffersScreen() {
   const params = useLocalSearchParams();
   const requestId = (params?.id as string) ?? "";
@@ -62,6 +94,7 @@ export default function RequestOffersScreen() {
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [offerSlots, setOfferSlots] = useState<OfferSlotInfo[]>([]);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -129,8 +162,51 @@ export default function RequestOffersScreen() {
     }
 
     setCounters((co ?? []) as any);
+
+    // Load offer slots with availability info
+    const offerIds = (off ?? []).map((o: any) => o.id);
+    if (offerIds.length > 0) {
+      const { data: slotsRaw, error: slotsErr } = await supabase
+        .from("offer_slots")
+        .select("offer_id,availability_id")
+        .in("offer_id", offerIds);
+
+      if (slotsErr) {
+        console.log("offer_slots query error:", slotsErr);
+        setOfferSlots([]);
+      } else if (slotsRaw && slotsRaw.length > 0) {
+        const availIds = [
+          ...new Set(slotsRaw.map((s: any) => s.availability_id)),
+        ];
+        const { data: availData } = await supabase
+          .from("request_availability")
+          .select("id,day_of_week,start_time,end_time,date")
+          .in("id", availIds);
+
+        const availMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
+        const mapped: OfferSlotInfo[] = [];
+        for (const s of slotsRaw as any[]) {
+          const a = availMap.get(s.availability_id);
+          if (a) {
+            mapped.push({
+              offer_id: s.offer_id,
+              day_of_week: a.day_of_week,
+              start_time: a.start_time,
+              end_time: a.end_time,
+              date: a.date ?? null,
+            });
+          }
+        }
+        setOfferSlots(mapped);
+      } else {
+        setOfferSlots([]);
+      }
+    } else {
+      setOfferSlots([]);
+    }
+
     setLoading(false);
-  }, [requestId]);
+  }, [requestId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -435,6 +511,31 @@ export default function RequestOffersScreen() {
                     {formatPrice(Number(o.price))}
                   </Text>
                   <Text style={styles.desc}>{o.description}</Text>
+
+                  {(() => {
+                    const slots = offerSlots.filter((s) => s.offer_id === o.id);
+                    if (slots.length === 0) return null;
+                    return (
+                      <View style={styles.slotsWrap}>
+                        <Text style={styles.slotsLabel}>
+                          {t("scheduledSlots")}
+                        </Text>
+                        <View style={styles.slotsBox}>
+                          {slots.map((s, i) => (
+                            <View key={i} style={styles.slotChip}>
+                              <Text style={styles.slotChipText}>
+                                {s.date
+                                  ? fmtSlotDate(s.date)
+                                  : t(DAY_KEYS[s.day_of_week])}{" "}
+                                {formatTime(s.start_time)} –{" "}
+                                {formatTime(s.end_time)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    );
+                  })()}
 
                   {o.status === "withdrawn" && (
                     <View style={styles.counterBox}>

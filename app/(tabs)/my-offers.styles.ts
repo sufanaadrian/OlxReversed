@@ -376,6 +376,37 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // ─── Offer time slot chips ───────────────────────────────────
+  offerSlotsRow: {
+    marginTop: 6,
+    marginBottom: 2,
+    gap: 4,
+  },
+  offerSlotsLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  offerSlotsChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  offerSlotChip: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  offerSlotChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+
   // ─── Decision / accepted offer summary ────────────────────────
   decisionLine: {
     flexDirection: "row",

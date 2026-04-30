@@ -224,4 +224,65 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 15,
   },
+
+  // ── Date range ──────────────────────────────────────────────────
+  dateRangeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  dateLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.secondaryText,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  hint: {
+    fontSize: 12,
+    color: theme.secondaryText,
+    marginBottom: 8,
+    lineHeight: 17,
+  },
+  datePickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: theme.surface,
+  },
+  datePickerBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.primaryText,
+    flex: 1,
+  },
+  datePickerPlaceholder: {
+    color: theme.secondaryText,
+    fontWeight: "500",
+  },
+  datePickerIcon: {
+    fontSize: 16,
+    marginLeft: 6,
+  },
+  datePickerInline: {
+    marginTop: 8,
+    alignItems: "center",
+  },
+  datePickerDone: {
+    alignSelf: "flex-end",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  datePickerDoneText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.primary,
+  },
 });

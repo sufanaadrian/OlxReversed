@@ -26,6 +26,10 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../../src/components/Screen";
+import {
+  AvailabilitySlot,
+  SlotSelector,
+} from "../../../src/components/SlotSelector";
 import { useCurrency } from "../../../src/context/CurrencyContext";
 import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
@@ -38,7 +42,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-type RequestStatus = "active" | "matched" | "closed";
+type RequestStatus = "open" | "active" | "negotiating" | "matched" | "closed";
 
 type RequestRow = {
   id: string;
@@ -46,10 +50,6 @@ type RequestRow = {
   title: string;
   description: string;
   status: RequestStatus;
-  close_requested_by?: string | null;
-  close_confirmed_by?: string | null;
-  close_reason?: "completed" | "cancelled" | null;
-  closed_at?: string | null;
 };
 
 type OfferRow = {
@@ -59,6 +59,10 @@ type OfferRow = {
   status: "pending" | "accepted" | "rejected" | "withdrawn";
   price: number;
   created_at: string;
+  close_requested_by?: string | null;
+  close_confirmed_by?: string | null;
+  close_reason?: "completed" | "cancelled" | null;
+  closed_at?: string | null;
 };
 
 type ProfileRow = {
@@ -155,13 +159,35 @@ const getRequestStatusLabel = (
   s: RequestStatus,
   t: (key: string) => string,
 ) => {
-  if (s === "active") return t("open");
-  if (s === "matched") return t("negotiating");
+  if (s === "open" || s === "active") return t("open");
+  if (s === "negotiating" || s === "matched") return t("negotiating");
   return t("closed");
 };
 
 const formatHM = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+const DAY_KEYS_CHAT = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+const fmtSlotTime = (t_: string) => t_.slice(0, 5);
+
+const fmtSlotDate = (date: string | null): string => {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+};
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -191,6 +217,30 @@ export default function ChatScreen() {
   const [meId, setMeId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<ProfileRow | null>(null);
   const pendingPickerAction = useRef<null | (() => Promise<void>)>(null);
+
+  // Schedule change state
+  const [scheduleChangeOpen, setScheduleChangeOpen] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [selectedChangeSlots, setSelectedChangeSlots] = useState<string[]>([]);
+  const [pendingChangeRequest, setPendingChangeRequest] = useState<{
+    id: string;
+    requested_by: string;
+    slots: {
+      availability_id: string;
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+      date: string | null;
+    }[];
+  } | null>(null);
+  const [currentOfferSlots, setCurrentOfferSlots] = useState<
+    {
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+      date: string | null;
+    }[]
+  >([]);
 
   const runPendingPicker = useCallback(async () => {
     const fn = pendingPickerAction.current;
@@ -258,9 +308,7 @@ export default function ChatScreen() {
 
     const { data: req, error: reqErr } = await supabase
       .from("requests")
-      .select(
-        "id,user_id,title,description,status,close_requested_by,close_confirmed_by,close_reason,closed_at",
-      )
+      .select("id,user_id,title,description,status")
       .eq("id", requestId)
       .single();
 
@@ -276,7 +324,9 @@ export default function ChatScreen() {
     // Find the accepted offer for this request (the conversation anchor).
     const { data: off, error: offErr } = await supabase
       .from("offers")
-      .select("id,request_id,user_id,status,price,created_at")
+      .select(
+        "id,request_id,user_id,status,price,created_at,close_requested_by,close_confirmed_by,close_reason,closed_at",
+      )
       .eq("request_id", requestId)
       .eq("status", "accepted")
       .order("created_at", { ascending: false })
@@ -355,6 +405,97 @@ export default function ChatScreen() {
 
     setMessages((msgs ?? []) as any);
     setLoading(false);
+
+    // Load offer slots and availability for schedule changes
+    if (accepted) {
+      // Current slots for this offer
+      const { data: oSlots } = await supabase
+        .from("offer_slots")
+        .select("availability_id")
+        .eq("offer_id", accepted.id);
+
+      if (oSlots && oSlots.length > 0) {
+        const oAvailIds = oSlots.map((s: any) => s.availability_id);
+        const { data: oAvail } = await supabase
+          .from("request_availability")
+          .select("id,day_of_week,start_time,end_time,date")
+          .in("id", oAvailIds);
+
+        const oAvailMap = new Map((oAvail ?? []).map((a: any) => [a.id, a]));
+        setCurrentOfferSlots(
+          oSlots
+            .map((s: any) => oAvailMap.get(s.availability_id))
+            .filter(Boolean)
+            .map((a: any) => ({
+              day_of_week: a.day_of_week,
+              start_time: a.start_time,
+              end_time: a.end_time,
+              date: a.date ?? null,
+            })),
+        );
+      } else {
+        setCurrentOfferSlots([]);
+      }
+
+      // All availability slots for the request
+      const { data: avail } = await supabase
+        .from("request_availability")
+        .select("id,day_of_week,start_time,end_time,is_booked,date")
+        .eq("request_id", requestId)
+        .order("day_of_week")
+        .order("start_time");
+
+      setAvailableSlots((avail ?? []) as AvailabilitySlot[]);
+
+      // Any pending schedule change request
+      const { data: changeReqs } = await supabase
+        .from("schedule_change_requests")
+        .select("id,requested_by,status")
+        .eq("offer_id", accepted.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const pendingReq = changeReqs?.[0] ?? null;
+      if (pendingReq) {
+        const { data: cSlots } = await supabase
+          .from("schedule_change_slots")
+          .select("availability_id")
+          .eq("change_request_id", pendingReq.id);
+
+        let parsedSlots: any[] = [];
+        if (cSlots && cSlots.length > 0) {
+          const cAvailIds = cSlots.map((s: any) => s.availability_id);
+          const { data: cAvail } = await supabase
+            .from("request_availability")
+            .select("id,day_of_week,start_time,end_time,date")
+            .in("id", cAvailIds);
+
+          const cAvailMap = new Map((cAvail ?? []).map((a: any) => [a.id, a]));
+          parsedSlots = cSlots
+            .map((s: any) => {
+              const a = cAvailMap.get(s.availability_id);
+              if (!a) return null;
+              return {
+                availability_id: s.availability_id,
+                day_of_week: a.day_of_week,
+                start_time: a.start_time,
+                end_time: a.end_time,
+                date: a.date ?? null,
+              };
+            })
+            .filter(Boolean);
+        }
+
+        setPendingChangeRequest({
+          id: pendingReq.id,
+          requested_by: pendingReq.requested_by,
+          slots: parsedSlots,
+        });
+      } else {
+        setPendingChangeRequest(null);
+      }
+    }
 
     // Mark read when opening chat
     if (uid) await markAsRead(accepted.id, uid);
@@ -442,7 +583,7 @@ export default function ChatScreen() {
     };
   }, [acceptedOffer?.id, meId, markAsRead]);
 
-  // Realtime: request status / close handshake updates
+  // Realtime: request status updates
   useEffect(() => {
     if (!requestId) return;
 
@@ -466,6 +607,32 @@ export default function ChatScreen() {
       supabase.removeChannel(channel);
     };
   }, [requestId]);
+
+  // Realtime: offer close handshake updates
+  useEffect(() => {
+    const offerId = acceptedOffer?.id;
+    if (!offerId) return;
+
+    const channel = supabase
+      .channel(`offer-close:${offerId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "offers",
+          filter: `id=eq.${offerId}`,
+        },
+        (payload) => {
+          setAcceptedOffer(payload.new as any);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [acceptedOffer?.id]);
 
   // WhatsApp-like: Presence + Typing on a channel per request
   useEffect(() => {
@@ -510,14 +677,16 @@ export default function ChatScreen() {
     };
   }, [requestId, meId]);
 
-  const statusLabel = useMemo(
-    () => (request ? getRequestStatusLabel(request.status, t) : ""),
-    [request, t],
-  );
+  const statusLabel = useMemo(() => {
+    if (!request) return "";
+    if (acceptedOffer?.closed_at) return t("closed");
+    return getRequestStatusLabel(request.status, t);
+  }, [request, acceptedOffer, t]);
 
   const canChat = useMemo(() => {
-    if (!request) return false;
     if (!acceptedOffer) return false;
+    if (acceptedOffer.closed_at) return false;
+    if (!request) return false;
     return request.status === "matched" || request.status === "closed";
   }, [request, acceptedOffer]);
 
@@ -603,10 +772,77 @@ export default function ChatScreen() {
     }, 1200);
   };
 
+  // -------- Schedule change --------
+
+  const proposeScheduleChange = useCallback(async () => {
+    if (!acceptedOffer || !meId || selectedChangeSlots.length === 0) return;
+
+    const { data: req, error: reqErr } = await supabase
+      .from("schedule_change_requests")
+      .insert({
+        offer_id: acceptedOffer.id,
+        requested_by: meId,
+      })
+      .select("id")
+      .single();
+
+    if (reqErr || !req) {
+      Alert.alert(t("error"), reqErr?.message ?? "Unknown error");
+      return;
+    }
+
+    const slotRows = selectedChangeSlots.map((aid) => ({
+      change_request_id: req.id,
+      availability_id: aid,
+    }));
+
+    await supabase.from("schedule_change_slots").insert(slotRows);
+
+    // Update existing offer_slots to the new selection
+    await supabase
+      .from("offer_slots")
+      .delete()
+      .eq("offer_id", acceptedOffer.id);
+
+    const newSlotRows = selectedChangeSlots.map((aid) => ({
+      offer_id: acceptedOffer.id,
+      availability_id: aid,
+    }));
+    await supabase.from("offer_slots").insert(newSlotRows);
+
+    setScheduleChangeOpen(false);
+    setSelectedChangeSlots([]);
+    await load();
+  }, [acceptedOffer, meId, selectedChangeSlots, t, load]);
+
+  const acceptScheduleChange = useCallback(async () => {
+    if (!pendingChangeRequest) return;
+
+    await supabase
+      .from("schedule_change_requests")
+      .update({ status: "accepted" })
+      .eq("id", pendingChangeRequest.id);
+
+    setPendingChangeRequest(null);
+    await load();
+  }, [pendingChangeRequest, load]);
+
+  const rejectScheduleChange = useCallback(async () => {
+    if (!pendingChangeRequest || !acceptedOffer) return;
+
+    await supabase
+      .from("schedule_change_requests")
+      .update({ status: "rejected" })
+      .eq("id", pendingChangeRequest.id);
+
+    setPendingChangeRequest(null);
+    await load();
+  }, [pendingChangeRequest, acceptedOffer, load]);
+
   // -------- Close deal handshake --------
   const confirmClose = useCallback(async () => {
-    if (!request) return;
-    if (request.status !== "matched") return;
+    if (!request || !acceptedOffer) return;
+    if (acceptedOffer.closed_at) return;
 
     const uid = await refreshMeId();
     if (!uid) {
@@ -614,51 +850,88 @@ export default function ChatScreen() {
       return;
     }
 
-    if (!request.close_requested_by || request.close_requested_by === uid) {
+    if (
+      !acceptedOffer.close_requested_by ||
+      acceptedOffer.close_requested_by === uid
+    ) {
       Alert.alert(t("waitingForClose"), t("waitingForCloseMsg"));
       return;
     }
 
     setCloseWorking(true);
     try {
-      const { error } = await supabase
-        .from("requests")
+      const now = new Date().toISOString();
+      const { error: offerError } = await supabase
+        .from("offers")
         .update({
           close_confirmed_by: uid,
-          status: "closed",
-          closed_at: new Date().toISOString(),
+          closed_at: now,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
-      if (error) {
-        Alert.alert(t("error"), error.message);
+      if (offerError) {
+        Alert.alert(t("error"), offerError.message);
         return;
+      }
+
+      if (acceptedOffer.close_reason === "cancelled") {
+        // Release booked slots for this offer
+        const { data: offerSlots } = await supabase
+          .from("offer_slots")
+          .select("availability_id")
+          .eq("offer_id", acceptedOffer.id);
+        if (offerSlots && offerSlots.length > 0) {
+          const slotIds = offerSlots.map((s: any) => s.availability_id);
+          await supabase
+            .from("request_availability")
+            .update({ is_booked: false })
+            .in("id", slotIds);
+        }
+
+        // Reset the request so new offers can come in
+        await supabase
+          .from("requests")
+          .update({ status: "open" })
+          .eq("id", request.id);
+      } else {
+        // Deal completed — mark selected slots as booked
+        const { data: offerSlots } = await supabase
+          .from("offer_slots")
+          .select("availability_id")
+          .eq("offer_id", acceptedOffer.id);
+        if (offerSlots && offerSlots.length > 0) {
+          const slotIds = offerSlots.map((s: any) => s.availability_id);
+          await supabase
+            .from("request_availability")
+            .update({ is_booked: true })
+            .in("id", slotIds);
+        }
       }
 
       await load();
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [request, acceptedOffer, t, refreshMeId, load]);
 
   const undoCloseRequest = useCallback(async () => {
-    if (!request) return;
+    if (!acceptedOffer) return;
 
     const uid = await refreshMeId();
     if (!uid) return;
-    if (request.close_requested_by !== uid) return;
+    if (acceptedOffer.close_requested_by !== uid) return;
 
     setCloseWorking(true);
     try {
       const { error } = await supabase
-        .from("requests")
+        .from("offers")
         .update({
           close_requested_by: null,
           close_confirmed_by: null,
           close_reason: null,
           closed_at: null,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
       if (error) {
         Alert.alert(t("error"), error.message);
@@ -668,28 +941,28 @@ export default function ChatScreen() {
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [acceptedOffer, t, refreshMeId, load]);
 
   const dismissCloseRequest = useCallback(async () => {
-    if (!request) return;
+    if (!acceptedOffer) return;
 
     const uid = await refreshMeId();
     if (!uid) return;
 
-    if (!request.close_requested_by) return;
-    if (request.close_requested_by === uid) return;
+    if (!acceptedOffer.close_requested_by) return;
+    if (acceptedOffer.close_requested_by === uid) return;
 
     setCloseWorking(true);
     try {
       const { error } = await supabase
-        .from("requests")
+        .from("offers")
         .update({
           close_requested_by: null,
           close_confirmed_by: null,
           close_reason: null,
           closed_at: null,
         })
-        .eq("id", request.id);
+        .eq("id", acceptedOffer.id);
 
       if (error) {
         Alert.alert(t("error"), error.message);
@@ -699,15 +972,12 @@ export default function ChatScreen() {
     } finally {
       setCloseWorking(false);
     }
-  }, [request, t, refreshMeId, load]);
+  }, [acceptedOffer, t, refreshMeId, load]);
 
   const requestClose = useCallback(
     async (reason: "completed" | "cancelled") => {
-      if (!request) return;
-      if (request.status !== "matched") {
-        Alert.alert(t("notAllowed"), t("chatOnlyNegotiating"));
-        return;
-      }
+      if (!acceptedOffer) return;
+      if (acceptedOffer.closed_at) return;
 
       const uid = await refreshMeId();
       if (!uid) {
@@ -715,7 +985,10 @@ export default function ChatScreen() {
         return;
       }
 
-      if (request.close_requested_by && request.close_requested_by !== uid) {
+      if (
+        acceptedOffer.close_requested_by &&
+        acceptedOffer.close_requested_by !== uid
+      ) {
         await confirmClose();
         return;
       }
@@ -723,14 +996,14 @@ export default function ChatScreen() {
       setCloseWorking(true);
       try {
         const { error } = await supabase
-          .from("requests")
+          .from("offers")
           .update({
             close_requested_by: uid,
             close_confirmed_by: null,
             close_reason: reason,
             closed_at: null,
           })
-          .eq("id", request.id);
+          .eq("id", acceptedOffer.id);
 
         if (error) {
           Alert.alert(t("error"), error.message);
@@ -742,7 +1015,7 @@ export default function ChatScreen() {
         setCloseWorking(false);
       }
     },
-    [request, t, refreshMeId, confirmClose, load],
+    [acceptedOffer, t, refreshMeId, confirmClose, load],
   );
 
   function base64ToUint8Array(base64: string) {
@@ -942,13 +1215,14 @@ export default function ChatScreen() {
   };
 
   const closeCTA = useMemo(() => {
-    if (!request || request.status !== "matched" || !meId) return null;
+    if (!acceptedOffer || acceptedOffer.closed_at || !meId) return null;
 
-    const requestedByMe = request.close_requested_by === meId;
+    const requestedByMe = acceptedOffer.close_requested_by === meId;
     const requestedByOther =
-      !!request.close_requested_by && request.close_requested_by !== meId;
+      !!acceptedOffer.close_requested_by &&
+      acceptedOffer.close_requested_by !== meId;
 
-    if (!request.close_requested_by) {
+    if (!acceptedOffer.close_requested_by) {
       return (
         <View style={styles.closeRow}>
           <Pressable
@@ -976,13 +1250,13 @@ export default function ChatScreen() {
       );
     }
 
-    if (requestedByMe && !request.close_confirmed_by) {
+    if (requestedByMe && !acceptedOffer.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
             {t("waitingConfirmation")} (
             {t(
-              (request.close_reason ?? "completed") === "completed"
+              (acceptedOffer.close_reason ?? "completed") === "completed"
                 ? "completed"
                 : "cancelled",
             ).toUpperCase()}
@@ -1005,13 +1279,13 @@ export default function ChatScreen() {
       );
     }
 
-    if (requestedByOther && !request.close_confirmed_by) {
+    if (requestedByOther && !acceptedOffer.close_confirmed_by) {
       return (
         <View style={styles.closeRow}>
           <Text style={styles.closeHint}>
             {t("otherUserRequested")}:{" "}
             {t(
-              (request.close_reason ?? "completed") === "completed"
+              (acceptedOffer.close_reason ?? "completed") === "completed"
                 ? "completed"
                 : "cancelled",
             ).toUpperCase()}
@@ -1044,7 +1318,7 @@ export default function ChatScreen() {
 
     return null;
   }, [
-    request,
+    acceptedOffer,
     meId,
     closeWorking,
     t,
@@ -1052,6 +1326,117 @@ export default function ChatScreen() {
     dismissCloseRequest,
     requestClose,
     undoCloseRequest,
+  ]);
+
+  const scheduleCTA = useMemo(() => {
+    if (!acceptedOffer || acceptedOffer.closed_at || !meId) return null;
+    if (availableSlots.length === 0) return null;
+
+    // Show current scheduled slots
+    const hasCurrentSlots = currentOfferSlots.length > 0;
+
+    // Pending change request from other user
+    if (pendingChangeRequest && pendingChangeRequest.requested_by !== meId) {
+      return (
+        <View style={styles.scheduleChangeBox}>
+          <Text style={styles.scheduleChangeTitle}>
+            {t("scheduleChangeRequested")}
+          </Text>
+          <View style={styles.scheduleChangeSlots}>
+            {pendingChangeRequest.slots.map((s, i) => (
+              <View key={i} style={styles.scheduleChangeChip}>
+                <Text style={styles.scheduleChangeChipText}>
+                  {s.date
+                    ? fmtSlotDate(s.date)
+                    : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                  {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.closeRow}>
+            <Pressable style={styles.closeBtn} onPress={acceptScheduleChange}>
+              <Text style={styles.closeBtnText}>{t("accept")}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.closeBtn, styles.closeBtnGhost]}
+              onPress={rejectScheduleChange}
+            >
+              <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
+                {t("reject")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    // Pending change request from me
+    if (pendingChangeRequest && pendingChangeRequest.requested_by === meId) {
+      return (
+        <View style={styles.scheduleChangeBox}>
+          <Text style={styles.scheduleChangeTitle}>
+            {t("scheduleChangeWaiting")}
+          </Text>
+          <View style={styles.scheduleChangeSlots}>
+            {pendingChangeRequest.slots.map((s, i) => (
+              <View key={i} style={styles.scheduleChangeChip}>
+                <Text style={styles.scheduleChangeChipText}>
+                  {s.date
+                    ? fmtSlotDate(s.date)
+                    : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                  {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.scheduleChangeBox}>
+        {hasCurrentSlots && (
+          <>
+            <Text style={styles.scheduleChangeTitle}>
+              {t("scheduledSlots")}
+            </Text>
+            <View style={styles.scheduleChangeSlots}>
+              {currentOfferSlots.map((s, i) => (
+                <View key={i} style={styles.scheduleChangeChip}>
+                  <Text style={styles.scheduleChangeChipText}>
+                    {s.date
+                      ? fmtSlotDate(s.date)
+                      : t(DAY_KEYS_CHAT[s.day_of_week])}{" "}
+                    {fmtSlotTime(s.start_time)} – {fmtSlotTime(s.end_time)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+        <Pressable
+          style={[styles.closeBtn, styles.closeBtnGhost]}
+          onPress={() => {
+            setSelectedChangeSlots([]);
+            setScheduleChangeOpen(true);
+          }}
+        >
+          <Text style={[styles.closeBtnText, styles.closeBtnTextGhost]}>
+            {t("changeSchedule")}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }, [
+    acceptedOffer,
+    meId,
+    availableSlots,
+    currentOfferSlots,
+    pendingChangeRequest,
+    t,
+    acceptScheduleChange,
+    rejectScheduleChange,
   ]);
 
   const contextBox = useMemo(() => {
@@ -1078,9 +1463,9 @@ export default function ChatScreen() {
             <View
               style={[
                 styles.statusPill,
-                request.status === "active"
+                request.status === "open" || request.status === "active"
                   ? styles.pillOpen
-                  : request.status === "matched"
+                  : request.status === "matched" && !acceptedOffer?.closed_at
                     ? styles.pillNegotiating
                     : styles.pillClosed,
               ]}
@@ -1151,13 +1536,16 @@ export default function ChatScreen() {
         )}
 
         {closeCTA}
+        {scheduleCTA}
       </Pressable>
     );
   }, [
     request,
+    acceptedOffer,
     finalPrice,
     statusLabel,
     closeCTA,
+    scheduleCTA,
     contextExpanded,
     formatPrice,
     t,
@@ -1286,7 +1674,7 @@ export default function ChatScreen() {
             </Text>
           </View>
 
-          {request?.status === "closed" ? (
+          {request?.status === "closed" || !!acceptedOffer?.closed_at ? (
             <View style={styles.headerIconBtn}>
               <Feather name="lock" size={18} color={theme.secondaryText} />
             </View>
@@ -1380,7 +1768,7 @@ export default function ChatScreen() {
                   placeholder={
                     canChat
                       ? t("writeMessage")
-                      : request?.status === "closed"
+                      : acceptedOffer?.closed_at
                         ? t("dealClosed")
                         : t("chatOnlyNegotiating")
                   }
@@ -1471,6 +1859,65 @@ export default function ChatScreen() {
                     resizeMode="contain"
                   />
                 ) : null}
+              </Pressable>
+            </Modal>
+
+            {/* Schedule change modal */}
+            <Modal
+              visible={scheduleChangeOpen}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setScheduleChangeOpen(false)}
+            >
+              <Pressable
+                style={styles.viewerBackdrop}
+                onPress={() => setScheduleChangeOpen(false)}
+              >
+                <Pressable
+                  style={styles.scheduleChangeModal}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <Text style={styles.scheduleChangeModalTitle}>
+                    {t("changeSchedule")}
+                  </Text>
+                  <Text style={styles.scheduleChangeModalHint}>
+                    {t("selectTimeSlotsHint")}
+                  </Text>
+
+                  <SlotSelector
+                    slots={availableSlots}
+                    selected={selectedChangeSlots}
+                    onToggle={(id) =>
+                      setSelectedChangeSlots((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((x) => x !== id)
+                          : [...prev, id],
+                      )
+                    }
+                  />
+
+                  <View style={styles.closeRow}>
+                    <Pressable
+                      style={styles.closeBtn}
+                      onPress={proposeScheduleChange}
+                      disabled={selectedChangeSlots.length === 0}
+                    >
+                      <Text style={styles.closeBtnText}>
+                        {t("proposeChange")}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.closeBtn, styles.closeBtnGhost]}
+                      onPress={() => setScheduleChangeOpen(false)}
+                    >
+                      <Text
+                        style={[styles.closeBtnText, styles.closeBtnTextGhost]}
+                      >
+                        {t("cancel")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
               </Pressable>
             </Modal>
           </>

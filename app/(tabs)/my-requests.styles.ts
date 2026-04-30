@@ -171,7 +171,10 @@ export const styles = StyleSheet.create({
   },
   metaStrong: { fontWeight: "900", color: theme.primaryText },
   metaMuted: { color: theme.secondaryText },
-
+  availWrap: {
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",

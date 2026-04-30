@@ -371,4 +371,54 @@ export const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+
+  // ─── Schedule change ──────────────────────────────────────────
+  scheduleChangeBox: {
+    marginTop: 8,
+    backgroundColor: theme.accentSoft,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  scheduleChangeTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.primary,
+  },
+  scheduleChangeSlots: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  scheduleChangeChip: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.primary,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  scheduleChangeChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+  scheduleChangeModal: {
+    backgroundColor: theme.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: "auto" as any,
+    padding: 20,
+    maxHeight: "80%",
+    gap: 12,
+  },
+  scheduleChangeModalTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: theme.primaryText,
+  },
+  scheduleChangeModalHint: {
+    fontSize: 13,
+    color: theme.secondaryText,
+  },
 });

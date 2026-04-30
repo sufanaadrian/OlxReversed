@@ -298,6 +298,27 @@ export const styles = StyleSheet.create({
   offerPrice: { fontSize: 17, fontWeight: "900", color: theme.primaryText },
   offerDesc: { fontSize: 13, color: theme.secondaryText, lineHeight: 18 },
 
+  offerSlotsWrap: { marginTop: 6, gap: 4 },
+  offerSlotsLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  offerSlotsChips: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  offerSlotChip: {
+    backgroundColor: theme.accentSoft,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  offerSlotChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: theme.primary,
+  },
+
   counterBox: {
     backgroundColor: theme.surface,
     borderWidth: 1,

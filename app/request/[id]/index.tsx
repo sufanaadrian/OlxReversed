@@ -14,6 +14,11 @@ import {
   View,
 } from "react-native";
 import { ImageViewer } from "../../../src/components/ImageViewer";
+import {
+  emptyWeek,
+  SchedulePicker,
+  WeekSchedule,
+} from "../../../src/components/SchedulePicker";
 import { Screen } from "../../../src/components/Screen";
 import { useCurrency } from "../../../src/context/CurrencyContext";
 import { useTranslation } from "../../../src/context/LanguageContext";
@@ -77,6 +82,34 @@ type CounterOfferRow = {
   status: CounterStatus;
   created_at: string;
 };
+
+const DAY_KEYS_INDEX = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+type OfferSlotInfo = {
+  offer_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  date: string | null;
+};
+
+function fmtSlotDate(date: string | null): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 const categoryTranslationKeys: Record<string, string> = {
   Vehicles: "vehicles",
@@ -176,6 +209,12 @@ export default function RequestDetailScreen() {
   const [counters, setCounters] = useState<CounterOfferRow[]>([]);
   const [offerFilter, setOfferFilter] = useState<OfferFilter>("all");
   const [descExpanded, setDescExpanded] = useState(false);
+  const [availSchedule, setAvailSchedule] = useState<WeekSchedule>(emptyWeek());
+  const [hasAvailability, setHasAvailability] = useState(false);
+  const [slotStatuses, setSlotStatuses] = useState<
+    Record<string, "available" | "pending" | "booked">
+  >({});
+  const [offerSlots, setOfferSlots] = useState<OfferSlotInfo[]>([]);
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const photoListRef = useRef<FlatList>(null);
@@ -237,6 +276,44 @@ export default function RequestDetailScreen() {
 
       setOffers((off ?? []) as OfferRow[]);
 
+      // Load offer slots
+      const offerIds = (off ?? []).map((o: any) => o.id);
+      if (offerIds.length > 0) {
+        const { data: slotsRaw } = await supabase
+          .from("offer_slots")
+          .select("offer_id,availability_id")
+          .in("offer_id", offerIds);
+
+        if (slotsRaw && slotsRaw.length > 0) {
+          const availIds = [
+            ...new Set(slotsRaw.map((s: any) => s.availability_id)),
+          ];
+          const { data: availData } = await supabase
+            .from("request_availability")
+            .select("id,day_of_week,start_time,end_time,date")
+            .in("id", availIds);
+
+          const aMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
+          const mapped: OfferSlotInfo[] = [];
+          for (const s of slotsRaw as any[]) {
+            const a = aMap.get(s.availability_id);
+            if (a)
+              mapped.push({
+                offer_id: s.offer_id,
+                day_of_week: a.day_of_week,
+                start_time: a.start_time,
+                end_time: a.end_time,
+                date: a.date ?? null,
+              });
+          }
+          setOfferSlots(mapped);
+        } else {
+          setOfferSlots([]);
+        }
+      } else {
+        setOfferSlots([]);
+      }
+
       const { data: co } = await supabase
         .from("counter_offers")
         .select(
@@ -246,6 +323,61 @@ export default function RequestDetailScreen() {
         .order("created_at", { ascending: false });
 
       setCounters((co ?? []) as CounterOfferRow[]);
+    }
+
+    // Load availability schedule
+    const { data: avail } = await supabase
+      .from("request_availability")
+      .select("id,day_of_week,start_time,end_time,is_booked,date")
+      .eq("request_id", id)
+      .order("day_of_week")
+      .order("start_time");
+
+    if (avail && avail.length > 0) {
+      const week = emptyWeek();
+      const statusMap: Record<string, "available" | "pending" | "booked"> = {};
+      for (const row of avail) {
+        const day = week[row.day_of_week as number];
+        day.enabled = true;
+        day.slots.push({
+          id: row.id as string,
+          start: (row.start_time as string).slice(0, 5),
+          end: (row.end_time as string).slice(0, 5),
+          date: (row as any).date ?? undefined,
+        });
+        statusMap[row.id as string] = (row.is_booked as boolean)
+          ? "booked"
+          : "available";
+      }
+
+      // Mark slots as "pending" (yellow) if they belong to an accepted-but-not-closed offer
+      const { data: acceptedOffers } = await supabase
+        .from("offers")
+        .select("id,closed_at")
+        .eq("request_id", id)
+        .eq("status", "accepted");
+      const openAcceptedIds = (acceptedOffers ?? [])
+        .filter((o: any) => !o.closed_at)
+        .map((o: any) => o.id);
+      if (openAcceptedIds.length > 0) {
+        const { data: pendingSlots } = await supabase
+          .from("offer_slots")
+          .select("availability_id")
+          .in("offer_id", openAcceptedIds);
+        for (const s of pendingSlots ?? []) {
+          if (statusMap[s.availability_id] === "available") {
+            statusMap[s.availability_id] = "pending";
+          }
+        }
+      }
+
+      setAvailSchedule(week);
+      setSlotStatuses(statusMap);
+      setHasAvailability(true);
+    } else {
+      setAvailSchedule(emptyWeek());
+      setSlotStatuses({});
+      setHasAvailability(false);
     }
 
     setLoading(false);
@@ -732,6 +864,20 @@ export default function RequestDetailScreen() {
             </View>
           )}
 
+          {/* ── Availability Schedule ── */}
+          {hasAvailability && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>
+                {t("availabilitySchedule")}
+              </Text>
+              <SchedulePicker
+                value={availSchedule}
+                readOnly
+                slotStatuses={slotStatuses}
+              />
+            </View>
+          )}
+
           {/* ── Seller actions (only if swiped right) ── */}
           {!isOwner && hasSwipedRight && request.status === "active" && (
             <View style={styles.ownerActions}>
@@ -896,6 +1042,34 @@ export default function RequestDetailScreen() {
                           {offer.description}
                         </Text>
                       )}
+
+                      {/* Selected time slots */}
+                      {(() => {
+                        const slots = offerSlots.filter(
+                          (s) => s.offer_id === offer.id,
+                        );
+                        if (slots.length === 0) return null;
+                        return (
+                          <View style={styles.offerSlotsWrap}>
+                            <Text style={styles.offerSlotsLabel}>
+                              {t("scheduledSlots")}
+                            </Text>
+                            <View style={styles.offerSlotsChips}>
+                              {slots.map((s, i) => (
+                                <View key={i} style={styles.offerSlotChip}>
+                                  <Text style={styles.offerSlotChipText}>
+                                    {s.date
+                                      ? fmtSlotDate(s.date)
+                                      : t(DAY_KEYS_INDEX[s.day_of_week])}{" "}
+                                    {s.start_time.slice(0, 5)} –{" "}
+                                    {s.end_time.slice(0, 5)}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        );
+                      })()}
 
                       {offer.status === "withdrawn" && (
                         <View style={styles.counterBox}>
