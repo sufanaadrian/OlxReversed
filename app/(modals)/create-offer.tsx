@@ -1,14 +1,15 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
@@ -18,18 +19,18 @@ import { styles, theme } from "./create-offer.styles";
 
 export default function ApplyModal() {
   const t = useTranslation();
-  const { requestId, title } = useLocalSearchParams<{ requestId: string; title?: string }>();
+  const { requestId, title } = useLocalSearchParams<{
+    requestId: string;
+    title?: string;
+  }>();
   const [coverLetter, setCoverLetter] = useState("");
   const [saving, setSaving] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
 
-  useEffect(() => {
-    requireAuth();
-    checkExisting();
-  }, []);
-
-  async function checkExisting() {
-    const { data: { user } } = await supabase.auth.getUser();
+  const checkExisting = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user || !requestId) return;
     const { data } = await supabase
       .from("offers")
@@ -39,7 +40,12 @@ export default function ApplyModal() {
       .neq("status", "withdrawn")
       .maybeSingle();
     setAlreadyApplied(!!data);
-  }
+  }, [requestId]);
+
+  useEffect(() => {
+    requireAuth();
+    checkExisting();
+  }, [checkExisting]);
 
   async function handleApply() {
     if (!coverLetter.trim()) {
@@ -47,8 +53,13 @@ export default function ApplyModal() {
       return;
     }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace("/sign-in"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/sign-in");
+      return;
+    }
 
     const { error } = await supabase.from("offers").insert({
       request_id: requestId,
@@ -85,7 +96,9 @@ export default function ApplyModal() {
         {title ? (
           <View style={styles.jobTitleBox}>
             <Text style={styles.jobTitleLabel}>{t("applyingFor")}</Text>
-            <Text style={styles.jobTitle} numberOfLines={2}>{title}</Text>
+            <Text style={styles.jobTitle} numberOfLines={2}>
+              {title}
+            </Text>
           </View>
         ) : null}
 
@@ -93,10 +106,45 @@ export default function ApplyModal() {
           {alreadyApplied ? (
             <View style={styles.alreadyApplied}>
               <Feather name="check-circle" size={20} color={theme.primary} />
-              <Text style={styles.alreadyAppliedText}>{t("alreadyApplied")}</Text>
+              <Text style={styles.alreadyAppliedText}>
+                {t("alreadyApplied")}
+              </Text>
             </View>
           ) : (
             <>
+              {/* Quick-fill templates */}
+              <Text style={styles.label}>{t("quickFill")}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.templatesRow}
+                contentContainerStyle={styles.templatesContent}
+              >
+                {[
+                  "Hi, I'm a student with relevant experience and I'm very interested in this role.",
+                  "I'm available immediately, motivated, and flexible with schedule.",
+                  "I have hands-on experience in this field and can start right away.",
+                  "I'm a reliable, fast learner looking for part-time work that fits my studies.",
+                ].map((tpl, i) => (
+                  <Pressable
+                    key={i}
+                    style={styles.templateChip}
+                    onPress={() => setCoverLetter(tpl)}
+                  >
+                    <Text style={styles.templateChipText} numberOfLines={1}>
+                      {t(
+                        [
+                          `templateFriendly`,
+                          `templateAvailable`,
+                          `templateExperienced`,
+                          `templateCustom`,
+                        ][i] as any,
+                      )}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
               <Text style={styles.label}>{t("coverLetter")} *</Text>
               <TextInput
                 style={styles.coverInput}

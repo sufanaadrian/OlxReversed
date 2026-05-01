@@ -3,25 +3,43 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme, CATEGORY_COLORS } from "./marketplace.styles";
+import { CATEGORY_COLORS, styles, theme } from "./marketplace.styles";
 
 const CATEGORIES = [
-  "All","Hospitality","Retail","Tutoring","Events","Delivery","IT","Office","Marketing","Other",
+  "All",
+  "Hospitality",
+  "Retail",
+  "Tutoring",
+  "Events",
+  "Delivery",
+  "IT",
+  "Office",
+  "Marketing",
+  "Other",
 ] as const;
 
 const CATEGORY_KEYS: Record<string, string> = {
-  All:"all",Hospitality:"hospitality",Retail:"retail",Tutoring:"tutoring",
-  Events:"events",Delivery:"delivery",IT:"it",Office:"office",Marketing:"marketing",Other:"other",
+  All: "all",
+  Hospitality: "hospitality",
+  Retail: "retail",
+  Tutoring: "tutoring",
+  Events: "events",
+  Delivery: "delivery",
+  IT: "it",
+  Office: "office",
+  Marketing: "marketing",
+  Other: "other",
 };
 
 type JobRequest = {
@@ -50,7 +68,12 @@ function timeAgo(dateStr: string) {
 
 function initials(name: string | null | undefined) {
   if (!name) return "?";
-  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function formatWage(min: number | null, max: number | null) {
@@ -66,34 +89,112 @@ export default function JobsScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setUserId(user?.id ?? null);
+
     let query = supabase
       .from("requests")
-      .select("id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,profiles(username)")
+      .select(
+        "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,profiles(username)",
+      )
       .eq("status", "active")
       .order("created_at", { ascending: false });
-    if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
+    if (selectedCategory !== "All")
+      query = query.eq("category", selectedCategory);
     const { data } = await query;
     setJobs((data as unknown as JobRequest[]) ?? []);
+
+    if (user) {
+      // Load saved jobs
+      const { data: saved } = await supabase
+        .from("saved_jobs")
+        .select("request_id")
+        .eq("user_id", user.id);
+      setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
+
+      // Check profile completeness
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("bio, skills, university")
+        .eq("id", user.id)
+        .single();
+      if (prof) {
+        const incomplete =
+          !prof.bio || !prof.university || !prof.skills?.length;
+        setProfileIncomplete(incomplete);
+      }
+    }
     setLoading(false);
   }, [selectedCategory]);
 
-  useFocusEffect(useCallback(() => { fetchJobs(); }, [fetchJobs]));
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobs();
+    }, [fetchJobs]),
+  );
+
+  async function toggleSave(jobId: string) {
+    if (!userId) return;
+    const isSaved = savedIds.has(jobId);
+    const next = new Set(savedIds);
+    if (isSaved) {
+      next.delete(jobId);
+      await supabase
+        .from("saved_jobs")
+        .delete()
+        .eq("user_id", userId)
+        .eq("request_id", jobId);
+    } else {
+      next.add(jobId);
+      await supabase
+        .from("saved_jobs")
+        .insert({ user_id: userId, request_id: jobId });
+    }
+    setSavedIds(next);
+  }
+
+  function commitSearch(q: string) {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setRecentSearches((prev) => {
+      const filtered = prev.filter((s) => s !== trimmed);
+      return [trimmed, ...filtered].slice(0, 5);
+    });
+  }
 
   const filtered = jobs.filter((j) => {
     const q = search.toLowerCase();
-    return !q || j.title.toLowerCase().includes(q) ||
+    return (
+      !q ||
+      j.title.toLowerCase().includes(q) ||
       j.description?.toLowerCase().includes(q) ||
-      j.location?.toLowerCase().includes(q);
+      j.location?.toLowerCase().includes(q)
+    );
   });
 
   function renderItem({ item }: { item: JobRequest }) {
     const isEmployer = item.posting_as === "employer";
     const wage = formatWage(item.budget_min, item.budget_max);
-    const catColor = CATEGORY_COLORS[item.category ?? "Other"] ?? CATEGORY_COLORS.Other;
+    const catColor =
+      CATEGORY_COLORS[item.category ?? "Other"] ?? CATEGORY_COLORS.Other;
     const posterName = item.profiles?.username ?? null;
+    const isSaved = savedIds.has(item.id);
+
+    // Expiry: auto-expires 30 days after posting
+    const msLeft =
+      new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
+    const daysLeft = Math.ceil(msLeft / 86400000);
+    const expiringSoon = daysLeft <= 5 && daysLeft > 0;
 
     return (
       <Pressable
@@ -105,22 +206,59 @@ export default function JobsScreen() {
           <Text style={[styles.cardStripText, { color: catColor.text }]}>
             {t(CATEGORY_KEYS[item.category ?? "Other"] ?? "other")}
           </Text>
-          <View style={[styles.roleBadge, {
-            backgroundColor: isEmployer ? theme.employerLight : theme.primaryLight,
-          }]}>
-            <Text style={[styles.roleBadgeText, {
-              color: isEmployer ? theme.employer : theme.primaryDark,
-            }]}>
-              {isEmployer ? t("employer") : t("student")}
-            </Text>
+          <View style={styles.stripRight}>
+            {expiringSoon && (
+              <View style={styles.expiryBadge}>
+                <Feather name="clock" size={10} color="#92400E" />
+                <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
+              </View>
+            )}
+            <View
+              style={[
+                styles.roleBadge,
+                {
+                  backgroundColor: isEmployer
+                    ? theme.employerLight
+                    : theme.primaryLight,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.roleBadgeText,
+                  { color: isEmployer ? theme.employer : theme.primaryDark },
+                ]}
+              >
+                {isEmployer ? t("employer") : t("student")}
+              </Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.cardTitle, { flex: 1 }]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            {userId && (
+              <Pressable
+                style={styles.bookmarkBtn}
+                onPress={() => toggleSave(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather
+                  name={isSaved ? "bookmark" : "bookmark"}
+                  size={18}
+                  color={isSaved ? theme.primary : theme.mutedText}
+                />
+              </Pressable>
+            )}
+          </View>
 
           {item.description ? (
-            <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>
+              {item.description}
+            </Text>
           ) : null}
 
           {/* Meta chips */}
@@ -128,13 +266,17 @@ export default function JobsScreen() {
             {item.location ? (
               <View style={styles.metaChip}>
                 <Feather name="map-pin" size={11} color={theme.secondaryText} />
-                <Text style={styles.metaChipText} numberOfLines={1}>{item.location}</Text>
+                <Text style={styles.metaChipText} numberOfLines={1}>
+                  {item.location}
+                </Text>
               </View>
             ) : null}
             {wage ? (
               <View style={[styles.metaChip, styles.wageChip]}>
                 <Feather name="dollar-sign" size={11} color={theme.success} />
-                <Text style={[styles.metaChipText, styles.wageChipText]}>{wage}</Text>
+                <Text style={[styles.metaChipText, styles.wageChipText]}>
+                  {wage}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -166,8 +308,12 @@ export default function JobsScreen() {
     <SafeAreaView style={styles.page} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t("findJobs")}</Text>
-        <Text style={styles.headerSub}>{filtered.length} {t("jobsAvailable")}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>{t("findJobs")}</Text>
+          <Text style={styles.headerSub}>
+            {filtered.length} {t("jobsAvailable")}
+          </Text>
+        </View>
         <View style={styles.searchBox}>
           <Feather name="search" size={16} color={theme.mutedText} />
           <TextInput
@@ -177,6 +323,7 @@ export default function JobsScreen() {
             value={search}
             onChangeText={setSearch}
             returnKeyType="search"
+            onSubmitEditing={() => commitSearch(search)}
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")}>
@@ -184,39 +331,86 @@ export default function JobsScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Recent searches */}
+        {search.length === 0 && recentSearches.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.recentRow}
+            contentContainerStyle={styles.recentContent}
+          >
+            {recentSearches.map((s) => (
+              <Pressable
+                key={s}
+                style={styles.recentChip}
+                onPress={() => setSearch(s)}
+              >
+                <Feather name="clock" size={11} color={theme.mutedText} />
+                <Text style={styles.recentChipText}>{s}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
-      {/* Category chips */}
-      <FlatList
-        data={CATEGORIES as unknown as string[]}
-        keyExtractor={c => c}
+      {/* Profile completeness banner */}
+      {profileIncomplete && showBanner && (
+        <View style={styles.banner}>
+          <Feather name="user" size={15} color={theme.primaryDark} />
+          <Text style={styles.bannerText}>{t("completeProfileBanner")}</Text>
+          <View style={styles.bannerActions}>
+            <Pressable onPress={() => router.push("/profile" as any)}>
+              <Text style={styles.bannerLink}>{t("completeNow")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowBanner(false)}
+              style={styles.bannerDismiss}
+            >
+              <Feather name="x" size={14} color={theme.primaryDark} />
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Category chips — ScrollView for reliable spacing */}
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipsScroll}
         contentContainerStyle={styles.chipsRow}
-        renderItem={({ item: cat }) => {
+      >
+        {(CATEGORIES as unknown as string[]).map((cat) => {
           const active = cat === selectedCategory;
-          const catColor = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.Other;
           return (
             <Pressable
-              style={[styles.chip, active && { backgroundColor: catColor.bg, borderColor: catColor.text }]}
+              key={cat}
+              style={[styles.chip, active && styles.chipActive]}
               onPress={() => setSelectedCategory(cat)}
             >
-              <Text style={[styles.chipText, active && { color: catColor.text, fontWeight: "800" }]}>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {cat === "All" ? t("all") : t(CATEGORY_KEYS[cat] ?? "other")}
               </Text>
             </Pressable>
           );
-        }}
-      />
+        })}
+      </ScrollView>
 
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} size="large" color={theme.primary} />
+        <ActivityIndicator
+          style={{ flex: 1 }}
+          size="large"
+          color={theme.primary}
+        />
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={j => j.id}
+          keyExtractor={(j) => j.id}
           renderItem={renderItem}
-          contentContainerStyle={[styles.list, filtered.length === 0 && { flex: 1 }]}
+          contentContainerStyle={[
+            styles.list,
+            filtered.length === 0 && { flex: 1 },
+          ]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           onRefresh={fetchJobs}
           refreshing={loading}
@@ -226,7 +420,9 @@ export default function JobsScreen() {
                 <Feather name="briefcase" size={32} color={theme.mutedText} />
               </View>
               <Text style={styles.emptyTitle}>{t("noJobsFound")}</Text>
-              <Text style={styles.emptySubtitle}>{t("tryAdjustingSearch")}</Text>
+              <Text style={styles.emptySubtitle}>
+                {t("tryAdjustingSearch")}
+              </Text>
               <Pressable style={styles.refreshBtn} onPress={fetchJobs}>
                 <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
               </Pressable>

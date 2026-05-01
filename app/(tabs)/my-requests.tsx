@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
@@ -39,8 +39,13 @@ export default function MyPostsScreen() {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { requireAuth(); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      requireAuth();
+      return;
+    }
 
     const { data: rows } = await supabase
       .from("requests")
@@ -48,14 +53,14 @@ export default function MyPostsScreen() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (!rows) { setLoading(false); return; }
+    if (!rows) {
+      setLoading(false);
+      return;
+    }
 
     const ids = rows.map((r) => r.id);
     const { data: counts } = ids.length
-      ? await supabase
-          .from("offers")
-          .select("request_id")
-          .in("request_id", ids)
+      ? await supabase.from("offers").select("request_id").in("request_id", ids)
       : { data: [] };
 
     const countMap: Record<string, number> = {};
@@ -68,7 +73,9 @@ export default function MyPostsScreen() {
   }, []);
 
   useFocusEffect(
-    useCallback(() => { fetchPosts(); }, [fetchPosts])
+    useCallback(() => {
+      fetchPosts();
+    }, [fetchPosts]),
   );
 
   async function handleMarkFilled(id: string) {
@@ -78,7 +85,10 @@ export default function MyPostsScreen() {
         text: t("confirm"),
         style: "default",
         onPress: async () => {
-          await supabase.from("requests").update({ status: "filled" }).eq("id", id);
+          await supabase
+            .from("requests")
+            .update({ status: "filled" })
+            .eq("id", id);
           fetchPosts();
         },
       },
@@ -115,7 +125,9 @@ export default function MyPostsScreen() {
                 style={[
                   styles.typeBadge,
                   {
-                    backgroundColor: isEmployer ? theme.employerLight : theme.primaryLight,
+                    backgroundColor: isEmployer
+                      ? theme.employerLight
+                      : theme.primaryLight,
                   },
                 ]}
               >
@@ -132,10 +144,14 @@ export default function MyPostsScreen() {
                 <Text style={styles.categoryText}>{item.category}</Text>
               ) : null}
             </View>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColor }]}
+            />
           </View>
 
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
 
           <View style={styles.metaRow}>
             {item.location ? (
@@ -154,26 +170,39 @@ export default function MyPostsScreen() {
 
           <View style={styles.cardFooter}>
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {t(`status${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`)}
+              {t(
+                `status${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`,
+              )}
             </Text>
             <View style={styles.actions}>
               {item.status === "active" && (
                 <Pressable
-                  style={styles.actionBtn}
+                  style={[styles.actionBtn, styles.filledBtn]}
                   onPress={() => handleMarkFilled(item.id)}
                 >
-                  <Feather name="check-circle" size={16} color={theme.primary} />
+                  <Feather name="user-check" size={13} color={theme.primary} />
+                  <Text style={styles.filledBtnText}>{t("markFilled")}</Text>
                 </Pressable>
               )}
               <Pressable
                 style={styles.actionBtn}
-                onPress={() => router.push({ pathname: "/request/[id]/offers", params: { id: item.id } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/request/[id]/offers",
+                    params: { id: item.id },
+                  })
+                }
               >
                 <Feather name="eye" size={16} color={theme.secondaryText} />
               </Pressable>
               <Pressable
                 style={styles.actionBtn}
-                onPress={() => router.push({ pathname: "/(modals)/create-request", params: { id: item.id } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(modals)/create-request",
+                    params: { id: item.id },
+                  })
+                }
               >
                 <Feather name="edit-2" size={16} color={theme.secondaryText} />
               </Pressable>
@@ -204,13 +233,20 @@ export default function MyPostsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} size="large" color={theme.primary} />
+        <ActivityIndicator
+          style={{ flex: 1 }}
+          size="large"
+          color={theme.primary}
+        />
       ) : (
         <FlatList
           data={posts}
           keyExtractor={(p) => p.id}
           renderItem={renderItem}
-          contentContainerStyle={[styles.list, posts.length === 0 && { flex: 1 }]}
+          contentContainerStyle={[
+            styles.list,
+            posts.length === 0 && { flex: 1 },
+          ]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           onRefresh={fetchPosts}
           refreshing={loading}

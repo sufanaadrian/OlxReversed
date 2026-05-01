@@ -50,6 +50,21 @@ export const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 24 },
   separator: { height: 10 },
 
+  sectionDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 14,
+  },
+  sectionLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.mutedText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
   // Card
   card: {
     backgroundColor: theme.surface,
@@ -120,7 +135,11 @@ export const styles = StyleSheet.create({
     borderColor: theme.border,
     alignItems: "center",
   },
-  rejectBtnText: { fontWeight: "700", color: theme.secondaryText, fontSize: 13 },
+  rejectBtnText: {
+    fontWeight: "700",
+    color: theme.secondaryText,
+    fontSize: 13,
+  },
 
   chatBtn: {
     flexDirection: "row",
@@ -132,6 +151,19 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.primary,
   },
   chatBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
+
+  rateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: theme.warning,
+    backgroundColor: theme.warningLight,
+  },
+  rateBtnText: { fontSize: 12, color: theme.warning, fontWeight: "700" },
 
   withdrawBtn: {
     paddingVertical: 6,
@@ -160,5 +192,9 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyTitle: { fontSize: 18, fontWeight: "800", color: theme.primaryText },
-  emptySubtitle: { fontSize: 14, color: theme.secondaryText, textAlign: "center" },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.secondaryText,
+    textAlign: "center",
+  },
 });

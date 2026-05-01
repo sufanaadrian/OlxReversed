@@ -88,7 +88,7 @@ export const styles = StyleSheet.create({
   },
   statusText: { fontSize: 13, fontWeight: "700" },
 
-  actions: { flexDirection: "row", gap: 6 },
+  actions: { flexDirection: "row", gap: 6, alignItems: "center" },
   actionBtn: {
     width: 34,
     height: 34,
@@ -100,6 +100,17 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.surface,
   },
   deleteBtn: { borderColor: theme.errorLight },
+  filledBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 34,
+    width: "auto",
+    paddingHorizontal: 10,
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
+  },
+  filledBtnText: { fontSize: 12, fontWeight: "700", color: theme.primary },
 
   // Empty state
   emptyWrap: {
@@ -119,7 +130,11 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyTitle: { fontSize: 18, fontWeight: "800", color: theme.primaryText },
-  emptySubtitle: { fontSize: 14, color: theme.secondaryText, textAlign: "center" },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.secondaryText,
+    textAlign: "center",
+  },
   emptyBtn: {
     marginTop: 6,
     paddingVertical: 10,

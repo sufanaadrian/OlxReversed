@@ -19,16 +19,16 @@ export const theme = {
 };
 
 export const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  All:         { bg: "#F1F5F9", text: "#64748B" },
+  All: { bg: "#F1F5F9", text: "#64748B" },
   Hospitality: { bg: "#FFF7ED", text: "#C2410C" },
-  Retail:      { bg: "#EFF6FF", text: "#1D4ED8" },
-  Tutoring:    { bg: "#F5F3FF", text: "#6D28D9" },
-  Events:      { bg: "#FDF4FF", text: "#A21CAF" },
-  Delivery:    { bg: "#ECFDF5", text: "#065F46" },
-  IT:          { bg: "#F0F9FF", text: "#0369A1" },
-  Office:      { bg: "#FFFBEB", text: "#92400E" },
-  Marketing:   { bg: "#FFF1F2", text: "#BE123C" },
-  Other:       { bg: "#F8FAFC", text: "#475569" },
+  Retail: { bg: "#EFF6FF", text: "#1D4ED8" },
+  Tutoring: { bg: "#F5F3FF", text: "#6D28D9" },
+  Events: { bg: "#FDF4FF", text: "#A21CAF" },
+  Delivery: { bg: "#ECFDF5", text: "#065F46" },
+  IT: { bg: "#F0F9FF", text: "#0369A1" },
+  Office: { bg: "#FFFBEB", text: "#92400E" },
+  Marketing: { bg: "#FFF1F2", text: "#BE123C" },
+  Other: { bg: "#F8FAFC", text: "#475569" },
 };
 
 export const styles = StyleSheet.create({
@@ -37,22 +37,27 @@ export const styles = StyleSheet.create({
   header: {
     backgroundColor: theme.surface,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
+    paddingTop: 6,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderColor: theme.border,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: "900",
     color: theme.primaryText,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   headerSub: {
-    fontSize: 13,
+    fontSize: 12,
     color: theme.mutedText,
-    marginBottom: 12,
-    marginTop: 2,
+    fontWeight: "500",
   },
   searchBox: {
     flexDirection: "row",
@@ -67,16 +72,31 @@ export const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: theme.primaryText, fontSize: 15 },
 
-  chipsRow: { paddingVertical: 12, paddingLeft: 16, gap: 8 },
+  chipsRow: { paddingVertical: 10, paddingLeft: 16, gap: 7 },
   chip: {
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 999,
     backgroundColor: theme.surface,
     borderWidth: 1.5,
     borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  chipText: { color: theme.secondaryText, fontSize: 13, fontWeight: "600" },
+  chipActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+  },
+  chipText: {
+    color: theme.secondaryText,
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  chipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
 
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
   separator: { height: 12 },
@@ -102,17 +122,34 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  cardStripText: { fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  cardStripText: {
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  stripRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   roleBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
   roleBadgeText: { fontSize: 11, fontWeight: "700" },
+  expiryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 5,
+    backgroundColor: "#FEF3C7",
+  },
+  expiryBadgeText: { fontSize: 10, fontWeight: "700", color: "#92400E" },
 
   cardBody: { padding: 14, paddingTop: 10 },
+  titleRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 5 },
+  bookmarkBtn: { paddingLeft: 8, paddingTop: 2 },
 
   cardTitle: {
     fontSize: 17,
     fontWeight: "800",
     color: theme.primaryText,
-    marginBottom: 5,
     lineHeight: 23,
   },
   cardDesc: {
@@ -154,7 +191,12 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { fontSize: 12, fontWeight: "800", color: theme.primaryDark },
-  posterName: { fontSize: 13, fontWeight: "700", color: theme.primaryText, maxWidth: 120 },
+  posterName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.primaryText,
+    maxWidth: 120,
+  },
   timeAgo: { fontSize: 11, color: theme.mutedText },
 
   applyBtn: {
@@ -167,6 +209,74 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.primary,
   },
   applyBtnText: { fontSize: 13, fontWeight: "800", color: "#FFFFFF" },
+
+  // Recent searches
+  recentRow: { marginTop: 8 },
+  recentContent: { gap: 6, paddingRight: 4 },
+  recentChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  recentChipText: {
+    fontSize: 12,
+    color: theme.secondaryText,
+    fontWeight: "600",
+  },
+
+  // Profile completeness banner
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.primaryDark,
+  },
+  bannerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  bannerLink: { fontSize: 13, fontWeight: "800", color: theme.primary },
+  bannerDismiss: { padding: 2 },
+
+  // Chips ScrollView
+  chipsScroll: { flexGrow: 0 },
+  chipsRow: { paddingVertical: 10, paddingHorizontal: 16, gap: 8 },
+  chip: {
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: theme.surface,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+  },
+  chipActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+  },
+  chipText: {
+    color: theme.secondaryText,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
 
   emptyWrap: {
     flex: 1,
@@ -185,7 +295,11 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyTitle: { fontSize: 18, fontWeight: "800", color: theme.primaryText },
-  emptySubtitle: { fontSize: 14, color: theme.secondaryText, textAlign: "center" },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.secondaryText,
+    textAlign: "center",
+  },
   refreshBtn: {
     marginTop: 6,
     paddingVertical: 10,

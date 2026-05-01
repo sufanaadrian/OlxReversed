@@ -39,7 +39,12 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.primary,
   },
-  jobTitleLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, marginBottom: 4 },
+  jobTitleLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.primary,
+    marginBottom: 4,
+  },
   jobTitle: { fontSize: 15, fontWeight: "800", color: theme.primaryText },
 
   body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
@@ -49,6 +54,22 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.primaryText,
     marginBottom: 8,
+  },
+  templatesRow: { marginBottom: 12, flexGrow: 0 },
+  templatesContent: { gap: 8, paddingRight: 4 },
+  templateChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1.5,
+    borderColor: theme.primary,
+    maxWidth: 180,
+  },
+  templateChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.primary,
   },
   coverInput: {
     backgroundColor: theme.surface,

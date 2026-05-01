@@ -1,16 +1,60 @@
 import { Feather } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { Tabs, router } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
+import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./_layout.styles";
 
 export default function TabsLayout() {
   const [open, setOpen] = useState(false);
   const { language } = useLanguage();
   const t = useTranslation();
+  const [pendingApplicants, setPendingApplicants] = useState(0);
+  const [newResponses, setNewResponses] = useState(0);
+
+  const fetchBadges = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Badge for "My Posts": count pending offers on my active posts
+    const { data: myPosts } = await supabase
+      .from("requests")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active");
+
+    if (myPosts && myPosts.length > 0) {
+      const ids = myPosts.map((p) => p.id);
+      const { count } = await supabase
+        .from("offers")
+        .select("id", { count: "exact", head: true })
+        .in("request_id", ids)
+        .eq("status", "pending");
+      setPendingApplicants(count ?? 0);
+    } else {
+      setPendingApplicants(0);
+    }
+
+    // Badge for "My Applications": count of my offers that were accepted (chat ready)
+    const { count: accepted } = await supabase
+      .from("offers")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", user.id)
+      .eq("status", "accepted");
+    setNewResponses(accepted ?? 0);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBadges();
+    }, [fetchBadges]),
+  );
 
   const close = () => setOpen(false);
 
@@ -64,6 +108,12 @@ export default function TabsLayout() {
             name="my-requests"
             options={{
               title: t("myPosts"),
+              tabBarBadge:
+                pendingApplicants > 0 ? pendingApplicants : undefined,
+              tabBarBadgeStyle: {
+                backgroundColor: theme.primary,
+                fontSize: 10,
+              },
               tabBarIcon: ({ color, size }) => (
                 <Feather name="file-text" color={color} size={size} />
               ),
@@ -103,6 +153,8 @@ export default function TabsLayout() {
             name="my-offers"
             options={{
               title: t("myApplications"),
+              tabBarBadge: newResponses > 0 ? newResponses : undefined,
+              tabBarBadgeStyle: { backgroundColor: theme.accent, fontSize: 10 },
               tabBarIcon: ({ color, size }) => (
                 <Feather name="inbox" color={color} size={size} />
               ),

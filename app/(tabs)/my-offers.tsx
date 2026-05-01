@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
@@ -58,32 +58,82 @@ export default function ApplicationsScreen() {
   const [received, setReceived] = useState<ReceivedApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [ratedOfferIds, setRatedOfferIds] = useState<Set<string>>(new Set());
+
+  async function handleRate(
+    offerId: string,
+    revieweeId: string,
+    requestId: string,
+  ) {
+    Alert.prompt(
+      t("rateExperience"),
+      "Enter a rating from 1 to 5",
+      async (input) => {
+        const rating = parseInt(input ?? "", 10);
+        if (!rating || rating < 1 || rating > 5) {
+          Alert.alert(t("error"), "Please enter a number from 1 to 5.");
+          return;
+        }
+        if (!userId) return;
+        const { error } = await supabase.from("reviews").insert({
+          reviewer_id: userId,
+          reviewee_id: revieweeId,
+          request_id: requestId,
+          offer_id: offerId,
+          rating,
+        });
+        if (!error) {
+          setRatedOfferIds((prev) => new Set([...prev, offerId]));
+          Alert.alert(t("ratingThanks"));
+        }
+      },
+      "plain-text",
+      "",
+      "number-pad",
+    );
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { requireAuth(); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      requireAuth();
+      return;
+    }
     setUserId(user.id);
 
-    const [{ data: sentData }, { data: receivedData }] = await Promise.all([
-      supabase
-        .from("offers")
-        .select("id, status, cover_letter, created_at, requests(id, title, user_id, status, posting_as, profiles(username))")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("offers")
-        .select("id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(username)")
-        .eq("requests.user_id", user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+    const [{ data: sentData }, { data: receivedData }, { data: myReviews }] =
+      await Promise.all([
+        supabase
+          .from("offers")
+          .select(
+            "id, status, cover_letter, created_at, requests(id, title, user_id, status, posting_as, profiles(username))",
+          )
+          .eq("seller_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("offers")
+          .select(
+            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(username)",
+          )
+          .eq("requests.user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase.from("reviews").select("offer_id").eq("reviewer_id", user.id),
+      ]);
 
     setSent((sentData as unknown as Application[]) ?? []);
     setReceived((receivedData as unknown as ReceivedApplication[]) ?? []);
+    setRatedOfferIds(new Set((myReviews ?? []).map((r: any) => r.offer_id)));
     setLoading(false);
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   async function handleWithdraw(offerId: string) {
     Alert.alert(t("withdrawApplication"), t("withdrawConfirm"), [
@@ -92,7 +142,10 @@ export default function ApplicationsScreen() {
         text: t("withdraw"),
         style: "destructive",
         onPress: async () => {
-          await supabase.from("offers").update({ status: "withdrawn" }).eq("id", offerId);
+          await supabase
+            .from("offers")
+            .update({ status: "withdrawn" })
+            .eq("id", offerId);
           fetchData();
         },
       },
@@ -112,7 +165,10 @@ export default function ApplicationsScreen() {
   }
 
   async function handleReject(offerId: string) {
-    await supabase.from("offers").update({ status: "rejected" }).eq("id", offerId);
+    await supabase
+      .from("offers")
+      .update({ status: "rejected" })
+      .eq("id", offerId);
     fetchData();
   }
 
@@ -120,7 +176,10 @@ export default function ApplicationsScreen() {
     const c = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
     const job = item.requests;
     return (
-      <Pressable style={styles.card} onPress={() => job && router.push(`/request/${job.id}`)}>
+      <Pressable
+        style={styles.card}
+        onPress={() => job && router.push(`/request/${job.id}`)}
+      >
         <View style={styles.cardBody}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle} numberOfLines={2}>
@@ -128,7 +187,9 @@ export default function ApplicationsScreen() {
             </Text>
             <View style={[styles.statusBadge, { backgroundColor: c.bg }]}>
               <Text style={[styles.statusText, { color: c.text }]}>
-                {t(`offer${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`)}
+                {t(
+                  `offer${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`,
+                )}
               </Text>
             </View>
           </View>
@@ -151,8 +212,24 @@ export default function ApplicationsScreen() {
                   <Text style={styles.chatBtnText}>{t("chat")}</Text>
                 </Pressable>
               )}
+              {item.status === "accepted" &&
+                job &&
+                !ratedOfferIds.has(item.id) && (
+                  <Pressable
+                    style={styles.rateBtn}
+                    onPress={() => handleRate(item.id, job.user_id, job.id)}
+                  >
+                    <Feather name="star" size={13} color={theme.warning} />
+                    <Text style={styles.rateBtnText}>
+                      {t("rateExperience")}
+                    </Text>
+                  </Pressable>
+                )}
               {item.status === "pending" && (
-                <Pressable style={styles.withdrawBtn} onPress={() => handleWithdraw(item.id)}>
+                <Pressable
+                  style={styles.withdrawBtn}
+                  onPress={() => handleWithdraw(item.id)}
+                >
                   <Text style={styles.withdrawBtnText}>{t("withdraw")}</Text>
                 </Pressable>
               )}
@@ -175,7 +252,9 @@ export default function ApplicationsScreen() {
             </Text>
             <View style={[styles.statusBadge, { backgroundColor: c.bg }]}>
               <Text style={[styles.statusText, { color: c.text }]}>
-                {t(`offer${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`)}
+                {t(
+                  `offer${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`,
+                )}
               </Text>
             </View>
           </View>
@@ -217,8 +296,12 @@ export default function ApplicationsScreen() {
     );
   }
 
-  const data = activeTab === "sent" ? sent : received;
-  const isEmpty = data.length === 0;
+  const activeSent = sent.filter(
+    (a) => a.status === "pending" || a.status === "accepted",
+  );
+  const pastSent = sent.filter(
+    (a) => a.status === "rejected" || a.status === "withdrawn",
+  );
 
   return (
     <View style={styles.page}>
@@ -234,7 +317,12 @@ export default function ApplicationsScreen() {
             style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
             onPress={() => setActiveTab(tab)}
           >
-            <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
+            <Text
+              style={[
+                styles.tabBtnText,
+                activeTab === tab && styles.tabBtnTextActive,
+              ]}
+            >
               {t(tab === "sent" ? "sent" : "received")}
             </Text>
           </Pressable>
@@ -242,13 +330,61 @@ export default function ApplicationsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} size="large" color={theme.primary} />
+        <ActivityIndicator
+          style={{ flex: 1 }}
+          size="large"
+          color={theme.primary}
+        />
+      ) : activeTab === "sent" ? (
+        <FlatList
+          data={[
+            ...activeSent,
+            ...(pastSent.length > 0 ? [{ __divider: true } as any] : []),
+            ...pastSent,
+          ]}
+          keyExtractor={(item, i) =>
+            item.__divider ? `divider-${i}` : item.id
+          }
+          renderItem={({ item }) => {
+            if (item.__divider) {
+              return (
+                <View style={styles.sectionDivider}>
+                  <View style={styles.sectionLine} />
+                  <Text style={styles.sectionLabel}>
+                    {t("pastApplications")}
+                  </Text>
+                  <View style={styles.sectionLine} />
+                </View>
+              );
+            }
+            return renderSentItem({ item });
+          }}
+          contentContainerStyle={[
+            styles.list,
+            activeSent.length === 0 && pastSent.length === 0 && { flex: 1 },
+          ]}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          onRefresh={fetchData}
+          refreshing={loading}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyIcon}>
+                <Feather name="inbox" size={32} color={theme.mutedText} />
+              </View>
+              <Text style={styles.emptyTitle}>{t("noApplicationsSent")}</Text>
+              <Text style={styles.emptySubtitle}>{t("browseJobsToApply")}</Text>
+            </View>
+          }
+        />
       ) : (
         <FlatList
-          data={data as any[]}
+          data={received as any[]}
           keyExtractor={(item) => item.id}
-          renderItem={activeTab === "sent" ? renderSentItem as any : renderReceivedItem as any}
-          contentContainerStyle={[styles.list, isEmpty && { flex: 1 }]}
+          renderItem={renderReceivedItem as any}
+          contentContainerStyle={[
+            styles.list,
+            received.length === 0 && { flex: 1 },
+          ]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           onRefresh={fetchData}
           refreshing={loading}
@@ -258,11 +394,9 @@ export default function ApplicationsScreen() {
                 <Feather name="inbox" size={32} color={theme.mutedText} />
               </View>
               <Text style={styles.emptyTitle}>
-                {activeTab === "sent" ? t("noApplicationsSent") : t("noApplicationsReceived")}
+                {t("noApplicationsReceived")}
               </Text>
-              <Text style={styles.emptySubtitle}>
-                {activeTab === "sent" ? t("browseJobsToApply") : t("postJobToReceive")}
-              </Text>
+              <Text style={styles.emptySubtitle}>{t("postJobToReceive")}</Text>
             </View>
           }
         />

@@ -3,12 +3,12 @@ import { StyleSheet } from "react-native";
 export const theme = {
   primary: "#0D9488",
   primaryLight: "#CCFBF1",
+  accent: "#F97316",
   bg: "#F8FAFC",
   surface: "#FFFFFF",
   primaryText: "#0F172A",
   secondaryText: "#64748B",
   border: "#E2E8F0",
-  accentSoft: "#CCFBF1",
 };
 
 export const styles = StyleSheet.create({
