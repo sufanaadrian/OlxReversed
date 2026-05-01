@@ -116,6 +116,22 @@ export const styles = StyleSheet.create({
   },
   expiryBadgeText: { fontSize: 10, fontWeight: "700", color: "#92400E" },
 
+  urgentBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    backgroundColor: "#FEE2E2",
+  },
+  urgentBadgeText: { fontSize: 10, fontWeight: "800", color: "#DC2626" },
+
+  boostedBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    backgroundColor: "#FEF3C7",
+  },
+  boostedBadgeText: { fontSize: 10, fontWeight: "800", color: "#D97706" },
+
   cardBody: { padding: 14, paddingTop: 10 },
   titleRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 5 },
   bookmarkBtn: { paddingLeft: 8, paddingTop: 2 },
@@ -183,6 +199,26 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.primary,
   },
   applyBtnText: { fontSize: 13, fontWeight: "800", color: "#FFFFFF" },
+
+  footerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+
+  interestedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  interestedBtnActive: {
+    backgroundColor: "#FFF1F2",
+    borderColor: "#FCA5A5",
+  },
+  interestedCount: { fontSize: 12, fontWeight: "700", color: theme.mutedText },
+  interestedCountActive: { color: "#EF4444" },
 
   // Applied badge (replaces apply button when already applied)
   appliedBadge: {

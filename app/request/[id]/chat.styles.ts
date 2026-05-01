@@ -71,6 +71,40 @@ export const styles = StyleSheet.create({
   msgTextMe: { color: "#FFFFFF" },
   msgTextOther: { color: theme.primaryText },
   msgTime: { fontSize: 10, color: theme.mutedText, marginHorizontal: 4 },
+  msgMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  readTick: { fontSize: 9, color: theme.mutedText, marginLeft: 4 },
+  readTickSeen: { color: theme.primary },
+
+  templateRow: {
+    maxHeight: 42,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  templateRowContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  templateChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  templateChipText: {
+    fontSize: 12,
+    color: theme.primaryText,
+    fontWeight: "600",
+  },
 
   emptyWrap: {
     flex: 1,

@@ -26,6 +26,7 @@ export default function ApplyModal() {
   const [coverLetter, setCoverLetter] = useState("");
   const [saving, setSaving] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [screeningNote, setScreeningNote] = useState<string | null>(null);
 
   const checkExisting = useCallback(async () => {
     const {
@@ -45,7 +46,16 @@ export default function ApplyModal() {
   useEffect(() => {
     requireAuth();
     checkExisting();
-  }, [checkExisting]);
+    // Load screening note
+    if (requestId) {
+      supabase
+        .from("requests")
+        .select("screening_note")
+        .eq("id", requestId)
+        .single()
+        .then(({ data }) => setScreeningNote(data?.screening_note ?? null));
+    }
+  }, [checkExisting, requestId]);
 
   async function handleApply() {
     if (!coverLetter.trim()) {
@@ -144,6 +154,19 @@ export default function ApplyModal() {
                   </Pressable>
                 ))}
               </ScrollView>
+
+              {/* Screening note from employer */}
+              {screeningNote ? (
+                <View style={styles.screeningBox}>
+                  <Feather name="info" size={14} color="#7C3AED" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.screeningLabel}>
+                      {t("noteFromEmployer")}
+                    </Text>
+                    <Text style={styles.screeningText}>{screeningNote}</Text>
+                  </View>
+                </View>
+              ) : null}
 
               <Text style={styles.label}>{t("coverLetter")} *</Text>
               <TextInput

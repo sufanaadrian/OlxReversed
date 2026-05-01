@@ -130,6 +130,46 @@ export const styles = StyleSheet.create({
   langBtnText: { fontSize: 12, fontWeight: "700", color: theme.mutedText },
   langBtnTextActive: { color: theme.primary },
 
+  // ── Verify identity ─────────────────────────────────────────────
+  verifyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: "#7C3AED",
+    alignSelf: "center",
+  },
+  verifyBtnText: { fontSize: 12, fontWeight: "700", color: "#7C3AED" },
+
+  // ── Work history ─────────────────────────────────────────────────
+  workHistorySection: { marginBottom: 16 },
+  workHistorySectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.secondaryText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  workHistoryItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  workHistoryTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.primaryText,
+  },
+  workHistoryMeta: { fontSize: 12, color: theme.mutedText, marginTop: 2 },
+
   signOutBtn: {
     flexDirection: "row",
     alignItems: "center",

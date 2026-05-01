@@ -44,6 +44,9 @@ export default function ProfileScreen() {
   const [editCvUrl, setEditCvUrl] = useState("");
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState(0);
+  const [workHistory, setWorkHistory] = useState<
+    { id: string; title: string; posted_by: string | null; closed_at: string }[]
+  >([]);
   const { language, setLanguage } = useLanguage();
   const { currency, setCurrency } = useCurrency();
   const t = useTranslation();
@@ -96,6 +99,23 @@ export default function ProfileScreen() {
     } else {
       setAvgRating(null);
       setRatingCount(0);
+    }
+
+    // Work history: jobs where this user's offer was accepted (as student)
+    const { data: acceptedOffers } = await supabase
+      .from("offers")
+      .select("id, requests(id, title, created_at, profiles(username))")
+      .eq("seller_id", user.id)
+      .eq("status", "accepted");
+    if (acceptedOffers) {
+      setWorkHistory(
+        (acceptedOffers as any[]).map((o) => ({
+          id: o.id,
+          title: o.requests?.title ?? "Untitled",
+          posted_by: o.requests?.profiles?.username ?? null,
+          closed_at: o.requests?.created_at ?? "",
+        })),
+      );
     }
 
     setProfile(prof as ProfileData | null);
@@ -157,6 +177,25 @@ export default function ProfileScreen() {
     router.replace("/sign-in");
   }
 
+  async function handleVerify() {
+    Alert.alert(t("verifyIdentity"), t("verifyMockMsg"), [
+      {
+        text: t("ok"),
+        onPress: async () => {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) return;
+          await supabase
+            .from("profiles")
+            .update({ verified: true })
+            .eq("id", user.id);
+          setProfile((p) => (p ? { ...p, verified: true } : p));
+        },
+      },
+    ]);
+  }
+
   if (loading) {
     return (
       <View style={styles.page}>
@@ -212,6 +251,12 @@ export default function ProfileScreen() {
             <Feather name="check-circle" size={12} color="#0D9488" />
             <Text style={styles.verifiedText}>{t("verified")}</Text>
           </View>
+        )}
+        {!profile?.verified && !editing && (
+          <Pressable style={styles.verifyBtn} onPress={handleVerify}>
+            <Feather name="shield" size={13} color="#7C3AED" />
+            <Text style={styles.verifyBtnText}>{t("verifyIdentity")}</Text>
+          </Pressable>
         )}
         {!editing && (
           <Pressable style={styles.editBtn} onPress={startEditing}>
@@ -463,6 +508,26 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {/* Work History */}
+      {workHistory.length > 0 && (
+        <View style={styles.workHistorySection}>
+          <Text style={styles.workHistorySectionTitle}>{t("workHistory")}</Text>
+          {workHistory.map((job) => (
+            <View key={job.id} style={styles.workHistoryItem}>
+              <Feather name="briefcase" size={14} color={theme.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.workHistoryTitle}>{job.title}</Text>
+                {job.posted_by ? (
+                  <Text style={styles.workHistoryMeta}>
+                    {t("workedAs")} {job.posted_by}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Sign Out */}
       <Pressable style={styles.signOutBtn} onPress={handleSignOut}>

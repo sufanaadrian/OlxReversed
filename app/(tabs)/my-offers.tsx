@@ -132,31 +132,26 @@ export default function ApplicationsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      // Poll every 20 seconds while tab is focused
+      const poll = setInterval(fetchData, 20000);
+      return () => clearInterval(poll);
     }, [fetchData]),
   );
 
-  // Realtime: auto-refresh when own sent offer status changes (accept/reject)
+  // Realtime: stable channel on mount — instant update when offer status changes
   useEffect(() => {
-    if (!userId) return;
     const channel = supabase
-      .channel(`offers-status-${userId}`)
+      .channel("my-offers-rt-stable")
       .on(
         "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "offers",
-          filter: `seller_id=eq.${userId}`,
-        },
-        () => {
-          fetchData();
-        },
+        { event: "*", schema: "public", table: "offers" },
+        () => fetchData(),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, fetchData]);
+  }, [fetchData]);
 
   async function handleWithdraw(offerId: string) {
     Alert.alert(t("withdrawApplication"), t("withdrawConfirm"), [

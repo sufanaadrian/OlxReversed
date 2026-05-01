@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
+    ScrollView,
     Text,
     TextInput,
     View,
@@ -22,6 +23,7 @@ type Message = {
   sender_id: string;
   content: string;
   created_at: string;
+  read_at: string | null;
 };
 
 type Profile = {
@@ -42,13 +44,26 @@ export default function ChatScreen() {
   const flatRef = useRef<FlatList>(null);
 
   const fetchMessages = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data } = await supabase
       .from("messages")
-      .select("id, sender_id, content, created_at")
+      .select("id, sender_id, content, created_at, read_at")
       .eq("request_id", id)
       .order("created_at", { ascending: true });
     setMessages((data as Message[]) ?? []);
     setLoading(false);
+
+    // Mark incoming messages as read
+    if (user) {
+      await supabase
+        .from("messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("request_id", id)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -246,9 +261,21 @@ export default function ChatScreen() {
                     {item.content}
                   </Text>
                 </View>
-                <Text style={styles.msgTime}>
-                  {formatTime(item.created_at)}
-                </Text>
+                <View style={styles.msgMeta}>
+                  <Text style={styles.msgTime}>
+                    {formatTime(item.created_at)}
+                  </Text>
+                  {isMe && (
+                    <Text
+                      style={[
+                        styles.readTick,
+                        item.read_at ? styles.readTickSeen : undefined,
+                      ]}
+                    >
+                      {item.read_at ? t("seen") : "✓"}
+                    </Text>
+                  )}
+                </View>
               </View>
             );
           }}
@@ -261,6 +288,32 @@ export default function ChatScreen() {
             ) : null
           }
         />
+
+        {/* Quick-reply templates */}
+        {!jobClosed && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.templateRow}
+            contentContainerStyle={styles.templateRowContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {[
+              t("tplAvailable"),
+              t("tplWhenStart"),
+              t("tplSoundsGood"),
+              t("tplConfirm"),
+            ].map((tpl) => (
+              <Pressable
+                key={tpl}
+                style={styles.templateChip}
+                onPress={() => setText(tpl)}
+              >
+                <Text style={styles.templateChipText}>{tpl}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Input */}
         <View style={styles.inputRow}>

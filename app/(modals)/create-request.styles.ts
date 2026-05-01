@@ -208,6 +208,30 @@ export const styles = StyleSheet.create({
   },
   submitBtnText: { fontSize: 15, fontWeight: "900", color: "white" },
 
+  // ── Urgent toggle ────────────────────────────────────────────────
+  urgentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  urgentCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  urgentCheckboxActive: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+  },
+  urgentLabel: { fontSize: 14, fontWeight: "700", color: theme.primaryText },
+  urgentHint: { fontSize: 12, color: theme.mutedText, marginTop: 2 },
+
   // ── Posting-mode selector ────────────────────────────────────────
   modeRow: { flexDirection: "row", gap: 10 },
   modeCard: {

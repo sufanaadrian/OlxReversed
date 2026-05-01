@@ -82,6 +82,22 @@ export const styles = StyleSheet.create({
     backgroundColor: "#ECFDF5",
   },
   expiryBadgeTextGreen: { fontSize: 10, fontWeight: "700", color: "#065F46" },
+
+  urgentBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    backgroundColor: "#FEE2E2",
+  },
+  urgentBadgeText: { fontSize: 10, fontWeight: "800", color: "#DC2626" },
+
+  boostedBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    backgroundColor: "#FEF3C7",
+  },
+  boostedBadgeText: { fontSize: 10, fontWeight: "800", color: "#D97706" },
   typeBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
   typeBadgeText: { fontSize: 11, fontWeight: "700" },
   categoryText: { fontSize: 12, color: theme.mutedText, fontWeight: "600" },

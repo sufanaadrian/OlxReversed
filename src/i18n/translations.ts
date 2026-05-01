@@ -417,6 +417,38 @@ export const translations = {
     jobCompleted: "Job completed!",
     rateNow: "Rate Now",
     rateLater: "Later",
+    // Urgently hiring
+    isUrgent: "Urgently hiring",
+    urgentBadge: "🔥 Urgent",
+    screeningNote: "Note for applicants",
+    screeningNotePlaceholder:
+      "E.g. Must be available weekends, bring portfolio...",
+    noteFromEmployer: "Note from employer",
+    // Interested pulse
+    interested: "Interested",
+    notInterested: "Remove interest",
+    interestCount: "interested",
+    // Boost post
+    boostPost: "Boost for 24h",
+    boostPostConfirm:
+      "Boost this post to the very top of the feed for 24 hours?",
+    boostedBadge: "Boosted",
+    // Mock verification
+    verifyIdentity: "Verify Identity",
+    verifyMockMsg:
+      "Identity verification is coming soon. For now you've been marked as verified!",
+    // Work history
+    workHistory: "Work History",
+    noWorkHistory: "No completed jobs yet",
+    workedAs: "as",
+    // Chat templates
+    quickReplies: "Quick replies",
+    tplAvailable: "I'm available!",
+    tplWhenStart: "When can we start?",
+    tplSoundsGood: "Sounds good!",
+    tplConfirm: "Let me confirm this.",
+    // Read receipts
+    seen: "Seen",
     monday: "Monday",
     tuesday: "Tuesday",
     wednesday: "Wednesday",
@@ -867,5 +899,37 @@ export const translations = {
     jobCompleted: "Job finalizat!",
     rateNow: "Evaluează acum",
     rateLater: "Mai târziu",
+    // Urgently hiring
+    isUrgent: "Angajare urgentă",
+    urgentBadge: "🔥 Urgent",
+    screeningNote: "Notă pentru candidați",
+    screeningNotePlaceholder:
+      "Ex. Trebuie disponibil weekend, aduce portfolio...",
+    noteFromEmployer: "Notă de la angajator",
+    // Interested pulse
+    interested: "Interesat",
+    notInterested: "Elimină interesul",
+    interestCount: "interesați",
+    // Boost post
+    boostPost: "Promovează 24h",
+    boostPostConfirm:
+      "Promovezi această postare în fruntea feedului timp de 24 ore?",
+    boostedBadge: "Promovat 🔥",
+    // Mock verification
+    verifyIdentity: "Verifică identitatea",
+    verifyMockMsg:
+      "Verificarea identității vine în curând. Momentan ai fost marcat ca verificat!",
+    // Work history
+    workHistory: "Istoric de muncă",
+    noWorkHistory: "Niciun job finalizat încă",
+    workedAs: "ca",
+    // Chat quick-reply templates
+    quickReplies: "Răspunsuri rapide",
+    tplAvailable: "Sunt disponibil!",
+    tplWhenStart: "Când putem începe?",
+    tplSoundsGood: "Sună bine!",
+    tplConfirm: "Lasă-mă să confirm.",
+    // Read receipts
+    seen: "Văzut",
   },
 };

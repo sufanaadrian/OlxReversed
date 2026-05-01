@@ -23,6 +23,9 @@ type JobPost = {
   status: string;
   posting_as: string | null;
   created_at: string;
+  is_urgent: boolean;
+  is_boosted: boolean;
+  boosted_until: string | null;
   offer_count: number;
 };
 
@@ -49,7 +52,9 @@ export default function MyPostsScreen() {
 
     const { data: rows } = await supabase
       .from("requests")
-      .select("id, title, category, location, status, posting_as, created_at")
+      .select(
+        "id, title, category, location, status, posting_as, created_at, is_urgent, is_boosted, boosted_until",
+      )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -75,6 +80,9 @@ export default function MyPostsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchPosts();
+      // Poll every 20 seconds while tab is focused
+      const poll = setInterval(fetchPosts, 20000);
+      return () => clearInterval(poll);
     }, [fetchPosts]),
   );
 
@@ -110,17 +118,24 @@ export default function MyPostsScreen() {
   }
 
   async function handleBump(id: string) {
-    Alert.alert(t("bumpPost"), t("bumpPostConfirm"), [
+    Alert.alert(t("boostPost"), t("boostPostConfirm"), [
       { text: t("cancel"), style: "cancel" },
       {
-        text: t("bumpPost"),
+        text: t("boostPost"),
         onPress: async () => {
+          const boostedUntil = new Date(
+            Date.now() + 24 * 3600000,
+          ).toISOString();
           await supabase
             .from("requests")
-            .update({ created_at: new Date().toISOString() })
+            .update({
+              created_at: new Date().toISOString(),
+              is_boosted: true,
+              boosted_until: boostedUntil,
+            })
             .eq("id", id);
           fetchPosts();
-          Alert.alert(t("bumped"));
+          Alert.alert(t("boostedBadge"));
         },
       },
     ]);
@@ -132,6 +147,10 @@ export default function MyPostsScreen() {
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
     const daysLeft = Math.ceil(msLeft / 86400000);
+    const isBoostedActive =
+      item.is_boosted &&
+      (!item.boosted_until ||
+        new Date(item.boosted_until).getTime() > Date.now());
 
     return (
       <Pressable
@@ -165,6 +184,18 @@ export default function MyPostsScreen() {
               ) : null}
             </View>
             <View style={styles.cardTopRight}>
+              {item.is_urgent && (
+                <View style={styles.urgentBadge}>
+                  <Text style={styles.urgentBadgeText}>🔥 {t("isUrgent")}</Text>
+                </View>
+              )}
+              {isBoostedActive && (
+                <View style={styles.boostedBadge}>
+                  <Text style={styles.boostedBadgeText}>
+                    {t("boostedBadge")}
+                  </Text>
+                </View>
+              )}
               {item.status === "active" && daysLeft > 0 && daysLeft <= 7 && (
                 <View style={styles.expiryBadge}>
                   <Feather name="clock" size={10} color="#92400E" />

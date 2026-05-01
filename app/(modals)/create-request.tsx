@@ -1,21 +1,21 @@
+import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./create-request.styles";
-import { Feather } from "@expo/vector-icons";
 
 const CATEGORIES = [
   "Hospitality",
@@ -55,6 +55,8 @@ export default function CreateJobScreen() {
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [postingAs, setPostingAs] = useState<PostingAs>("employer");
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [screeningNote, setScreeningNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -62,12 +64,15 @@ export default function CreateJobScreen() {
     if (isEdit && params.id) {
       loadExisting(params.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadExisting(id: string) {
     const { data } = await supabase
       .from("requests")
-      .select("title, description, category, location, budget_min, budget_max, posting_as")
+      .select(
+        "title, description, category, location, budget_min, budget_max, posting_as, is_urgent, screening_note",
+      )
       .eq("id", id)
       .single();
     if (!data) return;
@@ -78,6 +83,8 @@ export default function CreateJobScreen() {
     setBudgetMin(data.budget_min != null ? String(data.budget_min) : "");
     setBudgetMax(data.budget_max != null ? String(data.budget_max) : "");
     setPostingAs((data.posting_as as PostingAs) ?? "employer");
+    setIsUrgent(data.is_urgent ?? false);
+    setScreeningNote(data.screening_note ?? "");
   }
 
   async function handleSave() {
@@ -86,8 +93,13 @@ export default function CreateJobScreen() {
       return;
     }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace("/sign-in"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/sign-in");
+      return;
+    }
 
     const payload = {
       user_id: user.id,
@@ -98,6 +110,8 @@ export default function CreateJobScreen() {
       budget_min: budgetMin ? Number(budgetMin) : null,
       budget_max: budgetMax ? Number(budgetMax) : null,
       posting_as: postingAs,
+      is_urgent: isUrgent,
+      screening_note: screeningNote.trim() || null,
       status: "active",
     };
 
@@ -122,7 +136,10 @@ export default function CreateJobScreen() {
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -145,8 +162,12 @@ export default function CreateJobScreen() {
                     styles.toggleBtn,
                     postingAs === role && styles.toggleBtnActive,
                     postingAs === role && {
-                      backgroundColor: role === "employer" ? theme.employerLight : theme.primaryLight,
-                      borderColor: role === "employer" ? theme.employer : theme.primary,
+                      backgroundColor:
+                        role === "employer"
+                          ? theme.employerLight
+                          : theme.primaryLight,
+                      borderColor:
+                        role === "employer" ? theme.employer : theme.primary,
                     },
                   ]}
                   onPress={() => setPostingAs(role)}
@@ -155,7 +176,8 @@ export default function CreateJobScreen() {
                     style={[
                       styles.toggleBtnText,
                       postingAs === role && {
-                        color: role === "employer" ? theme.employer : theme.primary,
+                        color:
+                          role === "employer" ? theme.employer : theme.primary,
                         fontWeight: "700",
                       },
                     ]}
@@ -174,7 +196,11 @@ export default function CreateJobScreen() {
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder={postingAs === "employer" ? t("jobTitlePlaceholderEmployer") : t("jobTitlePlaceholderStudent")}
+              placeholder={
+                postingAs === "employer"
+                  ? t("jobTitlePlaceholderEmployer")
+                  : t("jobTitlePlaceholderStudent")
+              }
               placeholderTextColor={theme.mutedText}
               maxLength={120}
             />
@@ -255,6 +281,44 @@ export default function CreateJobScreen() {
                 keyboardType="numeric"
               />
             </View>
+          </View>
+
+          {/* Screening note */}
+          <View style={styles.section}>
+            <Text style={styles.label}>{t("screeningNote")}</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={screeningNote}
+              onChangeText={setScreeningNote}
+              placeholder={t("screeningNotePlaceholder")}
+              placeholderTextColor={theme.mutedText}
+              multiline
+              numberOfLines={3}
+              maxLength={400}
+            />
+          </View>
+
+          {/* Urgently hiring toggle */}
+          <View style={styles.section}>
+            <Pressable
+              style={styles.urgentRow}
+              onPress={() => setIsUrgent((v) => !v)}
+            >
+              <View
+                style={[
+                  styles.urgentCheckbox,
+                  isUrgent && styles.urgentCheckboxActive,
+                ]}
+              >
+                {isUrgent && <Feather name="check" size={14} color="#FFFFFF" />}
+              </View>
+              <View>
+                <Text style={styles.urgentLabel}>{t("isUrgent")}</Text>
+                <Text style={styles.urgentHint}>
+                  Shows a 🔥 badge on your post
+                </Text>
+              </View>
+            </Pressable>
           </View>
 
           {/* Submit */}

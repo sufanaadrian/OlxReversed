@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -53,6 +53,9 @@ type JobRequest = {
   status: string;
   posting_as: string | null;
   created_at: string;
+  is_urgent: boolean;
+  is_boosted: boolean;
+  boosted_until: string | null;
   profiles: { username: string | null } | null;
 };
 
@@ -91,6 +94,10 @@ export default function JobsScreen() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+  const [interestedIds, setInterestedIds] = useState<Set<string>>(new Set());
+  const [interestCounts, setInterestCounts] = useState<Record<string, number>>(
+    {},
+  );
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
@@ -98,81 +105,129 @@ export default function JobsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [newJobsCount, setNewJobsCount] = useState(0);
   const isFirstLoad = useRef(true);
+  // Ref so the stable realtime channel can always call the latest fetchJobs
+  const fetchJobsRef = useRef<((quiet?: boolean) => Promise<void>) | null>(
+    null,
+  );
 
-  const fetchJobs = useCallback(async () => {
-    if (isFirstLoad.current) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    setUserId(user?.id ?? null);
-
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-
-    let query = supabase
-      .from("requests")
-      .select(
-        "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,profiles(username)",
-      )
-      .eq("status", "active")
-      .gte("created_at", thirtyDaysAgo)
-      .order("created_at", { ascending: false });
-    if (selectedCategory !== "All")
-      query = query.eq("category", selectedCategory);
-    const { data } = await query;
-    setJobs((data as unknown as JobRequest[]) ?? []);
-    isFirstLoad.current = false;
-    setNewJobsCount(0);
-
-    if (user) {
-      // Load saved jobs
-      const { data: saved } = await supabase
-        .from("saved_jobs")
-        .select("request_id")
-        .eq("user_id", user.id);
-      setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
-
-      // Load applied jobs (non-withdrawn)
-      const { data: applied } = await supabase
-        .from("offers")
-        .select("request_id")
-        .eq("seller_id", user.id)
-        .neq("status", "withdrawn");
-      setAppliedIds(new Set((applied ?? []).map((a: any) => a.request_id)));
-
-      // Check profile completeness
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("bio, skills, university")
-        .eq("id", user.id)
-        .single();
-      if (prof) {
-        const incomplete =
-          !prof.bio || !prof.university || !prof.skills?.length;
-        setProfileIncomplete(incomplete);
+  const fetchJobs = useCallback(
+    async (quiet = false) => {
+      if (!quiet) {
+        if (isFirstLoad.current) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
+        }
       }
-    }
-    setLoading(false);
-    setRefreshing(false);
-  }, [selectedCategory]);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+
+      let query = supabase
+        .from("requests")
+        .select(
+          "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
+        )
+        .eq("status", "active")
+        .gte("created_at", thirtyDaysAgo)
+        .order("is_boosted", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (selectedCategory !== "All")
+        query = query.eq("category", selectedCategory);
+      const { data } = await query;
+      setJobs((data as unknown as JobRequest[]) ?? []);
+      isFirstLoad.current = false;
+      setNewJobsCount(0);
+
+      // Fetch interest counts for the loaded jobs
+      const jobIds = ((data ?? []) as { id: string }[]).map((j) => j.id);
+      if (jobIds.length) {
+        const { data: allInterests } = await supabase
+          .from("job_interests")
+          .select("request_id")
+          .in("request_id", jobIds);
+        const counts: Record<string, number> = {};
+        (allInterests ?? []).forEach((i: any) => {
+          counts[i.request_id] = (counts[i.request_id] ?? 0) + 1;
+        });
+        setInterestCounts(counts);
+      }
+
+      if (user) {
+        // Load saved jobs
+        const { data: saved } = await supabase
+          .from("saved_jobs")
+          .select("request_id")
+          .eq("user_id", user.id);
+        setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
+
+        // Load applied jobs (non-withdrawn)
+        const { data: applied } = await supabase
+          .from("offers")
+          .select("request_id")
+          .eq("seller_id", user.id)
+          .neq("status", "withdrawn");
+        setAppliedIds(new Set((applied ?? []).map((a: any) => a.request_id)));
+
+        // Load interested jobs
+        const { data: myInterests } = await supabase
+          .from("job_interests")
+          .select("request_id")
+          .eq("user_id", user.id);
+        setInterestedIds(
+          new Set((myInterests ?? []).map((i: any) => i.request_id)),
+        );
+
+        // Check profile completeness
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("bio, skills, university")
+          .eq("id", user.id)
+          .single();
+        if (prof) {
+          const incomplete =
+            !prof.bio || !prof.university || !prof.skills?.length;
+          setProfileIncomplete(incomplete);
+        }
+      }
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [selectedCategory],
+  );
+
+  // Keep ref pointing to latest fetchJobs so the stable channel can call it
+  useEffect(() => {
+    fetchJobsRef.current = fetchJobs;
+  });
+
+  // Realtime: stable channel (lives for component lifetime) — instant new-job notification
+  useEffect(() => {
+    const channel = supabase
+      .channel("marketplace-rt-stable")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "requests" },
+        () => {
+          // Silently re-fetch so list updates immediately
+          fetchJobsRef.current?.(true);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []); // mount/unmount only
 
   useFocusEffect(
     useCallback(() => {
       fetchJobs();
-      const channel = supabase
-        .channel("marketplace-new-jobs")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "requests" },
-          () => setNewJobsCount((n) => n + 1),
-        )
-        .subscribe();
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      // Poll every 20 seconds while tab is in focus
+      const poll = setInterval(() => fetchJobsRef.current?.(true), 20000);
+      return () => clearInterval(poll);
     }, [fetchJobs]),
   );
 
@@ -194,6 +249,30 @@ export default function JobsScreen() {
         .insert({ user_id: userId, request_id: jobId });
     }
     setSavedIds(next);
+  }
+
+  async function toggleInterest(jobId: string) {
+    if (!userId) return;
+    const isInterested = interestedIds.has(jobId);
+    const nextIds = new Set(interestedIds);
+    const nextCounts = { ...interestCounts };
+    if (isInterested) {
+      nextIds.delete(jobId);
+      nextCounts[jobId] = Math.max(0, (nextCounts[jobId] ?? 1) - 1);
+      await supabase
+        .from("job_interests")
+        .delete()
+        .eq("user_id", userId)
+        .eq("request_id", jobId);
+    } else {
+      nextIds.add(jobId);
+      nextCounts[jobId] = (nextCounts[jobId] ?? 0) + 1;
+      await supabase
+        .from("job_interests")
+        .insert({ user_id: userId, request_id: jobId });
+    }
+    setInterestedIds(nextIds);
+    setInterestCounts(nextCounts);
   }
 
   async function saveSearch() {
@@ -234,6 +313,12 @@ export default function JobsScreen() {
     const posterName = item.profiles?.username ?? null;
     const isSaved = savedIds.has(item.id);
     const hasApplied = appliedIds.has(item.id);
+    const isInterested = interestedIds.has(item.id);
+    const iCount = interestCounts[item.id] ?? 0;
+    const isBoostedActive =
+      item.is_boosted &&
+      (!item.boosted_until ||
+        new Date(item.boosted_until).getTime() > Date.now());
 
     // Expiry: auto-expires 30 days after posting
     const msLeft =
@@ -248,9 +333,21 @@ export default function JobsScreen() {
       >
         {/* Colored category strip */}
         <View style={[styles.cardStrip, { backgroundColor: catColor.bg }]}>
-          <Text style={[styles.cardStripText, { color: catColor.text }]}>
-            {t(CATEGORY_KEYS[item.category ?? "Other"] ?? "other")}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[styles.cardStripText, { color: catColor.text }]}>
+              {t(CATEGORY_KEYS[item.category ?? "Other"] ?? "other")}
+            </Text>
+            {item.is_urgent && (
+              <View style={styles.urgentBadge}>
+                <Text style={styles.urgentBadgeText}>{t("urgentBadge")}</Text>
+              </View>
+            )}
+            {isBoostedActive && (
+              <View style={styles.boostedBadge}>
+                <Text style={styles.boostedBadgeText}>{t("boostedBadge")}</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.stripRight}>
             {expiringSoon && (
               <View style={styles.expiryBadge}>
@@ -345,9 +442,37 @@ export default function JobsScreen() {
                 <Text style={styles.appliedBadgeText}>{t("appliedBadge")}</Text>
               </View>
             ) : (
-              <View style={styles.applyBtn}>
-                <Text style={styles.applyBtnText}>{t("apply")}</Text>
-                <Feather name="arrow-right" size={13} color="#FFFFFF" />
+              <View style={styles.footerRight}>
+                {userId && (
+                  <Pressable
+                    style={[
+                      styles.interestedBtn,
+                      isInterested && styles.interestedBtnActive,
+                    ]}
+                    onPress={() => toggleInterest(item.id)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Feather
+                      name="heart"
+                      size={13}
+                      color={isInterested ? "#EF4444" : theme.mutedText}
+                    />
+                    {iCount > 0 && (
+                      <Text
+                        style={[
+                          styles.interestedCount,
+                          isInterested && styles.interestedCountActive,
+                        ]}
+                      >
+                        {iCount}
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
+                <View style={styles.applyBtn}>
+                  <Text style={styles.applyBtnText}>{t("apply")}</Text>
+                  <Feather name="arrow-right" size={13} color="#FFFFFF" />
+                </View>
               </View>
             )}
           </View>
@@ -515,7 +640,7 @@ export default function JobsScreen() {
               <Text style={styles.emptySubtitle}>
                 {t("tryAdjustingSearch")}
               </Text>
-              <Pressable style={styles.refreshBtn} onPress={fetchJobs}>
+              <Pressable style={styles.refreshBtn} onPress={() => fetchJobs()}>
                 <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
               </Pressable>
             </View>

@@ -98,6 +98,27 @@ export const styles = StyleSheet.create({
   },
   submitBtnText: { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
 
+  screeningBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#C4B5FD",
+  },
+  screeningLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#7C3AED",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+  screeningText: { fontSize: 13, color: "#4C1D95", lineHeight: 18 },
+
   alreadyApplied: {
     flexDirection: "row",
     alignItems: "center",
