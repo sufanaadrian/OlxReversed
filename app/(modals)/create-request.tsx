@@ -57,6 +57,7 @@ export default function CreateJobScreen() {
   const [postingAs, setPostingAs] = useState<PostingAs>("employer");
   const [isUrgent, setIsUrgent] = useState(false);
   const [screeningNote, setScreeningNote] = useState("");
+  const [workersNeeded, setWorkersNeeded] = useState(1);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function CreateJobScreen() {
     const { data } = await supabase
       .from("requests")
       .select(
-        "title, description, category, location, budget_min, budget_max, posting_as, is_urgent, screening_note",
+        "title, description, category, location, budget_min, budget_max, posting_as, is_urgent, screening_note, workers_needed",
       )
       .eq("id", id)
       .single();
@@ -85,6 +86,7 @@ export default function CreateJobScreen() {
     setPostingAs((data.posting_as as PostingAs) ?? "employer");
     setIsUrgent(data.is_urgent ?? false);
     setScreeningNote(data.screening_note ?? "");
+    setWorkersNeeded(data.workers_needed ?? 1);
   }
 
   async function handleSave() {
@@ -112,6 +114,7 @@ export default function CreateJobScreen() {
       posting_as: postingAs,
       is_urgent: isUrgent,
       screening_note: screeningNote.trim() || null,
+      workers_needed: postingAs === "employer" ? workersNeeded : 1,
       status: "active",
     };
 
@@ -297,6 +300,47 @@ export default function CreateJobScreen() {
               maxLength={400}
             />
           </View>
+
+          {/* Workers needed (employer only) */}
+          {postingAs === "employer" && (
+            <View style={styles.section}>
+              <Text style={styles.label}>{t("workersNeeded")}</Text>
+              <Text style={styles.hint}>{t("workersNeededHint")}</Text>
+              <View style={styles.stepperRow}>
+                <Pressable
+                  style={[
+                    styles.stepperBtn,
+                    workersNeeded <= 1 && styles.stepperBtnDisabled,
+                  ]}
+                  onPress={() => setWorkersNeeded((v) => Math.max(1, v - 1))}
+                  disabled={workersNeeded <= 1}
+                >
+                  <Feather
+                    name="minus"
+                    size={18}
+                    color={workersNeeded <= 1 ? theme.mutedText : theme.primary}
+                  />
+                </Pressable>
+                <Text style={styles.stepperValue}>{workersNeeded}</Text>
+                <Pressable
+                  style={[
+                    styles.stepperBtn,
+                    workersNeeded >= 20 && styles.stepperBtnDisabled,
+                  ]}
+                  onPress={() => setWorkersNeeded((v) => Math.min(20, v + 1))}
+                  disabled={workersNeeded >= 20}
+                >
+                  <Feather
+                    name="plus"
+                    size={18}
+                    color={
+                      workersNeeded >= 20 ? theme.mutedText : theme.primary
+                    }
+                  />
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           {/* Urgently hiring toggle */}
           <View style={styles.section}>

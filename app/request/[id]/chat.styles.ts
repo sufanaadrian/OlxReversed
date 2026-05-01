@@ -45,6 +45,21 @@ export const styles = StyleSheet.create({
     borderColor: theme.success,
   },
   completeBtnText: { fontSize: 12, fontWeight: "700", color: theme.success },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  headerCallBtn: {
+    backgroundColor: theme.success,
+    borderColor: theme.success,
+  },
 
   messageList: { padding: 16, gap: 8, flexGrow: 1 },
 

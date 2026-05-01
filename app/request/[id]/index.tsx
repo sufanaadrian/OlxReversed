@@ -28,6 +28,8 @@ type JobDetail = {
   posting_as: string | null;
   created_at: string;
   user_id: string;
+  workers_needed: number;
+  accepted_count: number;
   profiles: { username: string | null; verified: boolean | null } | null;
 };
 
@@ -138,7 +140,7 @@ export default function JobDetailScreen() {
     const { data: jobData } = await supabase
       .from("requests")
       .select(
-        "id,title,description,category,location,budget_min,budget_max,status,posting_as,created_at,user_id,profiles(username,verified)",
+        "id,title,description,category,location,budget_min,budget_max,status,posting_as,created_at,user_id,workers_needed,accepted_count,profiles(username,verified)",
       )
       .eq("id", id)
       .single();
@@ -208,7 +210,20 @@ export default function JobDetailScreen() {
       .from("offers")
       .update({ status: "accepted" })
       .eq("id", offerId);
-    await supabase.from("requests").update({ status: "filled" }).eq("id", id);
+
+    // Increment accepted_count and conditionally mark filled
+    const newCount = (job?.accepted_count ?? 0) + 1;
+    const needed = job?.workers_needed ?? 1;
+    const nowFilled = newCount >= needed;
+
+    await supabase
+      .from("requests")
+      .update({
+        accepted_count: newCount,
+        ...(nowFilled ? { status: "filled" } : {}),
+      })
+      .eq("id", id);
+
     fetchData();
   }
 
@@ -422,6 +437,29 @@ export default function JobDetailScreen() {
           </View>
 
           <Text style={styles.heroTitle}>{job.title}</Text>
+
+          {/* Slots remaining pill — only for employer posts */}
+          {job.posting_as === "employer" && (
+            <View style={styles.slotsRow}>
+              <Feather
+                name="users"
+                size={13}
+                color={
+                  job.status === "filled" ? theme.mutedText : theme.primary
+                }
+              />
+              <Text
+                style={[
+                  styles.slotsText,
+                  job.status === "filled" && { color: theme.mutedText },
+                ]}
+              >
+                {job.status === "filled"
+                  ? t("slotsFilled")
+                  : `${job.accepted_count} / ${job.workers_needed} ${t("slotsAccepted")}`}
+              </Text>
+            </View>
+          )}
 
           {/* Meta chips */}
           <View style={styles.metaRow}>

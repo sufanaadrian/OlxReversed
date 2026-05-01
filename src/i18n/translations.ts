@@ -93,6 +93,9 @@ export const translations = {
     durationMultiDay: "Multi-day",
     durationRecurring: "Recurring",
     workersNeeded: "Workers needed",
+    workersNeededHint: "How many people do you want to hire for this job?",
+    slotsAccepted: "hired",
+    slotsFilled: "All slots filled",
     experienceSection: "Requirements",
     experienceLevel: "Experience needed",
     experienceAny: "No experience needed",
@@ -114,8 +117,8 @@ export const translations = {
     jobUpdated: "Job updated!",
     applyTitle: "Apply for this job",
     coverLetter: "Cover letter",
-    yourApplication: "Your application",
-    viewCV: "View CV",
+    yourApplication: "Your message",
+    viewCV: "View profile",
     coverLetterPlaceholder:
       "Introduce yourself — your skills, availability, why you’re a good fit…",
     sendApplication: "Send Application",
@@ -396,6 +399,8 @@ export const translations = {
     addSkillsHint:
       'Tap "Edit Profile" to add your skills (e.g. React, Excel, Design).',
     addLinkedinHint: 'Tap "Edit Profile" to add your LinkedIn profile URL.',
+    addPhoneHint:
+      'Tap "Edit Profile" to add your phone number so employers can reach you.',
     minAgo: "m ago",
     hAgo: "h ago",
     dAgo: "d ago",
@@ -485,6 +490,14 @@ export const translations = {
     fridayShort: "Fr",
     saturdayShort: "Sa",
     sundayShort: "Su",
+    activity: "Activity",
+    accept: "Accept",
+    reject: "Reject",
+    by: "by",
+    view: "View",
+    noConversations: "No conversations yet",
+    noConversationsDesc:
+      "Apply to jobs or accept applications to start chatting.",
   },
   ro: {
     home: "Joburi",
@@ -580,6 +593,9 @@ export const translations = {
     durationMultiDay: "Mai multe zile",
     durationRecurring: "Recurent",
     workersNeeded: "Angajați necesari",
+    workersNeededHint: "Câți oameni vrei să angajezi pentru acest job?",
+    slotsAccepted: "angajați",
+    slotsFilled: "Toate locurile ocupate",
     experienceSection: "Cerințe",
     experienceLevel: "Experiență necesară",
     experienceAny: "Fără experiență necesară",
@@ -602,8 +618,8 @@ export const translations = {
     jobUpdated: "Job actualizat!",
     applyTitle: "Aplică pentru acest job",
     coverLetter: "Scrisoare de intenție",
-    yourApplication: "Cererea ta",
-    viewCV: "Vezi CV",
+    yourApplication: "Mesajul tău",
+    viewCV: "Vezi profilul",
     coverLetterPlaceholder:
       "Prezintă-te — competențele tale, disponibilitate, de ce ești potrivit…",
     sendApplication: "Trimite candidatura",
@@ -903,6 +919,8 @@ export const translations = {
       'Apasă "Editează Profilul" pentru a adăuga competențele tale.',
     addLinkedinHint:
       'Apasă "Editează Profilul" pentru a adăuga URL-ul profilului tău LinkedIn.',
+    addPhoneHint:
+      'Apasă "Editează Profilul" pentru a adăuga numărul tău de telefon.',
     viewCv: "Vezi CV",
     minAgo: "m acum",
     hAgo: "h acum",
@@ -979,5 +997,13 @@ export const translations = {
     tplConfirm: "Lasă-mă să confirm.",
     // Read receipts
     seen: "Văzut",
+    activity: "Activitate",
+    accept: "Acceptă",
+    reject: "Respinge",
+    by: "de",
+    view: "Vezi",
+    noConversations: "Nicio conversație încă",
+    noConversationsDesc:
+      "Aplică la joburi sau acceptă candidaturi pentru a chata.",
   },
 };

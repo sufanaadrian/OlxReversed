@@ -22,32 +22,60 @@ export default function TabsLayout() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Badge for "My Posts": count pending offers on my active posts
+    // Badge for "Activity": count pending offers on my posts (new applicants)
     const { data: myPosts } = await supabase
       .from("requests")
       .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "active");
+      .eq("user_id", user.id);
 
-    if (myPosts && myPosts.length > 0) {
-      const ids = myPosts.map((p) => p.id);
+    const myPostIds = (myPosts ?? []).map((p) => p.id);
+
+    if (myPostIds.length > 0) {
       const { count } = await supabase
         .from("offers")
         .select("id", { count: "exact", head: true })
-        .in("request_id", ids)
+        .in("request_id", myPostIds)
         .eq("status", "pending");
       setPendingApplicants(count ?? 0);
     } else {
       setPendingApplicants(0);
     }
 
-    // Badge for "My Applications": count of my offers that were accepted (chat ready)
-    const { count: accepted } = await supabase
+    // Badge for "Messages": count unread messages across all my conversations
+    // Conversations = requests where I have an accepted offer (as applicant)
+    //               + my posts that have accepted offers (as employer)
+    const { data: myAcceptedOffers } = await supabase
       .from("offers")
-      .select("id", { count: "exact", head: true })
+      .select("request_id")
       .eq("seller_id", user.id)
       .eq("status", "accepted");
-    setNewResponses(accepted ?? 0);
+
+    const acceptedOnMyPosts =
+      myPostIds.length > 0
+        ? await supabase
+            .from("offers")
+            .select("request_id")
+            .in("request_id", myPostIds)
+            .eq("status", "accepted")
+        : { data: [] };
+
+    const convoIds = [
+      ...(myAcceptedOffers ?? []).map((o) => o.request_id),
+      ...(acceptedOnMyPosts.data ?? []).map((o) => o.request_id),
+    ];
+    const uniqueConvoIds = [...new Set(convoIds)];
+
+    if (uniqueConvoIds.length > 0) {
+      const { count: unread } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .in("request_id", uniqueConvoIds)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+      setNewResponses(unread ?? 0);
+    } else {
+      setNewResponses(0);
+    }
   }, []);
 
   useFocusEffect(
@@ -105,9 +133,9 @@ export default function TabsLayout() {
           />
 
           <Tabs.Screen
-            name="my-requests"
+            name="activity"
             options={{
-              title: t("myPosts"),
+              title: t("activity"),
               tabBarBadge:
                 pendingApplicants > 0 ? pendingApplicants : undefined,
               tabBarBadgeStyle: {
@@ -115,7 +143,7 @@ export default function TabsLayout() {
                 fontSize: 10,
               },
               tabBarIcon: ({ color, size }) => (
-                <Feather name="file-text" color={color} size={size} />
+                <Feather name="layers" color={color} size={size} />
               ),
             }}
           />
@@ -150,13 +178,16 @@ export default function TabsLayout() {
           />
 
           <Tabs.Screen
-            name="my-offers"
+            name="messages"
             options={{
-              title: t("myApplications"),
+              title: t("messages"),
               tabBarBadge: newResponses > 0 ? newResponses : undefined,
-              tabBarBadgeStyle: { backgroundColor: theme.accent, fontSize: 10 },
+              tabBarBadgeStyle: {
+                backgroundColor: theme.primary,
+                fontSize: 10,
+              },
               tabBarIcon: ({ color, size }) => (
-                <Feather name="inbox" color={color} size={size} />
+                <Feather name="message-circle" color={color} size={size} />
               ),
             }}
           />
@@ -170,6 +201,10 @@ export default function TabsLayout() {
               ),
             }}
           />
+
+          {/* Hide legacy screens from tab bar */}
+          <Tabs.Screen name="my-requests" options={{ href: null }} />
+          <Tabs.Screen name="my-offers" options={{ href: null }} />
         </Tabs>
 
         {/* Action Menu Modal */}

@@ -6,6 +6,7 @@ import {
     Alert,
     FlatList,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     Pressable,
     ScrollView,
@@ -38,6 +39,7 @@ export default function ChatScreen() {
   const [text, setText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<Profile | null>(null);
+  const [otherPhone, setOtherPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [jobClosed, setJobClosed] = useState(false);
@@ -89,13 +91,29 @@ export default function ChatScreen() {
         // I'm the owner, find the accepted applicant
         const { data: offer } = await supabase
           .from("offers")
-          .select("seller_id, profiles!seller_id(id, username)")
+          .select("seller_id, profiles!seller_id(id, username, phone_number)")
           .eq("request_id", id)
           .eq("status", "accepted")
           .maybeSingle();
-        if (offer) setOtherUser((offer as any).profiles as Profile);
+        if (offer) {
+          const prof = (offer as any).profiles as Profile & {
+            phone_number?: string;
+          };
+          setOtherUser(prof);
+          setOtherPhone(prof?.phone_number ?? null);
+        }
       } else {
-        setOtherUser((req as any).profiles as Profile);
+        const prof = (req as any).profiles as Profile & {
+          phone_number?: string;
+        };
+        // Fetch employer phone separately (profiles join on request owner)
+        const { data: empProf } = await supabase
+          .from("profiles")
+          .select("id, username, phone_number")
+          .eq("id", req.user_id)
+          .single();
+        setOtherUser(prof);
+        setOtherPhone((empProf as any)?.phone_number ?? null);
       }
     }
     fetchOther();
@@ -215,6 +233,24 @@ export default function ChatScreen() {
           {jobClosed && (
             <Text style={styles.headerSub}>{t("statusClosed")}</Text>
           )}
+        </View>
+        <View style={styles.headerActions}>
+          {otherUser?.id && (
+            <Pressable
+              style={styles.headerIconBtn}
+              onPress={() => router.push(`/cv/${otherUser.id}` as any)}
+            >
+              <Feather name="user" size={18} color={theme.primaryText} />
+            </Pressable>
+          )}
+          {otherPhone ? (
+            <Pressable
+              style={[styles.headerIconBtn, styles.headerCallBtn]}
+              onPress={() => Linking.openURL(`tel:${otherPhone}`)}
+            >
+              <Feather name="phone" size={18} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
         </View>
         {isOwner && !jobClosed && (
           <Pressable onPress={handleComplete} style={styles.completeBtn}>

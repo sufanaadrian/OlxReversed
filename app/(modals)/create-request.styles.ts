@@ -144,6 +144,7 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  stepperBtnDisabled: { opacity: 0.35 },
   stepperBtnText: {
     fontSize: 22,
     fontWeight: "700",

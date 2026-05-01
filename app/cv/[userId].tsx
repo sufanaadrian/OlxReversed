@@ -25,6 +25,7 @@ type CVProfile = {
   verified: boolean | null;
   linkedin_url: string | null;
   created_at: string | null;
+  phone_number: string | null;
 };
 
 function initials(name: string | null | undefined) {
@@ -48,7 +49,7 @@ export default function CVScreen() {
       const { data } = await supabase
         .from("profiles")
         .select(
-          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at",
+          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at, phone_number",
         )
         .eq("id", userId)
         .single();
@@ -214,6 +215,25 @@ export default function CVScreen() {
             >
               <Feather name="external-link" size={14} color={theme.linkedin} />
               <Text style={styles.linkedinBtnText}>{t("openLinkedIn")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Phone — visible to employers viewing a candidate */}
+        {profile.phone_number ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="phone" size={15} color={theme.primary} />
+              <Text style={styles.sectionTitle}>{t("phone")}</Text>
+            </View>
+            <Pressable
+              style={styles.linkedinBtn}
+              onPress={() => Linking.openURL(`tel:${profile.phone_number}`)}
+            >
+              <Feather name="phone" size={14} color={theme.primary} />
+              <Text style={[styles.linkedinBtnText, { color: theme.primary }]}>
+                {profile.phone_number}
+              </Text>
             </Pressable>
           </View>
         ) : null}

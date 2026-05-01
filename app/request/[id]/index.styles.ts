@@ -90,8 +90,20 @@ export const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.primaryText,
     lineHeight: 30,
-    marginBottom: 14,
+    marginBottom: 8,
     letterSpacing: -0.3,
+  },
+
+  slotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 14,
+  },
+  slotsText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.primary,
   },
 
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },

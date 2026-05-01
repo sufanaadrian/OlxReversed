@@ -28,6 +28,7 @@ type ProfileData = {
   cv_url: string | null;
   linkedin_url: string | null;
   verified: boolean | null;
+  phone_number: string | null;
 };
 
 export default function ProfileScreen() {
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
   const [editStudyYear, setEditStudyYear] = useState("");
   const [editSkillsRaw, setEditSkillsRaw] = useState("");
   const [editLinkedinUrl, setEditLinkedinUrl] = useState("");
+  const [editPhoneNumber, setEditPhoneNumber] = useState("");
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState(0);
   const [workHistory, setWorkHistory] = useState<
@@ -74,7 +76,7 @@ export default function ProfileScreen() {
         supabase
           .from("profiles")
           .select(
-            "username, university, study_year, bio, skills, user_type, created_at, cv_url, linkedin_url, verified",
+            "username, university, study_year, bio, skills, user_type, created_at, cv_url, linkedin_url, verified, phone_number",
           )
           .eq("id", user.id)
           .single(),
@@ -135,6 +137,7 @@ export default function ProfileScreen() {
     setEditStudyYear(profile.study_year ? String(profile.study_year) : "");
     setEditSkillsRaw((profile.skills ?? []).join(", "));
     setEditLinkedinUrl(profile.linkedin_url ?? "");
+    setEditPhoneNumber(profile.phone_number ?? "");
     setEditing(true);
   }
 
@@ -162,6 +165,7 @@ export default function ProfileScreen() {
         study_year: editStudyYear ? parseInt(editStudyYear, 10) : null,
         skills: skills.length ? skills : null,
         linkedin_url: editLinkedinUrl.trim() || null,
+        phone_number: editPhoneNumber.trim() || null,
       })
       .eq("id", user.id);
 
@@ -373,6 +377,17 @@ export default function ProfileScreen() {
             keyboardType="url"
           />
 
+          <Text style={styles.fieldLabel}>{t("phone")}</Text>
+          <TextInput
+            style={styles.fieldInput}
+            value={editPhoneNumber}
+            onChangeText={setEditPhoneNumber}
+            placeholder={t("phonePlaceholder")}
+            placeholderTextColor={theme.mutedText}
+            keyboardType="phone-pad"
+            autoCapitalize="none"
+          />
+
           <View style={styles.editActions}>
             <Pressable
               style={styles.cancelBtn}
@@ -488,6 +503,27 @@ export default function ProfileScreen() {
             ) : (
               <Pressable onPress={startEditing}>
                 <Text style={styles.emptyHint}>{t("addLinkedinHint")}</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Phone */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Feather name="phone" size={14} color={theme.primary} />
+              <Text style={styles.sectionTitle}>{t("phone")}</Text>
+            </View>
+            {profile?.phone_number ? (
+              <Pressable
+                style={styles.cvLinkRow}
+                onPress={() => Linking.openURL(`tel:${profile.phone_number}`)}
+              >
+                <Feather name="phone" size={14} color={theme.primary} />
+                <Text style={styles.cvLinkText}>{profile.phone_number}</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={startEditing}>
+                <Text style={styles.emptyHint}>{t("addPhoneHint")}</Text>
               </Pressable>
             )}
           </View>
