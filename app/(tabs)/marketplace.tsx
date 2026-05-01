@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Pressable,
     ScrollView,
@@ -89,6 +90,7 @@ export default function JobsScreen() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
@@ -123,6 +125,14 @@ export default function JobsScreen() {
         .select("request_id")
         .eq("user_id", user.id);
       setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
+
+      // Load applied jobs (non-withdrawn)
+      const { data: applied } = await supabase
+        .from("offers")
+        .select("request_id")
+        .eq("seller_id", user.id)
+        .neq("status", "withdrawn");
+      setAppliedIds(new Set((applied ?? []).map((a: any) => a.request_id)));
 
       // Check profile completeness
       const { data: prof } = await supabase
@@ -165,6 +175,17 @@ export default function JobsScreen() {
     setSavedIds(next);
   }
 
+  async function saveSearch() {
+    if (!userId) return;
+    const keyword = search.trim() || null;
+    const category = selectedCategory !== "All" ? selectedCategory : null;
+    if (!keyword && !category) return;
+    const { error } = await supabase
+      .from("job_alerts")
+      .insert({ user_id: userId, keyword, category });
+    if (!error) Alert.alert(t("searchSaved"));
+  }
+
   function commitSearch(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
@@ -191,6 +212,7 @@ export default function JobsScreen() {
       CATEGORY_COLORS[item.category ?? "Other"] ?? CATEGORY_COLORS.Other;
     const posterName = item.profiles?.username ?? null;
     const isSaved = savedIds.has(item.id);
+    const hasApplied = appliedIds.has(item.id);
 
     // Expiry: auto-expires 30 days after posting
     const msLeft =
@@ -296,10 +318,17 @@ export default function JobsScreen() {
                 <Text style={styles.timeAgo}>{timeAgo(item.created_at)}</Text>
               </View>
             </View>
-            <View style={styles.applyBtn}>
-              <Text style={styles.applyBtnText}>{t("apply")}</Text>
-              <Feather name="arrow-right" size={13} color="#FFFFFF" />
-            </View>
+            {hasApplied ? (
+              <View style={styles.appliedBadge}>
+                <Feather name="check" size={12} color={theme.primary} />
+                <Text style={styles.appliedBadgeText}>{t("appliedBadge")}</Text>
+              </View>
+            ) : (
+              <View style={styles.applyBtn}>
+                <Text style={styles.applyBtnText}>{t("apply")}</Text>
+                <Feather name="arrow-right" size={13} color="#FFFFFF" />
+              </View>
+            )}
           </View>
         </View>
       </Pressable>
@@ -317,12 +346,20 @@ export default function JobsScreen() {
               {filtered.length} {t("jobsAvailable")}
             </Text>
           </View>
-          <Pressable
-            onPress={() => router.push("/saved-jobs" as any)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="bookmark" size={22} color={theme.primaryDark} />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 4 }}>
+            <Pressable
+              onPress={() => router.push("/saved-searches" as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="bell" size={20} color={theme.primaryDark} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/saved-jobs" as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="bookmark" size={22} color={theme.primaryDark} />
+            </Pressable>
+          </View>
         </View>
         <View style={styles.searchBox}>
           <Feather name="search" size={16} color={theme.mutedText} />
@@ -405,6 +442,14 @@ export default function JobsScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Save search pill — visible when a filter or search is active */}
+      {userId && (search.trim() || selectedCategory !== "All") && (
+        <Pressable style={styles.saveSearchBtn} onPress={saveSearch}>
+          <Feather name="bell" size={12} color={theme.primaryDark} />
+          <Text style={styles.saveSearchText}>{t("saveSearch")}</Text>
+        </Pressable>
+      )}
 
       {loading ? (
         <ActivityIndicator

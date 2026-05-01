@@ -112,6 +112,11 @@ export const styles = StyleSheet.create({
   },
   filledBtnText: { fontSize: 12, fontWeight: "700", color: theme.primary },
 
+  bumpBtn: {
+    borderColor: "#EDE9FE",
+    backgroundColor: "#EDE9FE",
+  },
+
   // Empty state
   emptyWrap: {
     flex: 1,

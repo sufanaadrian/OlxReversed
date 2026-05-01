@@ -184,6 +184,37 @@ export const styles = StyleSheet.create({
   },
   applyBtnText: { fontSize: 13, fontWeight: "800", color: "#FFFFFF" },
 
+  // Applied badge (replaces apply button when already applied)
+  appliedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1.5,
+    borderColor: theme.primary,
+  },
+  appliedBadgeText: { fontSize: 12, fontWeight: "700", color: theme.primary },
+
+  // Save search pill
+  saveSearchBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  saveSearchText: { fontSize: 12, fontWeight: "700", color: theme.primaryDark },
+
   // Recent searches
   recentRow: { marginTop: 8 },
   recentContent: { gap: 6, paddingRight: 4 },

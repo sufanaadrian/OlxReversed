@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     Pressable,
     ScrollView,
     Text,
@@ -23,6 +24,8 @@ type ProfileData = {
   skills: string[] | null;
   user_type: string | null;
   created_at: string | null;
+  cv_url: string | null;
+  verified: boolean | null;
 };
 
 export default function ProfileScreen() {
@@ -38,6 +41,9 @@ export default function ProfileScreen() {
   const [editUniversity, setEditUniversity] = useState("");
   const [editStudyYear, setEditStudyYear] = useState("");
   const [editSkillsRaw, setEditSkillsRaw] = useState("");
+  const [editCvUrl, setEditCvUrl] = useState("");
+  const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [ratingCount, setRatingCount] = useState(0);
   const { language, setLanguage } = useLanguage();
   const { currency, setCurrency } = useCurrency();
   const t = useTranslation();
@@ -62,7 +68,7 @@ export default function ProfileScreen() {
         supabase
           .from("profiles")
           .select(
-            "username, university, study_year, bio, skills, user_type, created_at",
+            "username, university, study_year, bio, skills, user_type, created_at, cv_url, verified",
           )
           .eq("id", user.id)
           .single(),
@@ -75,6 +81,22 @@ export default function ProfileScreen() {
           .select("id", { count: "exact", head: true })
           .eq("seller_id", user.id),
       ]);
+
+    // Load avg rating
+    const { data: reviewRows } = await supabase
+      .from("reviews")
+      .select("rating")
+      .eq("reviewee_id", user.id);
+    if (reviewRows && reviewRows.length > 0) {
+      const avg =
+        reviewRows.reduce((s: number, r: any) => s + r.rating, 0) /
+        reviewRows.length;
+      setAvgRating(Math.round(avg * 10) / 10);
+      setRatingCount(reviewRows.length);
+    } else {
+      setAvgRating(null);
+      setRatingCount(0);
+    }
 
     setProfile(prof as ProfileData | null);
     setPostsCount(posts ?? 0);
@@ -89,6 +111,7 @@ export default function ProfileScreen() {
     setEditUniversity(profile.university ?? "");
     setEditStudyYear(profile.study_year ? String(profile.study_year) : "");
     setEditSkillsRaw((profile.skills ?? []).join(", "));
+    setEditCvUrl(profile.cv_url ?? "");
     setEditing(true);
   }
 
@@ -115,6 +138,7 @@ export default function ProfileScreen() {
         university: editUniversity.trim() || null,
         study_year: editStudyYear ? parseInt(editStudyYear, 10) : null,
         skills: skills.length ? skills : null,
+        cv_url: editCvUrl.trim() || null,
       })
       .eq("id", user.id);
 
@@ -183,6 +207,12 @@ export default function ProfileScreen() {
             </Text>
           </View>
         ) : null}
+        {profile?.verified && (
+          <View style={styles.verifiedBadge}>
+            <Feather name="check-circle" size={12} color="#0D9488" />
+            <Text style={styles.verifiedText}>{t("verified")}</Text>
+          </View>
+        )}
         {!editing && (
           <Pressable style={styles.editBtn} onPress={startEditing}>
             <Feather name="edit-2" size={14} color={theme.primary} />
@@ -201,6 +231,22 @@ export default function ProfileScreen() {
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{applicationsCount}</Text>
           <Text style={styles.statLabel}>{t("applications")}</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          {avgRating !== null ? (
+            <View style={styles.ratingRow}>
+              <Text style={styles.statValue}>{avgRating.toFixed(1)}</Text>
+              <Feather name="star" size={14} color="#F59E0B" />
+            </View>
+          ) : (
+            <Text style={styles.statValue}>—</Text>
+          )}
+          <Text style={styles.statLabel}>
+            {ratingCount > 0
+              ? `${ratingCount} ${t("ratings")}`
+              : t("noRatings")}
+          </Text>
         </View>
       </View>
 
@@ -259,6 +305,17 @@ export default function ProfileScreen() {
             placeholderTextColor={theme.mutedText}
           />
           <Text style={styles.fieldHint}>Separate skills with commas</Text>
+
+          <Text style={styles.fieldLabel}>{t("cvLink")}</Text>
+          <TextInput
+            style={styles.fieldInput}
+            value={editCvUrl}
+            onChangeText={setEditCvUrl}
+            placeholder={t("cvLinkPlaceholder")}
+            placeholderTextColor={theme.mutedText}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
 
           <View style={styles.editActions}>
             <Pressable
@@ -323,6 +380,22 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
+            </View>
+          ) : null}
+
+          {/* CV link */}
+          {profile?.cv_url ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t("cvLink")}</Text>
+              <Pressable
+                style={styles.cvLinkRow}
+                onPress={() => Linking.openURL(profile.cv_url!)}
+              >
+                <Feather name="external-link" size={14} color={theme.primary} />
+                <Text style={styles.cvLinkText} numberOfLines={1}>
+                  {profile.cv_url}
+                </Text>
+              </Pressable>
             </View>
           ) : null}
         </>

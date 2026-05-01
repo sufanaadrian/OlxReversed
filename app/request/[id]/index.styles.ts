@@ -284,4 +284,27 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.primary,
   },
   backLinkText: { color: "#FFFFFF", fontWeight: "700" },
+
+  // View counter chip
+  viewChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: theme.surfaceAlt,
+  },
+  viewChipText: { fontSize: 12, color: theme.mutedText, fontWeight: "600" },
+
+  // Verified badge on poster row
+  posterVerified: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 2,
+  },
+  posterVerifiedText: { fontSize: 11, fontWeight: "700", color: "#0F766E" },
+
+  // Report modal overlay handled via Alert; just need flag btn style
 });

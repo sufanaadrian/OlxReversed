@@ -28,7 +28,7 @@ type JobDetail = {
   posting_as: string | null;
   created_at: string;
   user_id: string;
-  profiles: { username: string | null } | null;
+  profiles: { username: string | null; verified: boolean | null } | null;
 };
 
 type Applicant = {
@@ -92,6 +92,8 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [hasApplied, setHasApplied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [viewCount, setViewCount] = useState(0);
+  const [alreadyReported, setAlreadyReported] = useState(false);
 
   async function handleShare() {
     if (!job) return;
@@ -128,11 +130,21 @@ export default function JobDetailScreen() {
     const { data: jobData } = await supabase
       .from("requests")
       .select(
-        "id,title,description,category,location,budget_min,budget_max,status,posting_as,created_at,user_id,profiles(username)",
+        "id,title,description,category,location,budget_min,budget_max,status,posting_as,created_at,user_id,profiles(username,verified)",
       )
       .eq("id", id)
       .single();
     setJob(jobData as JobDetail | null);
+
+    // Log this view and get count
+    await supabase
+      .from("job_views")
+      .insert({ request_id: id, viewer_id: user?.id ?? null });
+    const { count: vc } = await supabase
+      .from("job_views")
+      .select("id", { count: "exact", head: true })
+      .eq("request_id", id);
+    setViewCount(vc ?? 0);
 
     if (jobData && user) {
       if (jobData.user_id === user.id) {
@@ -161,6 +173,15 @@ export default function JobDetailScreen() {
         .eq("request_id", id)
         .maybeSingle();
       setIsSaved(!!savedRow);
+
+      // Check if already reported
+      const { data: reportRow } = await supabase
+        .from("reports")
+        .select("id")
+        .eq("reporter_id", user.id)
+        .eq("request_id", id)
+        .maybeSingle();
+      setAlreadyReported(!!reportRow);
     }
     setLoading(false);
   }, [id]);
@@ -202,6 +223,40 @@ export default function JobDetailScreen() {
         },
       },
     ]);
+  }
+
+  async function handleReport() {
+    if (!userId) return;
+    if (alreadyReported) {
+      Alert.alert(t("reportAlready"));
+      return;
+    }
+    Alert.alert(t("reportPost"), t("reportReason"), [
+      {
+        text: t("reportReasonSpam"),
+        onPress: () => submitReport(t("reportReasonSpam")),
+      },
+      {
+        text: t("reportReasonInappropriate"),
+        onPress: () => submitReport(t("reportReasonInappropriate")),
+      },
+      {
+        text: t("reportReasonFake"),
+        onPress: () => submitReport(t("reportReasonFake")),
+      },
+      { text: t("cancel"), style: "cancel" },
+    ]);
+  }
+
+  async function submitReport(reason: string) {
+    if (!userId) return;
+    const { error } = await supabase
+      .from("reports")
+      .insert({ reporter_id: userId, request_id: id, reason });
+    if (!error) {
+      setAlreadyReported(true);
+      Alert.alert(t("reportSent"));
+    }
   }
 
   if (loading) {
@@ -266,6 +321,15 @@ export default function JobDetailScreen() {
           <Pressable onPress={handleShare} style={styles.navBtn}>
             <Feather name="share-2" size={20} color={theme.primaryText} />
           </Pressable>
+          {userId && !isOwner && (
+            <Pressable onPress={handleReport} style={styles.navBtn}>
+              <Feather
+                name="flag"
+                size={18}
+                color={alreadyReported ? theme.error : theme.mutedText}
+              />
+            </Pressable>
+          )}
           {isOwner && job.status === "active" ? (
             <Pressable onPress={handleClose} style={styles.navBtn}>
               <Feather name="x-circle" size={20} color={theme.error} />
@@ -362,6 +426,12 @@ export default function JobDetailScreen() {
                 <Text style={[styles.metaText, styles.wageText]}>{wage}</Text>
               </View>
             )}
+            <View style={styles.viewChip}>
+              <Feather name="eye" size={11} color={theme.mutedText} />
+              <Text style={styles.viewChipText}>
+                {viewCount} {t("viewCount")}
+              </Text>
+            </View>
           </View>
 
           {/* Poster */}
@@ -373,9 +443,17 @@ export default function JobDetailScreen() {
               <Text style={styles.posterName}>
                 {posterName ?? t("anonymous")}
               </Text>
-              <Text style={styles.posterLabel}>
-                {t("postedBy").replace("Posted by ", "")}
-              </Text>
+              {(job.profiles as any)?.verified && (
+                <View style={styles.posterVerified}>
+                  <Feather name="check-circle" size={11} color="#0D9488" />
+                  <Text style={styles.posterVerifiedText}>{t("verified")}</Text>
+                </View>
+              )}
+              {!(job.profiles as any)?.verified && (
+                <Text style={styles.posterLabel}>
+                  {t("postedBy").replace("Posted by ", "")}
+                </Text>
+              )}
             </View>
           </View>
         </View>

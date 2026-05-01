@@ -369,6 +369,43 @@ export const translations = {
     filled: "Filled",
     closed: "Closed",
     active: "Active",
+    // Ratings on profile
+    avgRating: "Rating",
+    noRatings: "No ratings yet",
+    ratings: "ratings",
+    // CV link
+    cvLink: "CV / Portfolio link",
+    cvLinkPlaceholder: "https://linkedin.com/in/yourname or drive link",
+    viewCv: "View CV",
+    // Verified badge
+    verified: "Verified",
+    // Applied badge on cards
+    appliedBadge: "Applied",
+    // Job views
+    viewCount: "views",
+    // Report post
+    reportPost: "Report post",
+    reportReason: "Why are you reporting this?",
+    reportReasonSpam: "Spam or misleading",
+    reportReasonInappropriate: "Inappropriate content",
+    reportReasonFake: "Fake job",
+    reportSent: "Report submitted. Thank you.",
+    reportAlready: "You already reported this post.",
+    // Bump/renew posts
+    bumpPost: "Bump post",
+    bumpPostConfirm: "Reset this post to the top of the feed?",
+    bumped: "Post bumped!",
+    // Job alerts
+    savedSearches: "Job Alerts",
+    saveSearch: "Save this search",
+    searchSaved: "Alert saved! We'll match new jobs to it.",
+    noSavedSearches: "No alerts yet",
+    noSavedSearchesHint: "Save a search in the Find Jobs tab to get alerts.",
+    alertKeyword: "Keyword",
+    alertCategory: "Category",
+    alertLocation: "Location",
+    deleteAlert: "Delete alert",
+    any: "Any",
     monday: "Monday",
     tuesday: "Tuesday",
     wednesday: "Wednesday",
@@ -771,5 +808,42 @@ export const translations = {
     applyForJob: "Aplică pentru job",
     applyingFor: "Aplici pentru",
     coverLetterRequired: "Te rog scrie o scurtă scrisoare de intenție.",
+    // Ratings on profile
+    avgRating: "Evaluare",
+    noRatings: "Nicio evaluare",
+    ratings: "evaluări",
+    // CV link
+    cvLink: "Link CV / Portofoliu",
+    cvLinkPlaceholder: "https://linkedin.com/in/numetau sau link drive",
+    viewCv: "Vezi CV",
+    // Verified badge
+    verified: "Verificat",
+    // Applied badge
+    appliedBadge: "Aplicat",
+    // Job views
+    viewCount: "vizualizări",
+    // Report
+    reportPost: "Raportează postarea",
+    reportReason: "De ce raportezi?",
+    reportReasonSpam: "Spam sau înșelător",
+    reportReasonInappropriate: "Conținut inadecvat",
+    reportReasonFake: "Job fals",
+    reportSent: "Raportul a fost trimis. Mulțumim.",
+    reportAlready: "Ai raportat deja această postare.",
+    // Bump
+    bumpPost: "Repostează",
+    bumpPostConfirm: "Resetezi postarea la topul feed-ului?",
+    bumped: "Postare repostată!",
+    // Job alerts
+    savedSearches: "Alerte joburi",
+    saveSearch: "Salvează căutarea",
+    searchSaved: "Alertă salvată! Îți vom arăta joburi noi potrivite.",
+    noSavedSearches: "Nicio alertă",
+    noSavedSearchesHint: "Salvează o căutare în tab-ul Joburi pentru alerte.",
+    alertKeyword: "Cuvânt cheie",
+    alertCategory: "Categorie",
+    alertLocation: "Locație",
+    deleteAlert: "Șterge alerta",
+    any: "Oricare",
   },
 };

@@ -206,4 +206,36 @@ export const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: { fontSize: 14, fontWeight: "800", color: "#FFFFFF" },
+
+  // Verified badge
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: "#CCFBF1",
+    borderWidth: 1,
+    borderColor: "#0D9488",
+  },
+  verifiedText: { fontSize: 11, fontWeight: "700", color: "#0F766E" },
+
+  // Rating row in stats
+  ratingRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+
+  // CV link
+  cvLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: "#F0FDF9",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#0D9488",
+  },
+  cvLinkText: { flex: 1, fontSize: 13, color: "#0D9488", fontWeight: "600" },
 });

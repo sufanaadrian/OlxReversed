@@ -109,6 +109,23 @@ export default function MyPostsScreen() {
     ]);
   }
 
+  async function handleBump(id: string) {
+    Alert.alert(t("bumpPost"), t("bumpPostConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("bumpPost"),
+        onPress: async () => {
+          await supabase
+            .from("requests")
+            .update({ created_at: new Date().toISOString() })
+            .eq("id", id);
+          fetchPosts();
+          Alert.alert(t("bumped"));
+        },
+      },
+    ]);
+  }
+
   function renderItem({ item }: { item: JobPost }) {
     const isEmployer = item.posting_as === "employer";
     const statusColor = STATUS_COLOR[item.status] ?? theme.mutedText;
@@ -182,6 +199,14 @@ export default function MyPostsScreen() {
                 >
                   <Feather name="user-check" size={13} color={theme.primary} />
                   <Text style={styles.filledBtnText}>{t("markFilled")}</Text>
+                </Pressable>
+              )}
+              {item.status === "active" && (
+                <Pressable
+                  style={[styles.actionBtn, styles.bumpBtn]}
+                  onPress={() => handleBump(item.id)}
+                >
+                  <Feather name="trending-up" size={14} color="#7C3AED" />
                 </Pressable>
               )}
               <Pressable
