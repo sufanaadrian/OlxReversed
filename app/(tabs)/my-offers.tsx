@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -134,6 +134,29 @@ export default function ApplicationsScreen() {
       fetchData();
     }, [fetchData]),
   );
+
+  // Realtime: auto-refresh when own sent offer status changes (accept/reject)
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`offers-status-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "offers",
+          filter: `seller_id=eq.${userId}`,
+        },
+        () => {
+          fetchData();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, fetchData]);
 
   async function handleWithdraw(offerId: string) {
     Alert.alert(t("withdrawApplication"), t("withdrawConfirm"), [

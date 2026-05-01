@@ -3,13 +3,14 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
@@ -36,6 +37,8 @@ export default function ChatScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
+  const [jobClosed, setJobClosed] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
   const fetchMessages = useCallback(async () => {
@@ -52,17 +55,22 @@ export default function ChatScreen() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id ?? null);
     });
-    // Fetch other participant
+    // Fetch other participant + ownership
     async function fetchOther() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data: req } = await supabase
         .from("requests")
-        .select("user_id, profiles(id, username)")
+        .select("user_id, status, profiles(id, username)")
         .eq("id", id)
         .single();
       if (!req) return;
-      if (req.user_id === user.id) {
+      const owner = req.user_id === user.id;
+      setIsOwner(owner);
+      setJobClosed(req.status === "closed" || req.status === "filled");
+      if (owner) {
         // I'm the owner, find the accepted applicant
         const { data: offer } = await supabase
           .from("offers")
@@ -83,17 +91,23 @@ export default function ChatScreen() {
       fetchMessages();
       const channel = supabase
         .channel(`chat-${id}`)
-        .on("postgres_changes", {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `request_id=eq.${id}`,
-        }, (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
-        })
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `request_id=eq.${id}`,
+          },
+          (payload) => {
+            setMessages((prev) => [...prev, payload.new as Message]);
+          },
+        )
         .subscribe();
-      return () => { supabase.removeChannel(channel); };
-    }, [fetchMessages])
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [fetchMessages, id]),
   );
 
   async function sendMessage() {
@@ -105,6 +119,61 @@ export default function ChatScreen() {
       sender_id: userId,
       content: trimmed,
     });
+  }
+
+  function promptRating() {
+    Alert.alert(
+      t("rateExperience"),
+      otherUser?.username
+        ? `Rate your experience with ${otherUser.username} (1–5)`
+        : "Rate your experience (1–5)",
+      [
+        { text: t("rateLater"), style: "cancel" },
+        {
+          text: t("rateNow"),
+          onPress: () =>
+            Alert.prompt(
+              t("rateExperience"),
+              "Enter a number from 1 to 5",
+              async (input) => {
+                const rating = parseInt(input ?? "", 10);
+                if (!rating || rating < 1 || rating > 5) return;
+                if (!userId || !otherUser) return;
+                await supabase.from("reviews").insert({
+                  reviewer_id: userId,
+                  reviewee_id: otherUser.id,
+                  request_id: id,
+                  rating,
+                });
+                Alert.alert(t("ratingThanks"));
+              },
+              "plain-text",
+              "",
+              "number-pad",
+            ),
+        },
+      ],
+    );
+  }
+
+  async function handleComplete() {
+    Alert.alert(t("markComplete"), t("markCompleteConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("confirm"),
+        onPress: async () => {
+          await supabase
+            .from("requests")
+            .update({ status: "closed" })
+            .eq("id", id);
+          setJobClosed(true);
+          Alert.alert(t("jobCompleted"), undefined, [
+            { text: t("rateLater"), style: "cancel" },
+            { text: t("rateNow"), onPress: promptRating },
+          ]);
+        },
+      },
+    ]);
   }
 
   function formatTime(ts: string) {
@@ -125,8 +194,19 @@ export default function ChatScreen() {
           <Feather name="arrow-left" size={22} color={theme.primaryText} />
         </Pressable>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>{otherUser?.username ?? t("chat")}</Text>
+          <Text style={styles.headerName}>
+            {otherUser?.username ?? t("chat")}
+          </Text>
+          {jobClosed && (
+            <Text style={styles.headerSub}>{t("statusClosed")}</Text>
+          )}
         </View>
+        {isOwner && !jobClosed && (
+          <Pressable onPress={handleComplete} style={styles.completeBtn}>
+            <Feather name="check-circle" size={16} color={theme.success} />
+            <Text style={styles.completeBtnText}>{t("markComplete")}</Text>
+          </Pressable>
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -139,17 +219,36 @@ export default function ChatScreen() {
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() =>
+            flatRef.current?.scrollToEnd({ animated: false })
+          }
           renderItem={({ item }) => {
             const isMe = item.sender_id === userId;
             return (
-              <View style={[styles.msgWrap, isMe ? styles.msgWrapMe : styles.msgWrapOther]}>
-                <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-                  <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextOther]}>
+              <View
+                style={[
+                  styles.msgWrap,
+                  isMe ? styles.msgWrapMe : styles.msgWrapOther,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.bubble,
+                    isMe ? styles.bubbleMe : styles.bubbleOther,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.msgText,
+                      isMe ? styles.msgTextMe : styles.msgTextOther,
+                    ]}
+                  >
                     {item.content}
                   </Text>
                 </View>
-                <Text style={styles.msgTime}>{formatTime(item.created_at)}</Text>
+                <Text style={styles.msgTime}>
+                  {formatTime(item.created_at)}
+                </Text>
               </View>
             );
           }}

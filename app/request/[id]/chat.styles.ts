@@ -10,6 +10,8 @@ export const theme = {
   secondaryText: "#64748B",
   mutedText: "#94A3B8",
   border: "#E2E8F0",
+  success: "#10B981",
+  successLight: "#ECFDF5",
 };
 
 export const styles = StyleSheet.create({
@@ -30,6 +32,19 @@ export const styles = StyleSheet.create({
   backBtn: { padding: 8 },
   headerInfo: { flex: 1 },
   headerName: { fontSize: 17, fontWeight: "800", color: theme.primaryText },
+  headerSub: { fontSize: 12, color: theme.mutedText, fontWeight: "500" },
+  completeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: theme.successLight,
+    borderWidth: 1,
+    borderColor: theme.success,
+  },
+  completeBtnText: { fontSize: 12, fontWeight: "700", color: theme.success },
 
   messageList: { padding: 16, gap: 8, flexGrow: 1 },
 

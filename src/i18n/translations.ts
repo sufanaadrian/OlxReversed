@@ -406,6 +406,17 @@ export const translations = {
     alertLocation: "Location",
     deleteAlert: "Delete alert",
     any: "Any",
+    // Realtime / auto-refresh
+    newJobsBanner: "New jobs posted",
+    tapToRefresh: "Tap to refresh",
+    applicationUpdated: "An application status changed",
+    // Job completion flow
+    markComplete: "Mark Job as Completed",
+    markCompleteConfirm:
+      "Confirm the job is done. Both you and the worker will be asked to leave a review.",
+    jobCompleted: "Job completed!",
+    rateNow: "Rate Now",
+    rateLater: "Later",
     monday: "Monday",
     tuesday: "Tuesday",
     wednesday: "Wednesday",
@@ -845,5 +856,16 @@ export const translations = {
     alertLocation: "Locație",
     deleteAlert: "Șterge alerta",
     any: "Oricare",
+    // Realtime / auto-refresh
+    newJobsBanner: "Joburi noi disponibile",
+    tapToRefresh: "Apasă pentru a actualiza",
+    applicationUpdated: "Statusul unei candidaturi s-a schimbat",
+    // Job completion flow
+    markComplete: "Marchează job ca finalizat",
+    markCompleteConfirm:
+      "Confirmi că job-ul a fost finalizat? Amândoi veți fi invitați să lăsați o recenzie.",
+    jobCompleted: "Job finalizat!",
+    rateNow: "Evaluează acum",
+    rateLater: "Mai târziu",
   },
 };

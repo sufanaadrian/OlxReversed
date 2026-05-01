@@ -235,6 +235,27 @@ export const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  // New jobs notification banner
+  newJobsBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  newJobsBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+
   // Profile completeness banner
   banner: {
     flexDirection: "row",

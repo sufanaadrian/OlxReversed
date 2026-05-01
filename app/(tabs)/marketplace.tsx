@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -95,9 +95,16 @@ export default function JobsScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [newJobsCount, setNewJobsCount] = useState(0);
+  const isFirstLoad = useRef(true);
 
   const fetchJobs = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoad.current) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -117,6 +124,8 @@ export default function JobsScreen() {
       query = query.eq("category", selectedCategory);
     const { data } = await query;
     setJobs((data as unknown as JobRequest[]) ?? []);
+    isFirstLoad.current = false;
+    setNewJobsCount(0);
 
     if (user) {
       // Load saved jobs
@@ -147,11 +156,23 @@ export default function JobsScreen() {
       }
     }
     setLoading(false);
+    setRefreshing(false);
   }, [selectedCategory]);
 
   useFocusEffect(
     useCallback(() => {
       fetchJobs();
+      const channel = supabase
+        .channel("marketplace-new-jobs")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "requests" },
+          () => setNewJobsCount((n) => n + 1),
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }, [fetchJobs]),
   );
 
@@ -401,6 +422,22 @@ export default function JobsScreen() {
         )}
       </View>
 
+      {/* New jobs notification banner */}
+      {newJobsCount > 0 && (
+        <Pressable
+          style={styles.newJobsBanner}
+          onPress={() => {
+            setNewJobsCount(0);
+            fetchJobs();
+          }}
+        >
+          <Feather name="bell" size={14} color={theme.primaryDark} />
+          <Text style={styles.newJobsBannerText}>
+            {newJobsCount} {t("newJobsBanner")} — {t("tapToRefresh")}
+          </Text>
+        </Pressable>
+      )}
+
       {/* Profile completeness banner */}
       {profileIncomplete && showBanner && (
         <View style={styles.banner}>
@@ -468,7 +505,7 @@ export default function JobsScreen() {
           ]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           onRefresh={fetchJobs}
-          refreshing={loading}
+          refreshing={refreshing}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>

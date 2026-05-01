@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
@@ -129,6 +129,9 @@ export default function MyPostsScreen() {
   function renderItem({ item }: { item: JobPost }) {
     const isEmployer = item.posting_as === "employer";
     const statusColor = STATUS_COLOR[item.status] ?? theme.mutedText;
+    const msLeft =
+      new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
+    const daysLeft = Math.ceil(msLeft / 86400000);
 
     return (
       <Pressable
@@ -161,9 +164,25 @@ export default function MyPostsScreen() {
                 <Text style={styles.categoryText}>{item.category}</Text>
               ) : null}
             </View>
-            <View
-              style={[styles.statusDot, { backgroundColor: statusColor }]}
-            />
+            <View style={styles.cardTopRight}>
+              {item.status === "active" && daysLeft > 0 && daysLeft <= 7 && (
+                <View style={styles.expiryBadge}>
+                  <Feather name="clock" size={10} color="#92400E" />
+                  <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
+                </View>
+              )}
+              {item.status === "active" && daysLeft > 7 && (
+                <View style={styles.expiryBadgeGreen}>
+                  <Feather name="clock" size={10} color="#065F46" />
+                  <Text style={styles.expiryBadgeTextGreen}>
+                    {daysLeft}d left
+                  </Text>
+                </View>
+              )}
+              <View
+                style={[styles.statusDot, { backgroundColor: statusColor }]}
+              />
+            </View>
           </View>
 
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -198,7 +217,6 @@ export default function MyPostsScreen() {
                   onPress={() => handleMarkFilled(item.id)}
                 >
                   <Feather name="user-check" size={13} color={theme.primary} />
-                  <Text style={styles.filledBtnText}>{t("markFilled")}</Text>
                 </Pressable>
               )}
               {item.status === "active" && (
