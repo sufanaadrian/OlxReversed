@@ -5,6 +5,7 @@ import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     Pressable,
     ScrollView,
     Share,
@@ -36,7 +37,14 @@ type Applicant = {
   status: string;
   cover_letter: string | null;
   created_at: string;
-  profiles: { username: string | null; id: string } | null;
+  profiles: {
+    id: string;
+    username: string | null;
+    bio: string | null;
+    skills: string[] | null;
+    cv_url: string | null;
+    verified: boolean | null;
+  } | null;
 };
 
 const CATEGORY_KEYS: Record<string, string> = {
@@ -94,6 +102,7 @@ export default function JobDetailScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [viewCount, setViewCount] = useState(0);
   const [alreadyReported, setAlreadyReported] = useState(false);
+  const viewCounted = React.useRef(false);
 
   async function handleShare() {
     if (!job) return;
@@ -136,10 +145,13 @@ export default function JobDetailScreen() {
       .single();
     setJob(jobData as JobDetail | null);
 
-    // Log this view and get count
-    await supabase
-      .from("job_views")
-      .insert({ request_id: id, viewer_id: user?.id ?? null });
+    // Log view once per component mount (not on every focus/re-fetch)
+    if (!viewCounted.current) {
+      viewCounted.current = true;
+      await supabase
+        .from("job_views")
+        .insert({ request_id: id, viewer_id: user?.id ?? null });
+    }
     const { count: vc } = await supabase
       .from("job_views")
       .select("id", { count: "exact", head: true })
@@ -151,7 +163,7 @@ export default function JobDetailScreen() {
         const { data: apps } = await supabase
           .from("offers")
           .select(
-            "id,status,cover_letter,created_at,profiles!seller_id(id,username)",
+            "id,status,cover_letter,created_at,profiles!seller_id(id,username,bio,skills,cv_url,verified)",
           )
           .eq("request_id", id)
           .order("created_at", { ascending: false });
@@ -450,9 +462,7 @@ export default function JobDetailScreen() {
                 </View>
               )}
               {!(job.profiles as any)?.verified && (
-                <Text style={styles.posterLabel}>
-                  {t("postedBy").replace("Posted by ", "")}
-                </Text>
+                <Text style={styles.posterLabel}>{t("postedBy")}</Text>
               )}
             </View>
           </View>
@@ -504,24 +514,42 @@ export default function JobDetailScreen() {
             ) : (
               applicants.map((app) => {
                 const s = OFFER_STATUS[app.status] ?? OFFER_STATUS.pending;
-                const appName =
-                  (app as any).profiles?.username ?? t("anonymous");
+                const prof = (app as any).profiles;
+                const appName = prof?.username ?? t("anonymous");
+                const avatarLetters = appName
+                  .split(" ")
+                  .map((w: string) => w[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
                 return (
                   <View key={app.id} style={styles.applicantCard}>
+                    {/* Candidate header */}
                     <View style={styles.applicantHeader}>
                       <View style={styles.applicantAvatar}>
                         <Text style={styles.applicantAvatarText}>
-                          {initials(appName)}
+                          {avatarLetters}
                         </Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.applicantName}>{appName}</Text>
-                        {app.cover_letter ? (
-                          <Text
-                            style={styles.coverLetterPreview}
-                            numberOfLines={2}
-                          >
-                            {app.cover_letter}
+                        <View style={styles.candidateNameRow}>
+                          <Text style={styles.applicantName}>{appName}</Text>
+                          {prof?.verified && (
+                            <View style={styles.candidateVerified}>
+                              <Feather
+                                name="check-circle"
+                                size={10}
+                                color="#0D9488"
+                              />
+                              <Text style={styles.candidateVerifiedText}>
+                                {t("verified")}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        {prof?.bio ? (
+                          <Text style={styles.candidateBio} numberOfLines={2}>
+                            {prof.bio}
                           </Text>
                         ) : null}
                       </View>
@@ -537,10 +565,53 @@ export default function JobDetailScreen() {
                       </View>
                     </View>
 
-                    {app.cover_letter && app.cover_letter.length > 80 ? (
-                      <Text style={styles.coverLetterFull}>
-                        {app.cover_letter}
-                      </Text>
+                    {/* Skills */}
+                    {prof?.skills && prof.skills.length > 0 && (
+                      <View style={styles.skillsRow}>
+                        {prof.skills.slice(0, 5).map((sk: string) => (
+                          <View key={sk} style={styles.skillChip}>
+                            <Text style={styles.skillChipText}>{sk}</Text>
+                          </View>
+                        ))}
+                        {prof.skills.length > 5 && (
+                          <Text style={styles.skillMore}>
+                            +{prof.skills.length - 5}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {/* CV link */}
+                    {prof?.cv_url ? (
+                      <Pressable
+                        style={styles.cvBtn}
+                        onPress={() => {
+                          const url = prof.cv_url!;
+                          const safe =
+                            url.startsWith("http://") ||
+                            url.startsWith("https://")
+                              ? url
+                              : `https://${url}`;
+                          Linking.openURL(safe).catch(() =>
+                            Alert.alert(t("error"), t("invalidUrl")),
+                          );
+                        }}
+                      >
+                        <Feather name="file-text" size={13} color="#0D9488" />
+                        <Text style={styles.cvBtnText}>{t("viewCV")}</Text>
+                      </Pressable>
+                    ) : null}
+
+                    {/* Cover letter */}
+                    {app.cover_letter ? (
+                      <View style={styles.coverLetterBox}>
+                        <Text style={styles.coverLetterLabel}>
+                          {t("coverLetter")}
+                        </Text>
+                        <Text style={styles.coverLetterFull}>
+                          {app.cover_letter}
+                        </Text>
+                      </View>
                     ) : null}
 
                     {app.status === "pending" && (

@@ -172,6 +172,14 @@ export default function ProfileScreen() {
     }
   }
 
+  function openUrl(url: string) {
+    const safe =
+      url.startsWith("http://") || url.startsWith("https://")
+        ? url
+        : `https://${url}`;
+    Linking.openURL(safe).catch(() => Alert.alert(t("error"), t("invalidUrl")));
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.replace("/sign-in");
@@ -434,7 +442,7 @@ export default function ProfileScreen() {
               <Text style={styles.sectionTitle}>{t("cvLink")}</Text>
               <Pressable
                 style={styles.cvLinkRow}
-                onPress={() => Linking.openURL(profile.cv_url!)}
+                onPress={() => openUrl(profile.cv_url!)}
               >
                 <Feather name="external-link" size={14} color={theme.primary} />
                 <Text style={styles.cvLinkText} numberOfLines={1}>

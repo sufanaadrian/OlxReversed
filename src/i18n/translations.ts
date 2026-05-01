@@ -7,6 +7,7 @@ export const translations = {
     loading: "Loading...",
     loadingEllipsis: "Loading…",
     error: "Error",
+    invalidUrl: "Could not open URL. Make sure it's a valid web address.",
     cancel: "Cancel",
     delete: "Delete",
     edit: "Edit",
@@ -113,6 +114,8 @@ export const translations = {
     jobUpdated: "Job updated!",
     applyTitle: "Apply for this job",
     coverLetter: "Cover letter",
+    yourApplication: "Your application",
+    viewCV: "View CV",
     coverLetterPlaceholder:
       "Introduce yourself — your skills, availability, why you’re a good fit…",
     sendApplication: "Send Application",
@@ -376,7 +379,9 @@ export const translations = {
     // CV link
     cvLink: "CV / Portfolio link",
     cvLinkPlaceholder: "https://linkedin.com/in/yourname or drive link",
-    viewCv: "View CV",
+    minAgo: "m ago",
+    hAgo: "h ago",
+    dAgo: "d ago",
     // Verified badge
     verified: "Verified",
     // Applied badge on cards
@@ -472,6 +477,8 @@ export const translations = {
     loading: "Se încărcă...",
     loadingEllipsis: "Se încărcă…",
     error: "Eroare",
+    invalidUrl:
+      "Nu s-a putut deschide link-ul. Asigură-te că este un URL valid.",
     cancel: "Anulează",
     delete: "Şterge",
     edit: "Editează",
@@ -578,6 +585,8 @@ export const translations = {
     jobUpdated: "Job actualizat!",
     applyTitle: "Aplică pentru acest job",
     coverLetter: "Scrisoare de intenție",
+    yourApplication: "Cererea ta",
+    viewCV: "Vezi CV",
     coverLetterPlaceholder:
       "Prezintă-te — competențele tale, disponibilitate, de ce ești potrivit…",
     sendApplication: "Trimite candidatura",
@@ -859,6 +868,9 @@ export const translations = {
     cvLink: "Link CV / Portofoliu",
     cvLinkPlaceholder: "https://linkedin.com/in/numetau sau link drive",
     viewCv: "Vezi CV",
+    minAgo: "m acum",
+    hAgo: "h acum",
+    dAgo: "z acum",
     // Verified badge
     verified: "Verificat",
     // Applied badge

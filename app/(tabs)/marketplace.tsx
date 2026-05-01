@@ -59,14 +59,28 @@ type JobRequest = {
   profiles: { username: string | null } | null;
 };
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr: string, t: (key: string) => string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return mins <= 1 ? "1m ago" : mins + "m ago";
+  if (mins < 60) return (mins <= 1 ? "1" : String(mins)) + t("minAgo");
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + "h ago";
+  if (hrs < 24) return hrs + t("hAgo");
   const days = Math.floor(hrs / 24);
-  return days + "d ago";
+  return days + t("dAgo");
+}
+
+// Scoring: boosted (+1000) > urgent (+500) > recency (100→0 over 7 days)
+function scoreJob(job: JobRequest): number {
+  const now = Date.now();
+  const isBoosted =
+    job.is_boosted &&
+    (!job.boosted_until || new Date(job.boosted_until).getTime() > now);
+  const ageHours = (now - new Date(job.created_at).getTime()) / 3600000;
+  return (
+    (isBoosted ? 1000 : 0) +
+    (job.is_urgent ? 500 : 0) +
+    Math.max(0, Math.round(100 - (ageHours / 168) * 100))
+  );
 }
 
 function initials(name: string | null | undefined) {
@@ -132,13 +146,12 @@ export default function JobsScreen() {
           "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
         )
         .eq("status", "active")
-        .gte("created_at", thirtyDaysAgo)
-        .order("is_boosted", { ascending: false })
-        .order("created_at", { ascending: false });
+        .gte("created_at", thirtyDaysAgo);
       if (selectedCategory !== "All")
         query = query.eq("category", selectedCategory);
       const { data } = await query;
-      setJobs((data as unknown as JobRequest[]) ?? []);
+      const rawJobs = (data as unknown as JobRequest[]) ?? [];
+      setJobs([...rawJobs].sort((a, b) => scoreJob(b) - scoreJob(a)));
       isFirstLoad.current = false;
       setNewJobsCount(0);
 
@@ -225,9 +238,6 @@ export default function JobsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchJobs();
-      // Poll every 20 seconds while tab is in focus
-      const poll = setInterval(() => fetchJobsRef.current?.(true), 20000);
-      return () => clearInterval(poll);
     }, [fetchJobs]),
   );
 
@@ -320,11 +330,11 @@ export default function JobsScreen() {
       (!item.boosted_until ||
         new Date(item.boosted_until).getTime() > Date.now());
 
-    // Expiry: auto-expires 30 days after posting
+    // Expiry: show badge only when 7 days or fewer remain
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
     const daysLeft = Math.ceil(msLeft / 86400000);
-    const expiringSoon = daysLeft > 0;
+    const expiringSoon = daysLeft > 0 && daysLeft <= 7;
 
     return (
       <Pressable
@@ -433,7 +443,9 @@ export default function JobsScreen() {
                 <Text style={styles.posterName} numberOfLines={1}>
                   {posterName ?? t("anonymous")}
                 </Text>
-                <Text style={styles.timeAgo}>{timeAgo(item.created_at)}</Text>
+                <Text style={styles.timeAgo}>
+                  {timeAgo(item.created_at, t)}
+                </Text>
               </View>
             </View>
             {hasApplied ? (

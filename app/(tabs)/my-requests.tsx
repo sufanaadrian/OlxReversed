@@ -80,9 +80,6 @@ export default function MyPostsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchPosts();
-      // Poll every 20 seconds while tab is focused
-      const poll = setInterval(fetchPosts, 20000);
-      return () => clearInterval(poll);
     }, [fetchPosts]),
   );
 

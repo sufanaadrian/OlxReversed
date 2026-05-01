@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Linking,
     Pressable,
     Text,
     View,
@@ -39,7 +40,14 @@ type ReceivedApplication = {
     id: string;
     title: string;
   } | null;
-  profiles: { username: string | null } | null;
+  profiles: {
+    id: string;
+    username: string | null;
+    bio: string | null;
+    skills: string[] | null;
+    cv_url: string | null;
+    verified: boolean | null;
+  } | null;
 };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -104,7 +112,8 @@ export default function ApplicationsScreen() {
     }
     setUserId(user.id);
 
-    const [{ data: sentData }, { data: receivedData }, { data: myReviews }] =
+    // Fetch own request IDs first, then filter offers by those IDs (more reliable than embedded filter)
+    const [{ data: sentData }, { data: myRequests }, { data: myReviews }] =
       await Promise.all([
         supabase
           .from("offers")
@@ -113,15 +122,20 @@ export default function ApplicationsScreen() {
           )
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false }),
-        supabase
-          .from("offers")
-          .select(
-            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(username)",
-          )
-          .eq("requests.user_id", user.id)
-          .order("created_at", { ascending: false }),
+        supabase.from("requests").select("id").eq("user_id", user.id),
         supabase.from("reviews").select("offer_id").eq("reviewer_id", user.id),
       ]);
+
+    const myRequestIds = (myRequests ?? []).map((r: any) => r.id);
+    const { data: receivedData } = myRequestIds.length
+      ? await supabase
+          .from("offers")
+          .select(
+            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, cv_url, verified)",
+          )
+          .in("request_id", myRequestIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
     setSent((sentData as unknown as Application[]) ?? []);
     setReceived((receivedData as unknown as ReceivedApplication[]) ?? []);
@@ -132,9 +146,6 @@ export default function ApplicationsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-      // Poll every 20 seconds while tab is focused
-      const poll = setInterval(fetchData, 20000);
-      return () => clearInterval(poll);
     }, [fetchData]),
   );
 
@@ -194,15 +205,20 @@ export default function ApplicationsScreen() {
     const c = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
     const job = item.requests;
     return (
-      <Pressable
-        style={styles.card}
-        onPress={() => job && router.push(`/request/${job.id}`)}
-      >
+      <View style={styles.card}>
         <View style={styles.cardBody}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {job?.title ?? t("deletedPost")}
-            </Text>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => job && router.push(`/request/${job.id}`)}
+            >
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {job?.title ?? t("deletedPost")}
+              </Text>
+              <Text style={styles.postedBy}>
+                {job?.profiles?.username ?? t("anonymous")}
+              </Text>
+            </Pressable>
             <View style={[styles.statusBadge, { backgroundColor: c.bg }]}>
               <Text style={[styles.statusText, { color: c.text }]}>
                 {t(
@@ -211,14 +227,24 @@ export default function ApplicationsScreen() {
               </Text>
             </View>
           </View>
+
           {item.cover_letter ? (
-            <Text style={styles.coverLetter} numberOfLines={2}>
-              {item.cover_letter}
-            </Text>
+            <View style={styles.applicationBox}>
+              <Text style={styles.applicationLabel}>
+                {t("yourApplication")}
+              </Text>
+              <Text style={styles.applicationText}>{item.cover_letter}</Text>
+            </View>
           ) : null}
+
           <View style={styles.cardFooter}>
-            <Text style={styles.postedBy}>
-              {job?.profiles?.username ?? t("anonymous")}
+            <Text style={styles.dateText}>
+              {new Date(item.created_at).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </Text>
             <View style={styles.footerActions}>
               {item.status === "accepted" && job && (
@@ -254,20 +280,34 @@ export default function ApplicationsScreen() {
             </View>
           </View>
         </View>
-      </Pressable>
+      </View>
     );
   }
 
   function renderReceivedItem({ item }: { item: ReceivedApplication }) {
     const c = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
     const job = item.requests;
+    const prof = item.profiles;
+    const name = prof?.username ?? t("anonymous");
+    const avatarLetters = name
+      .split(" ")
+      .map((w: string) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
     return (
       <View style={styles.card}>
         <View style={styles.cardBody}>
+          {/* Job title + status */}
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {job?.title ?? t("deletedPost")}
-            </Text>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => job && router.push(`/request/${job.id}`)}
+            >
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {job?.title ?? t("deletedPost")}
+              </Text>
+            </Pressable>
             <View style={[styles.statusBadge, { backgroundColor: c.bg }]}>
               <Text style={[styles.statusText, { color: c.text }]}>
                 {t(
@@ -276,14 +316,77 @@ export default function ApplicationsScreen() {
               </Text>
             </View>
           </View>
-          <Text style={styles.applicantName}>
-            {(item as any).profiles?.username ?? t("anonymous")}
-          </Text>
+
+          {/* Candidate profile */}
+          <View style={styles.candidateSection}>
+            <View style={styles.candidateRow}>
+              <View style={styles.candidateAvatar}>
+                <Text style={styles.candidateAvatarText}>{avatarLetters}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.candidateNameRow}>
+                  <Text style={styles.candidateName}>{name}</Text>
+                  {prof?.verified && (
+                    <View style={styles.verifiedBadge}>
+                      <Feather name="check-circle" size={11} color="#0D9488" />
+                      <Text style={styles.verifiedText}>{t("verified")}</Text>
+                    </View>
+                  )}
+                </View>
+                {prof?.bio ? (
+                  <Text style={styles.candidateBio} numberOfLines={2}>
+                    {prof.bio}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Skills */}
+            {prof?.skills && prof.skills.length > 0 && (
+              <View style={styles.skillsRow}>
+                {prof.skills.slice(0, 5).map((s) => (
+                  <View key={s} style={styles.skillChip}>
+                    <Text style={styles.skillChipText}>{s}</Text>
+                  </View>
+                ))}
+                {prof.skills.length > 5 && (
+                  <Text style={styles.skillMore}>
+                    +{prof.skills.length - 5}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* CV link */}
+            {prof?.cv_url ? (
+              <Pressable
+                style={styles.cvBtn}
+                onPress={() => {
+                  const url = prof.cv_url!;
+                  const safe =
+                    url.startsWith("http://") || url.startsWith("https://")
+                      ? url
+                      : `https://${url}`;
+                  Linking.openURL(safe).catch(() =>
+                    Alert.alert(t("error"), t("invalidUrl")),
+                  );
+                }}
+              >
+                <Feather name="file-text" size={13} color={theme.primary} />
+                <Text style={styles.cvBtnText}>{t("viewCV")}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Cover letter */}
           {item.cover_letter ? (
-            <Text style={styles.coverLetter} numberOfLines={3}>
-              {item.cover_letter}
-            </Text>
+            <View style={styles.applicationBox}>
+              <Text style={styles.applicationLabel}>{t("coverLetter")}</Text>
+              <Text style={styles.applicationText}>{item.cover_letter}</Text>
+            </View>
           ) : null}
+
+          {/* Actions */}
           {item.status === "pending" && job && (
             <View style={styles.decisionRow}>
               <Pressable
@@ -302,7 +405,7 @@ export default function ApplicationsScreen() {
           )}
           {item.status === "accepted" && job && (
             <Pressable
-              style={styles.chatBtn}
+              style={[styles.chatBtn, { marginTop: 10 }]}
               onPress={() => router.push(`/request/${job.id}/chat`)}
             >
               <Feather name="message-circle" size={14} color="#FFFFFF" />
