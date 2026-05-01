@@ -7,212 +7,158 @@ import {
     Pressable,
     ScrollView,
     Text,
+    TextInput,
     View,
 } from "react-native";
-import { Screen } from "../src/components/Screen";
 import { useTranslation } from "../src/context/LanguageContext";
 import { supabase } from "../src/lib/supabase";
-import { styles } from "./onboarding.styles";
+import { styles, theme } from "./onboarding.styles";
 
-const CATEGORIES = [
-  "vehicles",
-  "realEstate",
-  "services",
-  "electronics",
-  "fashion",
-  "other",
-] as const;
-
-const TERMS_VERSION = "1.0";
-const PRIVACY_VERSION = "1.0";
+type UserType = "student" | "employer" | "both";
 
 export default function OnboardingScreen() {
   const t = useTranslation();
-
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [userType, setUserType] = useState<UserType | null>(null);
+  const [university, setUniversity] = useState("");
+  const [studyYear, setStudyYear] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
-  };
-
-  const onFinish = async () => {
-    setMsg("");
-
+  async function handleFinish() {
+    if (!userType) {
+      Alert.alert(t("error"), t("selectRoleRequired"));
+      return;
+    }
     if (!termsAccepted) {
-      setMsg(t("mustAcceptTerms"));
+      Alert.alert(t("error"), t("acceptTermsFirst"));
       return;
     }
 
     setLoading(true);
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
-      setLoading(false);
-      setMsg(t("pleaseSignInGeneric"));
+      router.replace("/sign-in");
       return;
     }
 
-    // Save categories (if any selected)
-    if (selectedCategories.length > 0) {
-      const rows = selectedCategories.flatMap((cat) => [
-        { user_id: user.id, category: cat, type: "buy" },
-        { user_id: user.id, category: cat, type: "sell" },
-      ]);
+    const updates: Record<string, unknown> = {
+      user_type: userType,
+      onboarding_completed: true,
+    };
+    if (university.trim()) updates.university = university.trim();
+    if (studyYear.trim()) updates.study_year = parseInt(studyYear, 10);
 
-      const { error: catError } = await supabase
-        .from("user_categories")
-        .upsert(rows, { onConflict: "user_id,category,type" });
-
-      if (catError) {
-        setLoading(false);
-        setMsg(t("profileSaveFailed"));
-        return;
-      }
-    }
-
-    // Save consent
-    const { error: consentError } = await supabase
-      .from("user_consents")
-      .insert({
-        user_id: user.id,
-        terms_version: TERMS_VERSION,
-        privacy_version: PRIVACY_VERSION,
-      });
-
-    if (consentError) {
-      setLoading(false);
-      setMsg(t("profileSaveFailed"));
-      return;
-    }
-
-    // Mark onboarding completed
-    await supabase
+    const { error } = await supabase
       .from("profiles")
-      .update({
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq("id", user.id);
 
-    // Insert default preferences
-    await supabase
-      .from("user_preferences")
-      .upsert(
-        { user_id: user.id, notifications: true },
-        { onConflict: "user_id" },
-      );
-
     setLoading(false);
-
-    Alert.alert(t("registrationComplete"), t("welcomeMessage"), [
-      {
-        text: t("goToMarketplaceBtn"),
-        onPress: () => router.replace("/(tabs)/marketplace" as any),
-      },
-    ]);
-  };
+    if (error) {
+      Alert.alert(t("error"), error.message);
+    } else {
+      router.replace("/(tabs)/marketplace" as any);
+    }
+  }
 
   return (
-    <Screen>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          style={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeText}>{t("step2of2")}</Text>
-          </View>
+        <View style={styles.hero}>
+          <Text style={styles.emoji}>🎓</Text>
+          <Text style={styles.heroTitle}>{t("welcomeToStudentJobs")}</Text>
+          <Text style={styles.heroSubtitle}>{t("onboardingSubtitle")}</Text>
+        </View>
 
-          <Text style={styles.h1}>{t("almostDone")}</Text>
-          <Text style={styles.subtitle}>{t("selectCategoriesHint")}</Text>
-
-          {/* ─── Categories ──────────────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("selectCategories")}</Text>
-            <Text style={styles.sectionHint}>{t("selectCategoriesHint")}</Text>
-
-            <View style={styles.categoryGrid}>
-              {CATEGORIES.map((cat) => {
-                const active = selectedCategories.includes(cat);
-                return (
-                  <Pressable
-                    key={cat}
-                    style={[
-                      styles.categoryChip,
-                      active && styles.categoryChipActive,
-                    ]}
-                    onPress={() => toggleCategory(cat)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        active && styles.categoryChipTextActive,
-                      ]}
-                    >
-                      {t(cat)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Pressable style={styles.skipBtn}>
-              <Text style={styles.skipBtnText}>{t("skipForNow")}</Text>
-            </Pressable>
-          </View>
-
-          {/* ─── Terms & Privacy ─────────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("termsAndPrivacy")}</Text>
-
-            <Pressable
-              style={styles.termsRow}
-              onPress={() => setTermsAccepted((v) => !v)}
-            >
-              <View
+        {/* Role selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("iAm")}</Text>
+          <View style={styles.roleGrid}>
+            {[
+              { key: "student" as UserType, icon: "📚" },
+              { key: "employer" as UserType, icon: "🏢" },
+              { key: "both" as UserType, icon: "🤝" },
+            ].map(({ key, icon }) => (
+              <Pressable
+                key={key}
                 style={[
-                  styles.checkbox,
-                  termsAccepted && styles.checkboxActive,
+                  styles.roleCard,
+                  userType === key && styles.roleCardSelected,
                 ]}
+                onPress={() => setUserType(key)}
               >
-                {termsAccepted && <Text style={styles.checkboxCheck}>✓</Text>}
-              </View>
-              <Text style={styles.termsText}>
-                {t("iAcceptThe")}{" "}
-                <Text style={styles.termsLink}>{t("termsOfService")}</Text>{" "}
-                {t("and")}{" "}
-                <Text style={styles.termsLink}>{t("privacyPolicy")}</Text>
-              </Text>
-            </Pressable>
+                <Text style={styles.roleIcon}>{icon}</Text>
+                <Text
+                  style={[
+                    styles.roleLabel,
+                    userType === key && styles.roleLabelSelected,
+                  ]}
+                >
+                  {t(key)}
+                </Text>
+              </Pressable>
+            ))}
           </View>
+        </View>
 
-          {!!msg && <Text style={styles.errorMsg}>{msg}</Text>}
+        {/* Student details (optional) */}
+        {(userType === "student" || userType === "both") && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>{t("studentDetails")}</Text>
+            <TextInput
+              style={styles.input}
+              value={university}
+              onChangeText={setUniversity}
+              placeholder={t("universityPlaceholder")}
+              placeholderTextColor={theme.mutedText}
+            />
+            <TextInput
+              style={[styles.input, { marginTop: 10 }]}
+              value={studyYear}
+              onChangeText={setStudyYear}
+              placeholder={t("studyYearPlaceholder")}
+              placeholderTextColor={theme.mutedText}
+              keyboardType="numeric"
+              maxLength={1}
+            />
+          </View>
+        )}
 
-          <Pressable
-            style={[styles.finishBtn, loading && styles.finishBtnDisabled]}
-            onPress={onFinish}
-            disabled={loading}
+        {/* Terms */}
+        <Pressable
+          style={styles.termsRow}
+          onPress={() => setTermsAccepted((v) => !v)}
+        >
+          <View
+            style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}
           >
-            <Text style={styles.finishBtnText}>
-              {loading ? t("working") : t("finishRegistration")}
-            </Text>
-          </Pressable>
+            {termsAccepted && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.termsText}>{t("acceptTerms")}</Text>
+        </Pressable>
 
-          <View style={styles.bottomSpace} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+        <Pressable
+          style={[
+            styles.submitBtn,
+            (!userType || !termsAccepted || loading) &&
+              styles.submitBtnDisabled,
+          ]}
+          onPress={handleFinish}
+          disabled={!userType || !termsAccepted || loading}
+        >
+          <Text style={styles.submitBtnText}>
+            {loading ? t("saving") : t("getStarted")}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

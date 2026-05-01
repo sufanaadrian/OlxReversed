@@ -1,13 +1,18 @@
 import { StyleSheet } from "react-native";
 
 export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
+  primary: "#0D9488",
+  primaryLight: "#CCFBF1",
+  primaryDark: "#0F766E",
+  bg: "#F8FAFC",
   surface: "#FFFFFF",
-  primaryText: "#020617",
+  surfaceAlt: "#F1F5F9",
+  primaryText: "#0F172A",
   secondaryText: "#64748B",
-  border: "#E5E7EB",
-  accentSoft: "#DBEAFE",
+  mutedText: "#94A3B8",
+  border: "#E2E8F0",
+  employer: "#7C3AED",
+  employerLight: "#EDE9FE",
 };
 
 export const styles = StyleSheet.create({
@@ -90,7 +95,10 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
   },
-  chipActive: { backgroundColor: theme.accentSoft, borderColor: theme.primary },
+  chipActive: {
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
+  },
   chipText: { fontSize: 13, fontWeight: "700", color: theme.secondaryText },
   chipTextActive: { color: theme.primary, fontWeight: "900" },
 
@@ -214,7 +222,7 @@ export const styles = StyleSheet.create({
   },
   modeCardActive: {
     borderColor: theme.primary,
-    backgroundColor: theme.accentSoft,
+    backgroundColor: theme.primaryLight,
   },
   modeIcon: { fontSize: 24 },
   modeTitle: { fontSize: 13, fontWeight: "900", color: theme.primaryText },
@@ -285,4 +293,48 @@ export const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.primary,
   },
+
+  // ── New simplified form styles ────────────────────────────────────
+  flex: { flex: 1 },
+  scroll: { paddingHorizontal: 16, paddingBottom: 32 },
+  backBtn: { padding: 8 },
+
+  toggleRow: { flexDirection: "row", gap: 10, marginTop: 6 },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    alignItems: "center",
+    backgroundColor: theme.surface,
+  },
+  toggleBtnActive: { borderWidth: 1.5 },
+  toggleBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.secondaryText,
+  },
+
+  catGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  catChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  catChipSelected: {
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
+  },
+  catChipText: { fontSize: 13, color: theme.secondaryText, fontWeight: "600" },
+  catChipTextSelected: { color: theme.primaryDark, fontWeight: "700" },
+
+  rangeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rangeInput: { flex: 1 },
+  rangeSep: { fontSize: 18, color: theme.mutedText },
+
+  inputMultiline: { height: 110, textAlignVertical: "top", paddingTop: 10 },
 });

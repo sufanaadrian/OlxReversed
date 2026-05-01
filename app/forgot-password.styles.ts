@@ -1,15 +1,15 @@
 import { StyleSheet } from "react-native";
 
 export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
+  primary: "#0D9488",
+  bg: "#F8FAFC",
   surface: "#FFFFFF",
   primaryText: "#0F172A",
   secondaryText: "#64748B",
   border: "#E2E8F0",
-  accentSoft: "#DBEAFE",
+  accentSoft: "#CCFBF1",
   danger: "#DC2626",
-  success: "#16a34a",
+  success: "#10B981",
 };
 
 export const styles = StyleSheet.create({

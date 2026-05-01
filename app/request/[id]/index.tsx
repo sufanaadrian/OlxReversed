@@ -1,1195 +1,336 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Dimensions,
-  FlatList,
-  Image,
   Pressable,
-  RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
-import { ImageViewer } from "../../../src/components/ImageViewer";
-import {
-  emptyWeek,
-  SchedulePicker,
-  WeekSchedule,
-} from "../../../src/components/SchedulePicker";
-import { Screen } from "../../../src/components/Screen";
-import { useCurrency } from "../../../src/context/CurrencyContext";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
 import { supabase } from "../../../src/lib/supabase";
 import { styles, theme } from "./index.styles";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-type RequestRow = {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string;
-  category: string;
-  budget_min: number | null;
-  budget_max: number | null;
-  location: string | null;
-  status: "active" | "matched" | "closed";
-  created_at: string;
-  open_budget: boolean | null;
-  posting_as: string | null;
-  budget_type: string | null;
-  timeline: string | null;
-  duration: string | null;
-  workers_needed: number | null;
-  work_mode: string | null;
-  experience_level: string | null;
-  equipment: string | null;
-  preferred_schedule: string | null;
-  scheduled_date: string | null;
-  special_requirements: string | null;
-  photos: string[] | null;
+type JobDetail = {
+  id: string; title: string; description: string | null; category: string | null;
+  location: string | null; budget_min: number | null; budget_max: number | null;
+  status: string; posting_as: string | null; created_at: string; user_id: string;
+  profiles: { username: string | null } | null;
 };
 
-type OfferStatus = "pending" | "accepted" | "rejected" | "withdrawn";
-type CounterStatus = "pending" | "accepted" | "rejected" | "withdrawn";
-type OfferFilter = "all" | OfferStatus;
-
-type OfferRow = {
-  id: string;
-  request_id: string;
-  user_id: string;
-  price: number;
-  description: string;
-  status: OfferStatus;
-  created_at: string;
-  profiles?:
-    | { display_name: string | null }[]
-    | { display_name: string | null }
-    | null;
+type Applicant = {
+  id: string; status: string; cover_letter: string | null; created_at: string;
+  profiles: { username: string | null; id: string } | null;
 };
 
-type CounterOfferRow = {
-  id: string;
-  request_id: string;
-  offer_id: string;
-  requester_id: string;
-  seller_id: string;
-  price: number;
-  message: string | null;
-  status: CounterStatus;
-  created_at: string;
+const CATEGORY_KEYS: Record<string, string> = {
+  Hospitality:"hospitality",Retail:"retail",Tutoring:"tutoring",Events:"events",
+  Delivery:"delivery",IT:"it",Office:"office",Marketing:"marketing",Other:"other",
 };
 
-const DAY_KEYS_INDEX = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-] as const;
-
-type OfferSlotInfo = {
-  offer_id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  date: string | null;
+const OFFER_STATUS: Record<string, { bg: string; text: string; label: string }> = {
+  pending:   { bg: theme.warningLight,  text: theme.warning,  label: "offerPending" },
+  accepted:  { bg: theme.successLight,  text: theme.success,  label: "offerAccepted" },
+  rejected:  { bg: theme.errorLight,    text: theme.error,    label: "offerRejected" },
+  withdrawn: { bg: theme.surfaceAlt,    text: theme.mutedText,label: "offerWithdrawn" },
 };
 
-function fmtSlotDate(date: string | null): string {
-  if (!date) return "";
-  const d = new Date(date + "T00:00:00");
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function initials(name: string | null | undefined) {
+  if (!name) return "?";
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const categoryTranslationKeys: Record<string, string> = {
-  Vehicles: "vehicles",
-  "Real Estate": "realEstate",
-  Services: "services",
-  "Electronics & Tech": "electronics",
-  "Fashion & Personal": "fashion",
-  Other: "other",
-};
-
-const statusKeys: Record<string, string> = {
-  active: "open",
-  matched: "negotiating",
-  closed: "closed",
-};
-
-const budgetTypeKeys: Record<string, string> = {
-  per_hour: "budgetPerHour",
-  per_day: "budgetPerDay",
-  fixed: "budgetFixed",
-};
-
-const timelineKeys: Record<string, string> = {
-  asap: "timelineAsap",
-  specific_date: "timelineDate",
-  flexible: "timelineFlexible",
-};
-
-const scheduleKeys: Record<string, string> = {
-  anytime: "scheduleAnytime",
-  weekdays: "scheduleWeekdays",
-  weekends: "scheduleWeekends",
-  specific_date: "scheduleSpecificDate",
-};
-
-const equipmentKeys: Record<string, string> = {
-  not_needed: "equipmentNotNeeded",
-  pro_provides: "equipmentPro",
-  client_provides: "equipmentClient",
-};
-
-const postingAsKeys: Record<string, string> = {
-  seeking: "postingSeeking",
-  offering: "postingOffering",
-};
-
-const durationKeys: Record<string, string> = {
-  few_hours: "durationHours",
-  full_day: "durationDay",
-  multi_day: "durationMultiDay",
-  recurring: "durationRecurring",
-};
-
-const workModeKeys: Record<string, string> = {
-  onsite: "workOnsite",
-  remote: "workRemote",
-  hybrid: "workHybrid",
-};
-
-const experienceKeys: Record<string, string> = {
-  any: "experienceAny",
-  beginner: "experienceBeginner",
-  experienced: "experienceExperienced",
-  expert: "experienceExpert",
-};
-
-function getDisplayName(profiles: OfferRow["profiles"]): string {
-  if (!profiles) return "user";
-  if (Array.isArray(profiles)) return profiles[0]?.display_name ?? "user";
-  return profiles.display_name ?? "user";
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export default function RequestDetailScreen() {
+export default function JobDetailScreen() {
   const t = useTranslation();
-  const { formatPrice } = useCurrency();
   const { id } = useLocalSearchParams<{ id: string }>();
-
-  const [request, setRequest] = useState<RequestRow | null>(null);
+  const [job, setJob] = useState<JobDetail | null>(null);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
-  const [myOfferId, setMyOfferId] = useState<string | null>(null);
-  const [hasSwipedRight, setHasSwipedRight] = useState(false);
-  const didInitialLoad = useRef(false);
+  const [hasApplied, setHasApplied] = useState(false);
 
-  const [offers, setOffers] = useState<OfferRow[]>([]);
-  const [counters, setCounters] = useState<CounterOfferRow[]>([]);
-  const [offerFilter, setOfferFilter] = useState<OfferFilter>("all");
-  const [descExpanded, setDescExpanded] = useState(false);
-  const [availSchedule, setAvailSchedule] = useState<WeekSchedule>(emptyWeek());
-  const [hasAvailability, setHasAvailability] = useState(false);
-  const [slotStatuses, setSlotStatuses] = useState<
-    Record<string, "available" | "pending" | "booked">
-  >({});
-  const [offerSlots, setOfferSlots] = useState<OfferSlotInfo[]>([]);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    setUserId(user?.id ?? null);
 
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const photoListRef = useRef<FlatList>(null);
-  const [viewerVisible, setViewerVisible] = useState(false);
-  const [viewerIndex, setViewerIndex] = useState(0);
-
-  const load = useCallback(async () => {
-    if (!id) return;
-
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes.user;
-
-    const { data, error } = await supabase
+    const { data: jobData } = await supabase
       .from("requests")
-      .select(
-        "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,preferred_schedule,scheduled_date,duration,workers_needed,work_mode,experience_level,equipment,special_requirements,photos",
-      )
+      .select("id,title,description,category,location,budget_min,budget_max,status,posting_as,created_at,user_id,profiles(username)")
       .eq("id", id)
       .single();
+    setJob(jobData as JobDetail | null);
 
-    if (error || !data) {
-      Alert.alert(t("error"), t("requestNotFound"));
-      router.back();
-      return;
-    }
-
-    setRequest(data as RequestRow);
-    const owner = !!user && data.user_id === user.id;
-    setIsOwner(owner);
-
-    if (user && !owner) {
-      const { data: existingOffer } = await supabase
-        .from("offers")
-        .select("id,status")
-        .eq("request_id", id)
-        .eq("user_id", user.id)
-        .eq("status", "pending")
-        .maybeSingle();
-      setMyOfferId(existingOffer?.id ?? null);
-
-      const { data: swipeData } = await supabase
-        .from("request_swipes")
-        .select("direction")
-        .eq("request_id", id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setHasSwipedRight(swipeData?.direction === "right");
-    }
-
-    if (owner) {
-      const { data: off } = await supabase
-        .from("offers")
-        .select(
-          `id,request_id,user_id,price,description,status,created_at,
-          profiles!offers_user_id_fkey(display_name)`,
-        )
-        .eq("request_id", id)
-        .order("created_at", { ascending: false });
-
-      setOffers((off ?? []) as OfferRow[]);
-
-      // Load offer slots
-      const offerIds = (off ?? []).map((o: any) => o.id);
-      if (offerIds.length > 0) {
-        const { data: slotsRaw } = await supabase
-          .from("offer_slots")
-          .select("offer_id,availability_id")
-          .in("offer_id", offerIds);
-
-        if (slotsRaw && slotsRaw.length > 0) {
-          const availIds = [
-            ...new Set(slotsRaw.map((s: any) => s.availability_id)),
-          ];
-          const { data: availData } = await supabase
-            .from("request_availability")
-            .select("id,day_of_week,start_time,end_time,date")
-            .in("id", availIds);
-
-          const aMap = new Map((availData ?? []).map((a: any) => [a.id, a]));
-          const mapped: OfferSlotInfo[] = [];
-          for (const s of slotsRaw as any[]) {
-            const a = aMap.get(s.availability_id);
-            if (a)
-              mapped.push({
-                offer_id: s.offer_id,
-                day_of_week: a.day_of_week,
-                start_time: a.start_time,
-                end_time: a.end_time,
-                date: a.date ?? null,
-              });
-          }
-          setOfferSlots(mapped);
-        } else {
-          setOfferSlots([]);
-        }
+    if (jobData && user) {
+      if (jobData.user_id === user.id) {
+        const { data: apps } = await supabase
+          .from("offers")
+          .select("id,status,cover_letter,created_at,profiles!seller_id(id,username)")
+          .eq("request_id", id)
+          .order("created_at", { ascending: false });
+        setApplicants((apps as unknown as Applicant[]) ?? []);
       } else {
-        setOfferSlots([]);
+        const { data: myApp } = await supabase
+          .from("offers").select("id").eq("request_id", id)
+          .eq("seller_id", user.id).neq("status", "withdrawn").maybeSingle();
+        setHasApplied(!!myApp);
       }
-
-      const { data: co } = await supabase
-        .from("counter_offers")
-        .select(
-          "id,request_id,offer_id,requester_id,seller_id,price,message,status,created_at",
-        )
-        .eq("request_id", id)
-        .order("created_at", { ascending: false });
-
-      setCounters((co ?? []) as CounterOfferRow[]);
     }
-
-    // Load availability schedule
-    const { data: avail } = await supabase
-      .from("request_availability")
-      .select("id,day_of_week,start_time,end_time,is_booked,date")
-      .eq("request_id", id)
-      .order("day_of_week")
-      .order("start_time");
-
-    if (avail && avail.length > 0) {
-      const week = emptyWeek();
-      const statusMap: Record<string, "available" | "pending" | "booked"> = {};
-      for (const row of avail) {
-        const day = week[row.day_of_week as number];
-        day.enabled = true;
-        day.slots.push({
-          id: row.id as string,
-          start: (row.start_time as string).slice(0, 5),
-          end: (row.end_time as string).slice(0, 5),
-          date: (row as any).date ?? undefined,
-        });
-        statusMap[row.id as string] = (row.is_booked as boolean)
-          ? "booked"
-          : "available";
-      }
-
-      // Mark slots as "pending" (yellow) if they belong to an accepted-but-not-closed offer
-      const { data: acceptedOffers } = await supabase
-        .from("offers")
-        .select("id,closed_at")
-        .eq("request_id", id)
-        .eq("status", "accepted");
-      const openAcceptedIds = (acceptedOffers ?? [])
-        .filter((o: any) => !o.closed_at)
-        .map((o: any) => o.id);
-      if (openAcceptedIds.length > 0) {
-        const { data: pendingSlots } = await supabase
-          .from("offer_slots")
-          .select("availability_id")
-          .in("offer_id", openAcceptedIds);
-        for (const s of pendingSlots ?? []) {
-          if (statusMap[s.availability_id] === "available") {
-            statusMap[s.availability_id] = "pending";
-          }
-        }
-      }
-
-      setAvailSchedule(week);
-      setSlotStatuses(statusMap);
-      setHasAvailability(true);
-    } else {
-      setAvailSchedule(emptyWeek());
-      setSlotStatuses({});
-      setHasAvailability(false);
-    }
-
     setLoading(false);
-  }, [id, t]);
+  }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!didInitialLoad.current) {
-        didInitialLoad.current = true;
-        setLoading(true);
-        load();
-      }
-    }, [load]),
-  );
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  async function handleAccept(offerId: string) {
+    await supabase.from("offers").update({ status: "accepted" }).eq("id", offerId);
+    await supabase.from("requests").update({ status: "filled" }).eq("id", id);
+    fetchData();
+  }
 
-  const latestCounterByOfferId = useMemo(() => {
-    const map = new Map<string, CounterOfferRow>();
-    for (const c of counters) {
-      if (!map.has(c.offer_id)) map.set(c.offer_id, c);
-    }
-    return map;
-  }, [counters]);
+  async function handleReject(offerId: string) {
+    await supabase.from("offers").update({ status: "rejected" }).eq("id", offerId);
+    fetchData();
+  }
 
-  const offerCounts = useMemo(() => {
-    const all = offers.length;
-    const pending = offers.filter((o) => {
-      if (o.status === "withdrawn") return false;
-      const c = latestCounterByOfferId.get(o.id);
-      if (c?.status === "pending") return true;
-      return o.status === "pending";
-    }).length;
-    const accepted = offers.filter((o) => {
-      if (o.status === "withdrawn") return false;
-      const c = latestCounterByOfferId.get(o.id);
-      if (c?.status === "accepted") return true;
-      return o.status === "accepted";
-    }).length;
-    const rejected = offers.filter((o) => {
-      if (o.status === "withdrawn") return false;
-      const c = latestCounterByOfferId.get(o.id);
-      if (c?.status === "accepted") return false;
-      return o.status === "rejected";
-    }).length;
-    const withdrawn = offers.filter((o) => o.status === "withdrawn").length;
-    return { all, pending, accepted, rejected, withdrawn };
-  }, [offers, latestCounterByOfferId]);
-
-  const filteredOffers = useMemo(() => {
-    if (offerFilter === "all") return offers;
-    return offers.filter((o) => {
-      const c = latestCounterByOfferId.get(o.id);
-      const effective: OfferStatus =
-        o.status === "withdrawn"
-          ? "withdrawn"
-          : c?.status === "accepted"
-            ? "accepted"
-            : c?.status === "pending"
-              ? "pending"
-              : o.status;
-      return effective === offerFilter;
-    });
-  }, [offers, offerFilter, latestCounterByOfferId]);
-
-  const acceptOffer = async (offerId: string) => {
-    const { error: acceptError } = await supabase
-      .from("offers")
-      .update({ status: "accepted" })
-      .eq("id", offerId);
-
-    if (acceptError) {
-      Alert.alert(acceptError.message);
-      return;
-    }
-
-    const { error: rejectOthersError } = await supabase
-      .from("offers")
-      .update({ status: "rejected" })
-      .eq("request_id", id)
-      .neq("id", offerId)
-      .eq("status", "pending");
-
-    if (rejectOthersError) {
-      Alert.alert(rejectOthersError.message);
-      return;
-    }
-
-    const { error: matchRequestError } = await supabase
-      .from("requests")
-      .update({ status: "matched" })
-      .eq("id", id);
-
-    if (matchRequestError) {
-      Alert.alert(matchRequestError.message);
-      return;
-    }
-
-    await load();
-  };
-
-  const rejectOffer = async (offerId: string) => {
-    const { error } = await supabase
-      .from("offers")
-      .update({ status: "rejected" })
-      .eq("id", offerId);
-
-    if (error) {
-      Alert.alert(error.message);
-      return;
-    }
-
-    await load();
-  };
-
-  const openRejectMenu = (offer: OfferRow) => {
-    const name = getDisplayName(offer.profiles);
-    const existingCounter = latestCounterByOfferId.get(offer.id);
-
-    if (existingCounter?.status === "pending") {
-      Alert.alert(t("counterAlreadySent"), t("counterAlreadySentMsg"), [
-        { text: t("cancel") },
-        {
-          text: t("viewCounter"),
-          onPress: () =>
-            router.push({
-              pathname: "/(modals)/counter-offer",
-              params: {
-                offerId: offer.id,
-                requestId: offer.request_id,
-                sellerId: offer.user_id,
-                sellerEmail: name,
-                originalPrice: String(offer.price),
-              },
-            } as any),
-        },
-      ]);
-      return;
-    }
-
-    Alert.alert(t("rejectOfferTitle"), t("chooseOption"), [
+  async function handleClose() {
+    Alert.alert(t("closePost"), t("closePostConfirm"), [
       { text: t("cancel"), style: "cancel" },
-      {
-        text: t("reject"),
-        style: "destructive",
-        onPress: () => rejectOffer(offer.id),
-      },
-      {
-        text: t("rejectWithOffer"),
-        onPress: () => {
-          router.push({
-            pathname: "/(modals)/counter-offer",
-            params: {
-              offerId: offer.id,
-              requestId: offer.request_id,
-              sellerId: offer.user_id,
-              sellerEmail: name,
-              originalPrice: String(offer.price),
-            },
-          } as any);
-        },
-      },
+      { text: t("confirm"), onPress: async () => {
+        await supabase.from("requests").update({ status: "closed" }).eq("id", id);
+        router.back();
+      }},
     ]);
-  };
+  }
 
-  const deleteRequest = () => {
-    if (!request) return;
-    Alert.alert(t("deleteRequest"), t("deleteConfirm"), [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("delete"),
-        style: "destructive",
-        onPress: async () => {
-          await supabase.from("requests").delete().eq("id", request.id);
-          router.back();
-        },
-      },
-    ]);
-  };
-
-  if (loading || !request) {
+  if (loading) {
     return (
-      <Screen>
-        <View style={styles.center}>
-          <Text>{t("loading")}</Text>
-        </View>
-      </Screen>
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color={theme.primary} />
+      </SafeAreaView>
     );
   }
 
-  const photos = request.photos ?? [];
-  const hasPhotos = photos.length > 0;
+  if (!job) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.notFound}>
+          <Feather name="alert-circle" size={48} color={theme.mutedText} />
+          <Text style={styles.notFoundText}>{t("jobNotFound")}</Text>
+          <Pressable onPress={() => router.back()} style={styles.backLink}>
+            <Text style={styles.backLinkText}>{t("goBack")}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const budgetLabel = request.open_budget
-    ? t("openBudget")
-    : request.budget_type &&
-        request.budget_type !== "range" &&
-        budgetTypeKeys[request.budget_type]
-      ? `${formatPrice(request.budget_min ?? 0)} ${t(budgetTypeKeys[request.budget_type])}`
-      : `${formatPrice(request.budget_min ?? 0)} – ${formatPrice(request.budget_max ?? 0)}`;
-
-  const detailBadges: string[] = [];
-  if (request.timeline && timelineKeys[request.timeline])
-    detailBadges.push(t(timelineKeys[request.timeline]));
-  if (request.work_mode && workModeKeys[request.work_mode])
-    detailBadges.push(t(workModeKeys[request.work_mode]));
-  if (
-    request.experience_level &&
-    request.experience_level !== "any" &&
-    experienceKeys[request.experience_level]
-  )
-    detailBadges.push(t(experienceKeys[request.experience_level]));
-  if (
-    request.budget_type &&
-    request.budget_type !== "range" &&
-    budgetTypeKeys[request.budget_type]
-  )
-    detailBadges.push(t(budgetTypeKeys[request.budget_type]));
-
-  const detailRows: { label: string; value: string }[] = [];
-
-  if (request.preferred_schedule && scheduleKeys[request.preferred_schedule])
-    detailRows.push({
-      label: t("preferredSchedule"),
-      value: t(scheduleKeys[request.preferred_schedule]),
-    });
-  if (request.preferred_schedule === "specific_date" && request.scheduled_date)
-    detailRows.push({
-      label: t("scheduledDate"),
-      value: request.scheduled_date,
-    });
-  if (request.duration && durationKeys[request.duration])
-    detailRows.push({
-      label: t("durationLabel"),
-      value: t(durationKeys[request.duration]),
-    });
-  if (request.workers_needed != null)
-    detailRows.push({
-      label: t("workersLabel"),
-      value: String(request.workers_needed),
-    });
-  if (request.work_mode && workModeKeys[request.work_mode])
-    detailRows.push({
-      label: t("workModeLabel"),
-      value: t(workModeKeys[request.work_mode]),
-    });
-  if (request.experience_level && experienceKeys[request.experience_level])
-    detailRows.push({
-      label: t("experienceLabel"),
-      value: t(experienceKeys[request.experience_level]),
-    });
-  if (request.budget_type && budgetTypeKeys[request.budget_type])
-    detailRows.push({
-      label: t("budgetTypeLabel"),
-      value: t(budgetTypeKeys[request.budget_type]),
-    });
-  if (request.equipment && equipmentKeys[request.equipment])
-    detailRows.push({
-      label: t("equipmentLabel"),
-      value: t(equipmentKeys[request.equipment]),
-    });
+  const isOwner = userId === job.user_id;
+  const isEmployer = job.posting_as === "employer";
+  const wage = job.budget_min && job.budget_max
+    ? `${job.budget_min}–${job.budget_max} RON/h`
+    : job.budget_min ? `${job.budget_min}+ RON/h`
+    : job.budget_max ? `~${job.budget_max} RON/h` : null;
+  const posterName = job.profiles?.username ?? null;
+  const pendingCount = applicants.filter(a => a.status === "pending").length;
 
   return (
-    <Screen>
-      <View style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {/* ── Photo gallery ── */}
-          {hasPhotos ? (
-            <View style={styles.photoContainer}>
-              <FlatList
-                ref={photoListRef}
-                data={photos}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(_, i) => String(i)}
-                onMomentumScrollEnd={(e) => {
-                  const idx = Math.round(
-                    e.nativeEvent.contentOffset.x / SCREEN_WIDTH,
-                  );
-                  setPhotoIndex(idx);
-                }}
-                renderItem={({ item: uri, index: i }) => (
-                  <Pressable
-                    onPress={() => {
-                      setViewerIndex(i);
-                      setViewerVisible(true);
-                    }}
-                  >
-                    <Image
-                      source={{ uri }}
-                      style={styles.photoPage}
-                      resizeMode="cover"
-                    />
-                  </Pressable>
-                )}
-              />
-              {photos.length > 1 && (
-                <View style={styles.dotsRow}>
-                  {photos.map((_, i) => (
-                    <View
-                      key={i}
-                      style={[styles.dot, i === photoIndex && styles.dotActive]}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.noPhotoBox}>
-              <Feather name="image" size={36} color={theme.secondaryText} />
-              <Text style={styles.noPhotoText}>{t("addPhotos")}</Text>
-            </View>
-          )}
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      {/* Nav bar */}
+      <View style={styles.navbar}>
+        <Pressable onPress={() => router.back()} style={styles.navBtn}>
+          <Feather name="arrow-left" size={20} color={theme.primaryText} />
+        </Pressable>
+        <Text style={styles.navTitle} numberOfLines={1}>{job.title}</Text>
+        {isOwner && job.status === "active" ? (
+          <Pressable onPress={handleClose} style={styles.navBtn}>
+            <Feather name="x-circle" size={20} color={theme.error} />
+          </Pressable>
+        ) : <View style={{ width: 40 }} />}
+      </View>
 
-          {/* ── Main info card ── */}
-          <View style={styles.infoCard}>
-            <View style={styles.badgeRow}>
-              {request.posting_as === "offering" && (
-                <View style={styles.offeringBadge}>
-                  <Text style={styles.offeringBadgeText}>
-                    {t("postingOffering")}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryBadgeText}>
-                  {t(categoryTranslationKeys[request.category] || "other")}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Hero section */}
+        <View style={styles.heroCard}>
+          {/* Type + category row */}
+          <View style={styles.badgeRow}>
+            <View style={[styles.roleBadge, {
+              backgroundColor: isEmployer ? theme.employerLight : theme.primaryLight,
+            }]}>
+              <Text style={[styles.roleBadgeText, {
+                color: isEmployer ? theme.employer : theme.primaryDark,
+              }]}>
+                {t(job.posting_as ?? "employer")}
+              </Text>
+            </View>
+            {job.category && (
+              <View style={styles.catBadge}>
+                <Text style={styles.catBadgeText}>
+                  {t(CATEGORY_KEYS[job.category] ?? "other")}
                 </Text>
               </View>
-              {(isOwner || hasSwipedRight) && (
-                <View
-                  style={[
-                    styles.statusBadge,
-                    request.status === "active"
-                      ? styles.statusOpen
-                      : request.status === "matched"
-                        ? styles.statusNegotiating
-                        : styles.statusClosed,
-                  ]}
-                >
-                  <Text style={styles.statusBadgeText}>
-                    {t(statusKeys[request.status] ?? "open")}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.title}>{request.title}</Text>
-
-            <View style={styles.priceRow}>
-              <Feather name="dollar-sign" size={18} color={theme.primary} />
-              <Text style={styles.price}>{budgetLabel}</Text>
-            </View>
-
-            <View style={styles.metaRow}>
-              {!!request.location && (
-                <View style={styles.metaItem}>
-                  <Feather
-                    name="map-pin"
-                    size={14}
-                    color={theme.secondaryText}
-                  />
-                  <Text style={styles.metaText}>{request.location}</Text>
-                </View>
-              )}
-              <View style={styles.metaItem}>
-                <Feather name="clock" size={14} color={theme.secondaryText} />
-                <Text style={styles.metaText}>
-                  {formatDateTime(request.created_at)}
-                </Text>
-              </View>
+            )}
+            <View style={[styles.statusBadge, {
+              backgroundColor: job.status === "active" ? theme.successLight : theme.surfaceAlt,
+            }]}>
+              <View style={[styles.statusDot, {
+                backgroundColor: job.status === "active" ? theme.success : theme.mutedText,
+              }]} />
+              <Text style={[styles.statusText, {
+                color: job.status === "active" ? theme.success : theme.mutedText,
+              }]}>
+                {t(`status${job.status.charAt(0).toUpperCase()+job.status.slice(1)}`)}
+              </Text>
             </View>
           </View>
 
-          {/* ── Offers summary banner (owner only, when there are offers) ── */}
-          {isOwner && offerCounts.all > 0 && (
-            <Pressable
-              style={styles.offersBanner}
-              onPress={() => {
-                /* scroll handled by being above description */
-              }}
-            >
-              <View style={styles.offersBannerLeft}>
-                <Feather name="inbox" size={18} color={theme.primary} />
-                <Text style={styles.offersBannerTitle}>
-                  {offerCounts.all}{" "}
-                  {offerCounts.all === 1 ? t("offer") : t("offers")}
-                </Text>
+          <Text style={styles.heroTitle}>{job.title}</Text>
+
+          {/* Meta chips */}
+          <View style={styles.metaRow}>
+            {job.location && (
+              <View style={styles.metaChip}>
+                <Feather name="map-pin" size={13} color={theme.primary} />
+                <Text style={styles.metaText}>{job.location}</Text>
               </View>
-              <View style={styles.offersBannerBadges}>
-                {offerCounts.pending > 0 && (
-                  <View style={[styles.offersBannerPill, styles.pillPending]}>
-                    <Text style={styles.offersBannerPillText}>
-                      {offerCounts.pending} {t("pending")}
-                    </Text>
-                  </View>
-                )}
-                {offerCounts.accepted > 0 && (
-                  <View style={[styles.offersBannerPill, styles.pillAccepted]}>
-                    <Text style={styles.offersBannerPillText}>
-                      {offerCounts.accepted} {t("accepted")}
-                    </Text>
-                  </View>
-                )}
+            )}
+            {wage && (
+              <View style={[styles.metaChip, styles.wageChip]}>
+                <Feather name="dollar-sign" size={13} color={theme.success} />
+                <Text style={[styles.metaText, styles.wageText]}>{wage}</Text>
               </View>
-            </Pressable>
-          )}
+            )}
+          </View>
 
-          {/* ── No offers yet banner (owner only) ── */}
-          {isOwner && offerCounts.all === 0 && (
-            <View style={styles.offersBannerEmpty}>
-              <Feather name="inbox" size={18} color={theme.secondaryText} />
-              <Text style={styles.offersBannerEmptyText}>
-                {t("noOffersYet")}
-              </Text>
+          {/* Poster */}
+          <View style={styles.posterRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials(posterName)}</Text>
             </View>
-          )}
-
-          {/* ── Closed banner ── */}
-          {request.status === "closed" && (
-            <View style={styles.closedBanner}>
-              <Feather name="lock" size={18} color={theme.secondaryText} />
-              <Text style={styles.closedText}>{t("requestClosed")}</Text>
+            <View>
+              <Text style={styles.posterName}>{posterName ?? t("anonymous")}</Text>
+              <Text style={styles.posterLabel}>{t("postedBy").replace("Posted by ", "")}</Text>
             </View>
-          )}
+          </View>
+        </View>
 
-          {/* ── Description (expandable) ── */}
-          {!!request.description && (
-            <Pressable
-              style={styles.sectionCard}
-              onPress={() => setDescExpanded((prev) => !prev)}
-            >
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>{t("description")}</Text>
-                <Feather
-                  name={descExpanded ? "chevron-up" : "chevron-down"}
-                  size={16}
-                  color={theme.secondaryText}
-                />
-              </View>
-              <Text
-                style={styles.descText}
-                numberOfLines={descExpanded ? 0 : 3}
-              >
-                {request.description}
-              </Text>
-            </Pressable>
-          )}
-
-          {/* ── Detail info (labeled grid) ── */}
-          {(detailRows.length > 0 || !!request.special_requirements) && (
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>{t("showDetails")}</Text>
-              {detailRows.length > 0 && (
-                <View style={styles.detailGrid}>
-                  {detailRows.map((d, i) => (
-                    <View key={i} style={styles.detailGridItem}>
-                      <Text style={styles.detailGridLabel}>{d.label}</Text>
-                      <Text style={styles.detailGridValue}>{d.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              {!!request.special_requirements && (
-                <View style={styles.specialReqBox}>
-                  <Text style={styles.detailGridLabel}>
-                    {t("specialRequirementsLabel")}
-                  </Text>
-                  <Text style={styles.specialReqText}>
-                    {request.special_requirements}
-                  </Text>
-                </View>
-              )}
+        {/* Description */}
+        {job.description ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="file-text" size={16} color={theme.primary} />
+              <Text style={styles.sectionTitle}>{t("description")}</Text>
             </View>
-          )}
+            <Text style={styles.descText}>{job.description}</Text>
+          </View>
+        ) : null}
 
-          {/* ── Availability Schedule ── */}
-          {hasAvailability && (
-            <View style={styles.sectionCard}>
+        {/* Already applied banner */}
+        {!isOwner && hasApplied && (
+          <View style={styles.appliedBanner}>
+            <Feather name="check-circle" size={18} color={theme.primary} />
+            <Text style={styles.appliedText}>{t("alreadyApplied")}</Text>
+          </View>
+        )}
+
+        {/* Applicants (owner view) */}
+        {isOwner && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="users" size={16} color={theme.primary} />
               <Text style={styles.sectionTitle}>
-                {t("availabilitySchedule")}
+                {t("applicants")} ({applicants.length})
               </Text>
-              <SchedulePicker
-                value={availSchedule}
-                readOnly
-                slotStatuses={slotStatuses}
-              />
-            </View>
-          )}
-
-          {/* ── Seller actions (only if swiped right) ── */}
-          {!isOwner && hasSwipedRight && request.status === "active" && (
-            <View style={styles.ownerActions}>
-              {!myOfferId ? (
-                <Pressable
-                  style={styles.primaryBtn}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/create-offer",
-                      params: { requestId: id },
-                    } as any)
-                  }
-                >
-                  <Text style={styles.primaryBtnText}>{t("sendOffer")}</Text>
-                </Pressable>
-              ) : (
-                <>
-                  <Pressable
-                    style={styles.primaryBtn}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/create-offer",
-                        params: { requestId: id, offerId: myOfferId },
-                      } as any)
-                    }
-                  >
-                    <Text style={styles.primaryBtnText}>{t("editOffer")}</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.dangerBtn}
-                    onPress={async () => {
-                      await supabase
-                        .from("offers")
-                        .delete()
-                        .eq("id", myOfferId);
-                      setMyOfferId(null);
-                    }}
-                  >
-                    <Text style={styles.dangerText}>{t("withdrawOffer")}</Text>
-                  </Pressable>
-                </>
+              {pendingCount > 0 && (
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>{pendingCount} new</Text>
+                </View>
               )}
             </View>
-          )}
 
-          {/* ── Offers section (owner only) ── */}
-          {isOwner && (
-            <View style={styles.sectionCard}>
-              <View style={styles.offersHeader}>
-                <Text style={styles.sectionTitle}>{t("offersHeader")}</Text>
-                <Text style={styles.offersCount}>
-                  {offerCounts.all}{" "}
-                  {offerCounts.all === 1 ? t("offer") : t("offers")}
-                </Text>
+            {applicants.length === 0 ? (
+              <View style={styles.emptyApplicants}>
+                <Feather name="inbox" size={28} color={theme.mutedText} />
+                <Text style={styles.emptyApplicantsText}>{t("noApplicantsYet")}</Text>
               </View>
-
-              {offerCounts.withdrawn > 0 && (
-                <View style={styles.withdrawnBanner}>
-                  <Feather
-                    name="alert-triangle"
-                    size={14}
-                    color={theme.danger}
-                  />
-                  <Text style={styles.withdrawnBannerText}>
-                    {offerCounts.withdrawn}{" "}
-                    {offerCounts.withdrawn === 1
-                      ? t("offersWithdrawnWarning_one")
-                      : t("offersWithdrawnWarning_other")}
-                  </Text>
-                </View>
-              )}
-
-              {offerCounts.all > 0 && (
-                <View style={styles.filtersRow}>
-                  {(
-                    [
-                      ["all", offerCounts.all],
-                      ["pending", offerCounts.pending],
-                      ["accepted", offerCounts.accepted],
-                      ["rejected", offerCounts.rejected],
-                      ["withdrawn", offerCounts.withdrawn],
-                    ] as [OfferFilter, number][]
-                  ).map(([key, count]) => (
-                    <Pressable
-                      key={key}
-                      onPress={() => setOfferFilter(key)}
-                      style={[
-                        styles.filterChip,
-                        offerFilter === key && styles.filterChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          offerFilter === key && styles.filterChipTextActive,
-                        ]}
-                      >
-                        {t(key === "all" ? "all" : `${key}`)} ({count})
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              {filteredOffers.length === 0 ? (
-                <View style={styles.noOffersBox}>
-                  <Feather name="inbox" size={24} color={theme.secondaryText} />
-                  <Text style={styles.noOffersText}>{t("noOffersYet")}</Text>
-                </View>
-              ) : (
-                filteredOffers.map((offer) => {
-                  const sellerName = getDisplayName(offer.profiles);
-                  const latestCounter = latestCounterByOfferId.get(offer.id);
-                  const effectiveStatus: OfferStatus =
-                    offer.status === "withdrawn"
-                      ? "withdrawn"
-                      : latestCounter?.status === "accepted"
-                        ? "accepted"
-                        : latestCounter?.status === "pending"
-                          ? "pending"
-                          : offer.status;
-                  const isPending = effectiveStatus === "pending";
-                  const isAccepted = effectiveStatus === "accepted";
-                  const isWithdrawn = effectiveStatus === "withdrawn";
-
-                  return (
-                    <View key={offer.id} style={styles.offerCard}>
-                      <View style={styles.offerTop}>
-                        <Text style={styles.offerSeller}>{sellerName}</Text>
-                        <View
-                          style={[
-                            styles.offerStatusPill,
-                            isAccepted
-                              ? styles.pillAccepted
-                              : isWithdrawn
-                                ? styles.pillWithdrawn
-                                : effectiveStatus === "rejected"
-                                  ? styles.pillRejected
-                                  : styles.pillPending,
-                          ]}
-                        >
-                          <Text style={styles.offerStatusText}>
-                            {t(
-                              effectiveStatus === "pending"
-                                ? "pendingStatus"
-                                : effectiveStatus === "accepted"
-                                  ? "acceptedStatus"
-                                  : effectiveStatus === "rejected"
-                                    ? "rejectedStatus"
-                                    : "withdrawnStatus",
-                            )}
-                          </Text>
-                        </View>
+            ) : (
+              applicants.map((app) => {
+                const s = OFFER_STATUS[app.status] ?? OFFER_STATUS.pending;
+                const appName = (app as any).profiles?.username ?? t("anonymous");
+                return (
+                  <View key={app.id} style={styles.applicantCard}>
+                    <View style={styles.applicantHeader}>
+                      <View style={styles.applicantAvatar}>
+                        <Text style={styles.applicantAvatarText}>{initials(appName)}</Text>
                       </View>
-
-                      <Text style={styles.offerPrice}>
-                        {formatPrice(Number(offer.price))}
-                      </Text>
-
-                      {!!offer.description && (
-                        <Text style={styles.offerDesc}>
-                          {offer.description}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.applicantName}>{appName}</Text>
+                        {app.cover_letter ? (
+                          <Text style={styles.coverLetterPreview} numberOfLines={2}>
+                            {app.cover_letter}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={[styles.appStatusBadge, { backgroundColor: s.bg }]}>
+                        <Text style={[styles.appStatusText, { color: s.text }]}>
+                          {t(s.label)}
                         </Text>
-                      )}
-
-                      {/* Selected time slots */}
-                      {(() => {
-                        const slots = offerSlots.filter(
-                          (s) => s.offer_id === offer.id,
-                        );
-                        if (slots.length === 0) return null;
-                        return (
-                          <View style={styles.offerSlotsWrap}>
-                            <Text style={styles.offerSlotsLabel}>
-                              {t("scheduledSlots")}
-                            </Text>
-                            <View style={styles.offerSlotsChips}>
-                              {slots.map((s, i) => (
-                                <View key={i} style={styles.offerSlotChip}>
-                                  <Text style={styles.offerSlotChipText}>
-                                    {s.date
-                                      ? fmtSlotDate(s.date)
-                                      : t(DAY_KEYS_INDEX[s.day_of_week])}{" "}
-                                    {s.start_time.slice(0, 5)} –{" "}
-                                    {s.end_time.slice(0, 5)}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          </View>
-                        );
-                      })()}
-
-                      {offer.status === "withdrawn" && (
-                        <View style={styles.counterBox}>
-                          <Text style={styles.counterTitle}>
-                            {t("offerWithdrawnTitle")}
-                          </Text>
-                          <Text style={styles.counterMsg}>
-                            {t("offerWithdrawnMsg")}
-                          </Text>
-                        </View>
-                      )}
-
-                      {latestCounter && (
-                        <View style={styles.counterBox}>
-                          <Text style={styles.counterTitle}>
-                            {t("counterOfferLabel")}:{" "}
-                            {formatPrice(Number(latestCounter.price))}
-                          </Text>
-                          {!!latestCounter.message && (
-                            <Text style={styles.counterMsg}>
-                              {latestCounter.message}
-                            </Text>
-                          )}
-                          <Text style={styles.counterStatus}>
-                            {t("counterStatus")}:{" "}
-                            {t(
-                              latestCounter.status === "pending"
-                                ? "pendingStatus"
-                                : latestCounter.status === "accepted"
-                                  ? "acceptedStatus"
-                                  : latestCounter.status === "rejected"
-                                    ? "rejectedStatus"
-                                    : "withdrawnStatus",
-                            )}
-                          </Text>
-                        </View>
-                      )}
-
-                      {isPending &&
-                        !isWithdrawn &&
-                        latestCounter?.status !== "pending" && (
-                          <View style={styles.offerActions}>
-                            <Pressable
-                              onPress={() => openRejectMenu(offer)}
-                              style={[styles.actionBtn, styles.btnSecondary]}
-                            >
-                              <Text style={styles.btnSecondaryText}>
-                                {t("reject")}
-                              </Text>
-                            </Pressable>
-                            <Pressable
-                              onPress={() => acceptOffer(offer.id)}
-                              style={[styles.actionBtn, styles.btnPrimary]}
-                            >
-                              <Text style={styles.btnPrimaryText}>
-                                {t("accept")}
-                              </Text>
-                            </Pressable>
-                          </View>
-                        )}
-
-                      {isAccepted && (
-                        <View style={styles.offerActions}>
-                          <Pressable
-                            onPress={() =>
-                              router.push({
-                                pathname: "/request/[id]/chat",
-                                params: { id: request.id },
-                              } as any)
-                            }
-                            style={[styles.actionBtn, styles.btnPrimary]}
-                          >
-                            <Text style={styles.btnPrimaryText}>
-                              {t("chat")}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      )}
+                      </View>
                     </View>
-                  );
-                })
-              )}
-            </View>
-          )}
 
-          {/* ── Owner actions ── */}
-          {isOwner && (
-            <View style={styles.ownerActions}>
-              <Pressable
-                style={styles.primaryBtn}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(modals)/create-request",
-                    params: { requestId: request.id },
-                  } as any)
-                }
-              >
-                <Text style={styles.primaryBtnText}>{t("editRequest")}</Text>
-              </Pressable>
+                    {app.cover_letter && app.cover_letter.length > 80 ? (
+                      <Text style={styles.coverLetterFull}>{app.cover_letter}</Text>
+                    ) : null}
 
-              <Pressable style={styles.dangerBtn} onPress={deleteRequest}>
-                <Text style={styles.dangerText}>{t("deleteRequest")}</Text>
-              </Pressable>
-            </View>
-          )}
-        </ScrollView>
+                    {app.status === "pending" && (
+                      <View style={styles.decisionRow}>
+                        <Pressable style={styles.rejectBtn} onPress={() => handleReject(app.id)}>
+                          <Feather name="x" size={14} color={theme.error} />
+                          <Text style={styles.rejectBtnText}>{t("reject")}</Text>
+                        </Pressable>
+                        <Pressable style={styles.acceptBtn} onPress={() => handleAccept(app.id)}>
+                          <Feather name="check" size={14} color="#FFFFFF" />
+                          <Text style={styles.acceptBtnText}>{t("accept")}</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    {app.status === "accepted" && (
+                      <Pressable
+                        style={styles.chatBtn}
+                        onPress={() => router.push(`/request/${id}/chat`)}
+                      >
+                        <Feather name="message-circle" size={15} color="#FFFFFF" />
+                        <Text style={styles.chatBtnText}>{t("openChat")}</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
 
-        {/* Back button — always visible overlay */}
-        <Pressable style={styles.backBtnOverlay} onPress={() => router.back()}>
-          <Feather name="chevron-left" size={22} color={theme.primaryText} />
-        </Pressable>
+        <View style={{ height: isOwner ? 16 : 100 }} />
+      </ScrollView>
 
-        {/* Fullscreen image viewer */}
-        <ImageViewer
-          images={photos}
-          visible={viewerVisible}
-          initialIndex={viewerIndex}
-          onClose={() => setViewerVisible(false)}
-        />
-      </View>
-    </Screen>
+      {/* Sticky apply button (non-owner only) */}
+      {!isOwner && userId && job.status === "active" && !hasApplied && (
+        <View style={styles.stickyFooter}>
+          <Pressable
+            style={styles.applyBtn}
+            onPress={() => router.push({
+              pathname: "/(modals)/create-offer",
+              params: { requestId: id, title: job.title },
+            })}
+          >
+            <Text style={styles.applyBtnText}>{t("apply")}</Text>
+            <Feather name="arrow-right" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }

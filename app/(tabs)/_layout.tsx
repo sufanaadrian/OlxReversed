@@ -55,7 +55,7 @@ export default function TabsLayout() {
             options={{
               title: t("home"),
               tabBarIcon: ({ color, size }) => (
-                <Feather name="home" color={color} size={size} />
+                <Feather name="search" color={color} size={size} />
               ),
             }}
           />
@@ -63,7 +63,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="my-requests"
             options={{
-              title: t("myRequests"),
+              title: t("myPosts"),
               tabBarIcon: ({ color, size }) => (
                 <Feather name="file-text" color={color} size={size} />
               ),
@@ -102,9 +102,9 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="my-offers"
             options={{
-              title: t("myOffers"),
+              title: t("myApplications"),
               tabBarIcon: ({ color, size }) => (
-                <Feather name="briefcase" color={color} size={size} />
+                <Feather name="inbox" color={color} size={size} />
               ),
             }}
           />

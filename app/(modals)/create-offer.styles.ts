@@ -1,65 +1,91 @@
 import { StyleSheet } from "react-native";
 
 export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
+  primary: "#0D9488",
+  primaryLight: "#CCFBF1",
+  bg: "#F8FAFC",
   surface: "#FFFFFF",
-  primaryText: "#020617",
+  surfaceAlt: "#F1F5F9",
+  primaryText: "#0F172A",
   secondaryText: "#64748B",
-  border: "#E5E7EB",
+  mutedText: "#94A3B8",
+  border: "#E2E8F0",
 };
 
 export const styles = StyleSheet.create({
-  page: { flex: 1, paddingHorizontal: 16, paddingTop: 8, gap: 10 },
+  safe: { flex: 1, backgroundColor: theme.bg },
+  flex: { flex: 1 },
 
-  headerRow: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  backBtn: {
-    height: 36,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
     borderColor: theme.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backText: { fontWeight: "900", color: theme.primaryText },
-  headerTitle: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
-
-  infoBox: {
     backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 16,
-    padding: 12,
   },
-  infoText: { color: theme.secondaryText, fontWeight: "700" },
+  closeBtn: { padding: 8 },
+  headerTitle: { fontSize: 17, fontWeight: "800", color: theme.primaryText },
 
-  label: { fontWeight: "900", color: theme.primaryText, marginTop: 6 },
-  input: {
-    height: 46,
+  jobTitleBox: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 14,
     borderRadius: 14,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  jobTitleLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, marginBottom: 4 },
+  jobTitle: { fontSize: 15, fontWeight: "800", color: theme.primaryText },
+
+  body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+
+  label: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.primaryText,
+    marginBottom: 8,
+  },
+  coverInput: {
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 14,
     color: theme.primaryText,
+    minHeight: 160,
+    lineHeight: 20,
   },
-  textArea: { height: 110, paddingTop: 12, textAlignVertical: "top" },
+  charCount: {
+    fontSize: 11,
+    color: theme.mutedText,
+    textAlign: "right",
+    marginTop: 4,
+    marginBottom: 16,
+  },
 
-  cta: {
-    height: 48,
-    borderRadius: 16,
+  submitBtn: {
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: theme.primary,
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 16,
   },
-  ctaDisabled: { opacity: 0.5 },
-  ctaText: { color: "white", fontWeight: "900" },
+  submitBtnText: { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
+
+  alreadyApplied: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  alreadyAppliedText: { fontSize: 15, fontWeight: "700", color: theme.primary },
 });

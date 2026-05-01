@@ -7,25 +7,7 @@ export default function ModalsLayout() {
         name="create-offer"
         options={{
           presentation: "formSheet",
-          sheetAllowedDetents: [0.55, 0.75],
-          sheetGrabberVisible: true,
-          sheetCornerRadius: 20,
-        }}
-      />
-      <Stack.Screen
-        name="counter-offer"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.55, 0.75],
-          sheetGrabberVisible: true,
-          sheetCornerRadius: 20,
-        }}
-      />
-      <Stack.Screen
-        name="edit-offer"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.55, 0.75],
+          sheetAllowedDetents: [0.65, 0.85],
           sheetGrabberVisible: true,
           sheetCornerRadius: 20,
         }}

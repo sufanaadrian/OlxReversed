@@ -1,136 +1,75 @@
 import { StyleSheet } from "react-native";
 
 export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
+  primary: "#0D9488",
+  primaryLight: "#CCFBF1",
+  bg: "#F8FAFC",
   surface: "#FFFFFF",
+  surfaceAlt: "#F1F5F9",
   primaryText: "#0F172A",
   secondaryText: "#64748B",
+  mutedText: "#94A3B8",
   border: "#E2E8F0",
-  accentSoft: "#DBEAFE",
-  danger: "#DC2626",
-  success: "#16a34a",
 };
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.bg,
-  },
-  scroll: {
-    flex: 1,
-    padding: 20,
-  },
-  stepBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: theme.accentSoft,
-    marginBottom: 8,
-  },
-  stepBadgeText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: theme.primary,
-  },
-  h1: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: theme.primaryText,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: theme.secondaryText,
-    marginBottom: 20,
-    lineHeight: 20,
-  },
+  flex: { flex: 1, backgroundColor: theme.bg },
+  scroll: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 },
 
-  // ─── Section ──────────────────────────────────────────────────
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: theme.primaryText,
-    marginBottom: 4,
-  },
-  sectionHint: {
+  hero: { alignItems: "center", marginBottom: 32, gap: 8 },
+  emoji: { fontSize: 56, marginBottom: 8 },
+  heroTitle: { fontSize: 28, fontWeight: "900", color: theme.primaryText, textAlign: "center" },
+  heroSubtitle: { fontSize: 15, color: theme.secondaryText, textAlign: "center", lineHeight: 22 },
+
+  section: { marginBottom: 24 },
+  sectionLabel: {
     fontSize: 13,
-    color: theme.secondaryText,
-    marginBottom: 12,
-    lineHeight: 18,
+    fontWeight: "800",
+    color: theme.mutedText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
 
-  // ─── Category chips ──────────────────────────────────────────
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  categoryChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+  roleGrid: { flexDirection: "row", gap: 10 },
+  roleCard: {
+    flex: 1,
+    paddingVertical: 18,
+    borderRadius: 16,
     backgroundColor: theme.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.border,
+    alignItems: "center",
+    gap: 6,
   },
-  categoryChipActive: {
-    backgroundColor: theme.primary,
+  roleCardSelected: {
     borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: theme.secondaryText,
-  },
-  categoryChipTextActive: {
-    color: "#FFFFFF",
-  },
-  skipBtn: {
-    alignSelf: "flex-end",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginTop: 8,
-  },
-  skipBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: theme.secondaryText,
-  },
+  roleIcon: { fontSize: 28 },
+  roleLabel: { fontSize: 13, fontWeight: "700", color: theme.secondaryText },
+  roleLabelSelected: { color: theme.primary },
 
-  // ─── Business details ─────────────────────────────────────────
-  label: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: theme.primaryText,
-    marginBottom: 6,
-    marginTop: 10,
-  },
   input: {
+    backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
     color: theme.primaryText,
-    backgroundColor: theme.surface,
   },
 
-  // ─── Terms ────────────────────────────────────────────────────
   termsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginBottom: 20,
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: theme.border,
@@ -138,51 +77,19 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: theme.surface,
   },
-  checkboxActive: {
-    backgroundColor: theme.primary,
+  checkboxChecked: {
     borderColor: theme.primary,
+    backgroundColor: theme.primary,
   },
-  checkboxCheck: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  termsText: {
-    flex: 1,
-    fontSize: 13,
-    color: theme.secondaryText,
-    lineHeight: 18,
-  },
-  termsLink: {
-    color: theme.primary,
-    fontWeight: "700",
-  },
+  checkmark: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  termsText: { flex: 1, fontSize: 13, color: theme.secondaryText, lineHeight: 18 },
 
-  // ─── Actions ──────────────────────────────────────────────────
-  errorMsg: {
-    color: theme.danger,
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  finishBtn: {
-    marginTop: 20,
-    height: 50,
-    borderRadius: 14,
+  submitBtn: {
+    paddingVertical: 16,
+    borderRadius: 16,
     backgroundColor: theme.primary,
     alignItems: "center",
-    justifyContent: "center",
   },
-  finishBtnDisabled: {
-    opacity: 0.6,
-  },
-  finishBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-    fontSize: 16,
-  },
-  bottomSpace: {
-    height: 40,
-  },
+  submitBtnDisabled: { opacity: 0.45 },
+  submitBtnText: { fontSize: 17, fontWeight: "900", color: "#FFFFFF" },
 });

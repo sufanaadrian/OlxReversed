@@ -1,13 +1,7 @@
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
-import * as FileSystem from "expo-file-system/legacy";
-import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,991 +11,260 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  emptyWeek,
-  SchedulePicker,
-  WeekSchedule,
-} from "../../src/components/SchedulePicker";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./create-request.styles";
+import { Feather } from "@expo/vector-icons";
 
-const categories = [
-  "Services",
-  "Vehicles",
-  "Real Estate",
-  "Electronics & Tech",
-  "Fashion & Personal",
+const CATEGORIES = [
+  "Hospitality",
+  "Retail",
+  "Tutoring",
+  "Events",
+  "Delivery",
+  "IT",
+  "Office",
+  "Marketing",
   "Other",
 ] as const;
 
-const categoryTranslationKeys: Record<string, string> = {
-  Services: "services",
-  Vehicles: "vehicles",
-  "Real Estate": "realEstate",
-  "Electronics & Tech": "electronics",
-  "Fashion & Personal": "fashion",
+const CATEGORY_KEYS: Record<string, string> = {
+  Hospitality: "hospitality",
+  Retail: "retail",
+  Tutoring: "tutoring",
+  Events: "events",
+  Delivery: "delivery",
+  IT: "it",
+  Office: "office",
+  Marketing: "marketing",
   Other: "other",
 };
 
-type Duration = "few_hours" | "full_day" | "multi_day" | "recurring";
-type WorkMode = "onsite" | "remote" | "hybrid";
-type Experience = "any" | "beginner" | "experienced" | "expert";
-type Equipment = "not_needed" | "pro_provides" | "client_provides";
-type Schedule = "anytime" | "weekdays" | "weekends" | "specific_date";
-type PostingMode = "seeking" | "offering";
-type BudgetType = "range" | "per_hour" | "per_day" | "fixed";
+type PostingAs = "employer" | "student";
 
-const MAX_PHOTOS = 5;
-
-/** Format a Date to "YYYY-MM-DD" using local timezone (avoids UTC shift) */
-function localISODate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-export default function CreateRequestModal() {
+export default function CreateJobScreen() {
   const t = useTranslation();
-  const { requestId } = useLocalSearchParams<{ requestId?: string }>();
-  const isEditMode = !!requestId;
+  const params = useLocalSearchParams<{ id?: string }>();
+  const isEdit = !!params.id;
 
-  // ── Posting mode ──────────────────────────────────────────────────
-  const [postingAs, setPostingAs] = useState<PostingMode>("seeking");
-  const isOffering = postingAs === "offering";
-
-  // ── Core ─────────────────────────────────────────────────────────
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] =
-    useState<(typeof categories)[number]>("Services");
-  const [budgetType, setBudgetType] = useState<BudgetType>("range");
+  const [category, setCategory] = useState<string>("Other");
+  const [location, setLocation] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
-  const [budgetAmount, setBudgetAmount] = useState("");
-  const [openBudget, setOpenBudget] = useState(false);
-  const [location, setLocation] = useState("");
+  const [postingAs, setPostingAs] = useState<PostingAs>("employer");
+  const [saving, setSaving] = useState(false);
 
-  // ── Job Specifics ────────────────────────────────────────────────
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [duration, setDuration] = useState<Duration>("few_hours");
-  const [workers, setWorkers] = useState(1);
-
-  // ── Context ──────────────────────────────────────────────────────
-  const [workMode, setWorkMode] = useState<WorkMode>("onsite");
-  const [experience, setExperience] = useState<Experience>("any");
-  const [equipment, setEquipment] = useState<Equipment>("not_needed");
-  const [preferredSchedule, setPreferredSchedule] =
-    useState<Schedule>("anytime");
-  const [specialRequirements, setSpecialRequirements] = useState("");
-
-  // ── Photos ───────────────────────────────────────────────────────
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // ── Availability schedule ────────────────────────────────────────
-  const [schedule, setSchedule] = useState<WeekSchedule>(emptyWeek());
-  const [scheduleStart, setScheduleStart] = useState("");
-  const [scheduleEnd, setScheduleEnd] = useState("");
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-
-  // ── Populate from DB in edit mode ────────────────────────────────
   useEffect(() => {
-    if (!requestId) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from("requests")
-        .select("*")
-        .eq("id", requestId)
-        .maybeSingle();
-      if (error || !data) {
-        Alert.alert(t("error"), error?.message ?? t("requestNotFound"));
-        router.back();
-        return;
-      }
-      setPostingAs((data.posting_as as PostingMode) ?? "seeking");
-      setTitle(data.title ?? "");
-      setDescription(data.description ?? "");
-      setCategory((data.category as (typeof categories)[number]) ?? "Services");
-      setOpenBudget(data.open_budget ?? false);
-      const type = (data.budget_type as BudgetType) ?? "range";
-      setBudgetType(type);
-      if (type === "range") {
-        setBudgetMin(data.budget_min != null ? String(data.budget_min) : "");
-        setBudgetMax(data.budget_max != null ? String(data.budget_max) : "");
-      } else {
-        setBudgetAmount(data.budget_min != null ? String(data.budget_min) : "");
-      }
-      setLocation(data.location ?? "");
-      setDuration((data.duration as Duration) ?? "few_hours");
-      setWorkers(data.workers_needed ?? 1);
-      setWorkMode((data.work_mode as WorkMode) ?? "onsite");
-      setExperience((data.experience_level as Experience) ?? "any");
-      setEquipment((data.equipment as Equipment) ?? "not_needed");
-      setPreferredSchedule((data.preferred_schedule as Schedule) ?? "anytime");
-      setScheduledDate(data.scheduled_date ?? "");
-      setSpecialRequirements(data.special_requirements ?? "");
-      setPhotos(data.photos ?? []);
-      setScheduleStart(data.schedule_start ?? "");
-      setScheduleEnd(data.schedule_end ?? "");
-
-      // Load existing availability slots
-      const { data: avail } = await supabase
-        .from("request_availability")
-        .select("id,day_of_week,start_time,end_time,is_booked,date")
-        .eq("request_id", requestId)
-        .order("day_of_week")
-        .order("start_time");
-
-      if (avail && avail.length > 0) {
-        const week = emptyWeek();
-        for (const row of avail) {
-          const day = week[row.day_of_week];
-          day.enabled = true;
-          day.slots.push({
-            id: row.id,
-            start: (row.start_time as string).slice(0, 5),
-            end: (row.end_time as string).slice(0, 5),
-          });
-        }
-        setSchedule(week);
-      }
-    })();
-  }, [requestId, t]);
-
-  const canSubmit = useMemo(() => {
-    if (!title.trim()) return false;
-    if (!description.trim()) return false;
-    if (!openBudget) {
-      if (budgetType === "range") {
-        const min = Number(budgetMin);
-        const max = Number(budgetMax);
-        if (!budgetMin || !budgetMax) return false;
-        if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
-        if (min <= 0 || max <= 0 || min > max) return false;
-      } else {
-        const amt = Number(budgetAmount);
-        if (!budgetAmount) return false;
-        if (!Number.isFinite(amt) || amt <= 0) return false;
-      }
+    requireAuth();
+    if (isEdit && params.id) {
+      loadExisting(params.id);
     }
-    return true;
-  }, [
-    title,
-    description,
-    budgetType,
-    budgetMin,
-    budgetMax,
-    budgetAmount,
-    openBudget,
-  ]);
+  }, []);
 
-  const addPhoto = async () => {
-    if (photos.length >= MAX_PHOTOS) return;
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t("photosPermission"), t("allowPhotosAccess"));
+  async function loadExisting(id: string) {
+    const { data } = await supabase
+      .from("requests")
+      .select("title, description, category, location, budget_min, budget_max, posting_as")
+      .eq("id", id)
+      .single();
+    if (!data) return;
+    setTitle(data.title ?? "");
+    setDescription(data.description ?? "");
+    setCategory(data.category ?? "Other");
+    setLocation(data.location ?? "");
+    setBudgetMin(data.budget_min != null ? String(data.budget_min) : "");
+    setBudgetMax(data.budget_max != null ? String(data.budget_max) : "");
+    setPostingAs((data.posting_as as PostingAs) ?? "employer");
+  }
+
+  async function handleSave() {
+    if (!title.trim()) {
+      Alert.alert(t("error"), t("titleRequired"));
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.85,
-      allowsMultipleSelection: false,
-    });
-    if (result.canceled) return;
-    const uri = result.assets?.[0]?.uri;
-    if (!uri) return;
-    setPhotos((prev) => [...prev, uri]);
-  };
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.replace("/sign-in"); return; }
 
-  const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
-  };
+    const payload = {
+      user_id: user.id,
+      title: title.trim(),
+      description: description.trim() || null,
+      category,
+      location: location.trim() || null,
+      budget_min: budgetMin ? Number(budgetMin) : null,
+      budget_max: budgetMax ? Number(budgetMax) : null,
+      posting_as: postingAs,
+      status: "active",
+    };
 
-  const uploadPhoto = async (uri: string): Promise<string> => {
-    const extMatch = uri.match(/\.(\w+)(\?|$)/);
-    const ext = extMatch?.[1]?.toLowerCase() ?? "jpg";
-    const mime = `image/${ext === "jpg" ? "jpeg" : ext}`;
-    const fileName = `job-photos/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-
-    let readUri = uri;
-    if (!uri.startsWith("file://")) {
-      const dest = `${FileSystem.cacheDirectory}upload-${Date.now()}.${ext}`;
-      await FileSystem.copyAsync({ from: uri, to: dest });
-      readUri = dest;
+    if (isEdit && params.id) {
+      const { error } = await supabase
+        .from("requests")
+        .update(payload)
+        .eq("id", params.id);
+      if (error) Alert.alert(t("error"), error.message);
+      else router.back();
+    } else {
+      const { error } = await supabase.from("requests").insert(payload);
+      if (error) Alert.alert(t("error"), error.message);
+      else router.back();
     }
-
-    const base64 = await FileSystem.readAsStringAsync(readUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const binary = globalThis.atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-    const { data, error } = await supabase.storage
-      .from("job-photos")
-      .upload(fileName, bytes, { contentType: mime, upsert: false });
-    if (error) throw error;
-
-    const { data: pub } = supabase.storage
-      .from("job-photos")
-      .getPublicUrl(data.path);
-    return pub.publicUrl;
-  };
-
-  const submit = async () => {
-    setLoading(true);
-    try {
-      const photoUrls: string[] = await Promise.all(
-        photos.map((uri) =>
-          uri.startsWith("https://") ? Promise.resolve(uri) : uploadPhoto(uri),
-        ),
-      );
-
-      let bMin: number | null = null;
-      let bMax: number | null = null;
-      if (!openBudget) {
-        if (budgetType === "range") {
-          bMin = Number(budgetMin);
-          bMax = Number(budgetMax);
-        } else {
-          const amt = Number(budgetAmount);
-          bMin = amt;
-          bMax = amt;
-        }
-      }
-
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        budget_min: bMin,
-        budget_max: bMax,
-        open_budget: openBudget,
-        location: location.trim() || null,
-        posting_as: postingAs,
-        budget_type: openBudget ? null : budgetType,
-        timeline: null,
-        scheduled_date:
-          preferredSchedule === "specific_date"
-            ? scheduledDate.trim() || null
-            : null,
-        duration: isOffering ? duration : null,
-        workers_needed: isOffering ? workers : null,
-        work_mode: workMode,
-        experience_level: experience,
-        equipment,
-        preferred_schedule: preferredSchedule,
-        special_requirements: specialRequirements.trim() || null,
-        photos: photoUrls,
-        schedule_start: scheduleStart || null,
-        schedule_end: scheduleEnd || null,
-      };
-
-      let error;
-      let insertedRequestId = requestId;
-      if (isEditMode) {
-        ({ error } = await supabase
-          .from("requests")
-          .update(payload)
-          .eq("id", requestId));
-      } else {
-        const guard = await requireAuth("/create-request");
-        if (!guard.ok) return;
-        const { data: inserted, error: insError } = await supabase
-          .from("requests")
-          .insert({
-            ...payload,
-            user_id: guard.userId,
-            type: "service",
-            status: "active",
-          })
-          .select("id")
-          .single();
-        error = insError;
-        if (inserted) insertedRequestId = inserted.id;
-      }
-
-      if (error) throw error;
-
-      // Save availability schedule
-      if (insertedRequestId) {
-        // In edit mode, remove old non-booked slots and re-insert
-        if (isEditMode) {
-          await supabase
-            .from("request_availability")
-            .delete()
-            .eq("request_id", insertedRequestId)
-            .eq("is_booked", false);
-        }
-
-        const enabledDays = schedule.filter(
-          (d) => d.enabled && d.slots.length > 0,
-        );
-
-        const slotsToInsert: {
-          request_id: string;
-          day_of_week: number;
-          start_time: string;
-          end_time: string;
-          date: string | null;
-        }[] = [];
-
-        if (scheduleStart && scheduleEnd && enabledDays.length > 0) {
-          // Generate date-specific slots from template × date range
-          // JS getDay(): 0=Sun … 6=Sat → convert to our 0=Mon … 6=Sun
-          const jsToOur = (jsDay: number) => (jsDay === 0 ? 6 : jsDay - 1);
-          const enabledSet = new Set(enabledDays.map((d) => d.dayIndex));
-          const cursor = new Date(scheduleStart + "T00:00:00");
-          const end = new Date(scheduleEnd + "T00:00:00");
-
-          while (cursor <= end) {
-            const ourDay = jsToOur(cursor.getDay());
-            if (enabledSet.has(ourDay)) {
-              const dateStr = localISODate(cursor);
-              const day = schedule[ourDay];
-              for (const s of day.slots) {
-                if (isEditMode && !s.id.startsWith("slot-")) continue;
-                slotsToInsert.push({
-                  request_id: insertedRequestId!,
-                  day_of_week: ourDay,
-                  start_time: s.start + ":00",
-                  end_time: s.end + ":00",
-                  date: dateStr,
-                });
-              }
-            }
-            cursor.setDate(cursor.getDate() + 1);
-          }
-        } else {
-          // No date range → legacy day-of-week-only slots
-          for (const d of enabledDays) {
-            for (const s of d.slots) {
-              if (isEditMode && !s.id.startsWith("slot-")) continue;
-              slotsToInsert.push({
-                request_id: insertedRequestId!,
-                day_of_week: d.dayIndex,
-                start_time: s.start + ":00",
-                end_time: s.end + ":00",
-                date: null,
-              });
-            }
-          }
-        }
-
-        if (slotsToInsert.length > 0) {
-          const { error: slotErr } = await supabase
-            .from("request_availability")
-            .insert(slotsToInsert);
-          if (slotErr) console.log("availability insert error:", slotErr);
-        }
-      }
-
-      router.back();
-    } catch (e: any) {
-      Alert.alert(t("couldNotPostRequest"), e?.message ?? "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setSaving(false);
+  }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>{t("cancel")}</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>
-            {isEditMode ? t("editRequest") : t("postARequest")}
-          </Text>
-          <Pressable
-            onPress={submit}
-            disabled={!canSubmit || loading}
-            style={[
-              styles.headerBtnPrimary,
-              (!canSubmit || loading) && { opacity: 0.5 },
-            ]}
-          >
-            <Text style={styles.headerBtnPrimaryText}>
-              {loading
-                ? isEditMode
-                  ? t("saving")
-                  : t("posting")
-                : isEditMode
-                  ? t("saveChanges")
-                  : t("post")}
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} style={styles.backBtn}>
+              <Feather name="x" size={22} color={theme.primaryText} />
+            </Pressable>
+            <Text style={styles.headerTitle}>
+              {isEdit ? t("editPost") : t("createPost")}
             </Text>
-          </Pressable>
-        </View>
+            <View style={{ width: 38 }} />
+          </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Posting Mode ── */}
+          {/* Posting as toggle */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("postingAs")}</Text>
-            <View style={styles.modeRow}>
-              <Pressable
-                style={[
-                  styles.modeCard,
-                  postingAs === "seeking" && styles.modeCardActive,
-                ]}
-                onPress={() => {
-                  setPostingAs("seeking");
-                  setBudgetType("range");
-                }}
-              >
-                <Text style={styles.modeIcon}>🔍</Text>
-                <Text style={styles.modeTitle}>{t("postingSeeking")}</Text>
-                <Text style={styles.modeDesc}>{t("postingSeekingDesc")}</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.modeCard,
-                  postingAs === "offering" && styles.modeCardActive,
-                ]}
-                onPress={() => setPostingAs("offering")}
-              >
-                <Text style={styles.modeIcon}>🛠️</Text>
-                <Text style={styles.modeTitle}>{t("postingOffering")}</Text>
-                <Text style={styles.modeDesc}>{t("postingOfferingDesc")}</Text>
-              </Pressable>
+            <Text style={styles.label}>{t("iAm")}</Text>
+            <View style={styles.toggleRow}>
+              {(["employer", "student"] as PostingAs[]).map((role) => (
+                <Pressable
+                  key={role}
+                  style={[
+                    styles.toggleBtn,
+                    postingAs === role && styles.toggleBtnActive,
+                    postingAs === role && {
+                      backgroundColor: role === "employer" ? theme.employerLight : theme.primaryLight,
+                      borderColor: role === "employer" ? theme.employer : theme.primary,
+                    },
+                  ]}
+                  onPress={() => setPostingAs(role)}
+                >
+                  <Text
+                    style={[
+                      styles.toggleBtnText,
+                      postingAs === role && {
+                        color: role === "employer" ? theme.employer : theme.primary,
+                        fontWeight: "700",
+                      },
+                    ]}
+                  >
+                    {t(role)}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
-          {/* ── Section 1: Core Details ── */}
+          {/* Title */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("jobSectionCore")}</Text>
-
-            <Text style={[styles.label, styles.labelFirst]}>
-              {isOffering ? t("offeringTitle") : t("requestTitle")}
-            </Text>
+            <Text style={styles.label}>{t("jobTitle")} *</Text>
             <TextInput
+              style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder={
-                isOffering
-                  ? t("offeringTitlePlaceholder")
-                  : t("exampleRequestTitle")
-              }
-              placeholderTextColor={theme.secondaryText}
-              style={styles.input}
+              placeholder={postingAs === "employer" ? t("jobTitlePlaceholderEmployer") : t("jobTitlePlaceholderStudent")}
+              placeholderTextColor={theme.mutedText}
+              maxLength={120}
             />
+          </View>
 
+          {/* Description */}
+          <View style={styles.section}>
             <Text style={styles.label}>{t("description")}</Text>
             <TextInput
+              style={[styles.input, styles.inputMultiline]}
               value={description}
               onChangeText={setDescription}
-              placeholder={
-                isOffering
-                  ? t("offeringDescPlaceholder")
-                  : t("descriptionPlaceholder")
-              }
-              placeholderTextColor={theme.secondaryText}
-              style={[styles.input, styles.textarea]}
+              placeholder={t("descriptionPlaceholder")}
+              placeholderTextColor={theme.mutedText}
               multiline
+              numberOfLines={4}
+              maxLength={800}
             />
+          </View>
 
+          {/* Category */}
+          <View style={styles.section}>
             <Text style={styles.label}>{t("category")}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsScroll}
-            >
-              {categories.map((c) => {
-                const active = c === category;
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => setCategory(c)}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text
-                      style={[styles.chipText, active && styles.chipTextActive]}
-                    >
-                      {t(categoryTranslationKeys[c] || "other")}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Text style={styles.label}>
-              {isOffering ? t("offeringBudgetType") : t("budgetType")}
-            </Text>
-
-            {isOffering && (
-              <>
-                <View style={styles.chipsWrap}>
-                  {(
-                    ["range", "per_hour", "per_day", "fixed"] as BudgetType[]
-                  ).map((v) => (
-                    <Pressable
-                      key={v}
-                      style={[
-                        styles.chip,
-                        !openBudget && budgetType === v && styles.chipActive,
-                        openBudget && { opacity: 0.4 },
-                      ]}
-                      onPress={() => {
-                        if (!openBudget) setBudgetType(v);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          !openBudget &&
-                            budgetType === v &&
-                            styles.chipTextActive,
-                        ]}
-                      >
-                        {v === "range"
-                          ? t("budgetTypeRange")
-                          : v === "per_hour"
-                            ? t("budgetPerHour")
-                            : v === "per_day"
-                              ? t("budgetPerDay")
-                              : t("budgetFixed")}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {!openBudget && budgetType === "range" && (
-              <View style={[styles.budgetRow, { marginTop: 10 }]}>
-                <View style={styles.budgetInput}>
-                  <TextInput
-                    value={budgetMin}
-                    onChangeText={setBudgetMin}
-                    placeholder={t("min")}
-                    placeholderTextColor={theme.secondaryText}
-                    keyboardType="number-pad"
-                    style={styles.input}
-                  />
-                </View>
-                <View style={styles.budgetInput}>
-                  <TextInput
-                    value={budgetMax}
-                    onChangeText={setBudgetMax}
-                    placeholder={t("max")}
-                    placeholderTextColor={theme.secondaryText}
-                    keyboardType="number-pad"
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-            )}
-
-            {!openBudget && budgetType !== "range" && (
-              <TextInput
-                value={budgetAmount}
-                onChangeText={setBudgetAmount}
-                placeholder={t("budgetAmount")}
-                placeholderTextColor={theme.secondaryText}
-                keyboardType="number-pad"
-                style={[styles.input, { marginTop: 10 }]}
-              />
-            )}
-
-            <Pressable
-              style={styles.openBudgetPressable}
-              onPress={() => setOpenBudget((v) => !v)}
-            >
-              <View
-                style={[
-                  styles.openBudgetCheckbox,
-                  openBudget && styles.openBudgetCheckboxActive,
-                ]}
-              >
-                {openBudget && (
+            <View style={styles.catGrid}>
+              {CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat}
+                  style={[
+                    styles.catChip,
+                    category === cat && styles.catChipSelected,
+                  ]}
+                  onPress={() => setCategory(cat)}
+                >
                   <Text
-                    style={{ color: "white", fontSize: 12, fontWeight: "900" }}
+                    style={[
+                      styles.catChipText,
+                      category === cat && styles.catChipTextSelected,
+                    ]}
                   >
-                    ✓
+                    {t(CATEGORY_KEYS[cat] ?? "other")}
                   </Text>
-                )}
-              </View>
-              <Text style={styles.openBudgetLabel}>
-                {isOffering ? t("offeringOpenBudget") : t("openBudget")}
-              </Text>
-            </Pressable>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
-            <Text style={styles.label}>{t("locationOptional")}</Text>
+          {/* Location */}
+          <View style={styles.section}>
+            <Text style={styles.label}>{t("location")}</Text>
             <TextInput
+              style={styles.input}
               value={location}
               onChangeText={setLocation}
-              placeholder={t("exampleLocation")}
-              placeholderTextColor={theme.secondaryText}
-              style={styles.input}
+              placeholder={t("locationPlaceholder")}
+              placeholderTextColor={theme.mutedText}
             />
           </View>
 
-          {/* ── Section 2: Job Specifics (offering mode only) ── */}
-          {isOffering && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {t("jobSectionSpecifics")}
-              </Text>
-
-              <Text style={[styles.label, styles.labelFirst]}>
-                {t("offeringDuration")}
-              </Text>
-              <View style={styles.chipsWrap}>
-                {(
-                  [
-                    "few_hours",
-                    "full_day",
-                    "multi_day",
-                    "recurring",
-                  ] as Duration[]
-                ).map((v) => (
-                  <Pressable
-                    key={v}
-                    style={[styles.chip, duration === v && styles.chipActive]}
-                    onPress={() => setDuration(v)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        duration === v && styles.chipTextActive,
-                      ]}
-                    >
-                      {v === "few_hours"
-                        ? t("durationHours")
-                        : v === "full_day"
-                          ? t("durationDay")
-                          : v === "multi_day"
-                            ? t("durationMultiDay")
-                            : t("durationRecurring")}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.label}>{t("workersNeeded")}</Text>
-              <View style={styles.stepperRow}>
-                <Pressable
-                  style={styles.stepperBtn}
-                  onPress={() => setWorkers((v) => Math.max(1, v - 1))}
-                >
-                  <Text style={styles.stepperBtnText}>−</Text>
-                </Pressable>
-                <Text style={styles.stepperValue}>{workers}</Text>
-                <Pressable
-                  style={styles.stepperBtn}
-                  onPress={() => setWorkers((v) => Math.min(20, v + 1))}
-                >
-                  <Text style={styles.stepperBtnText}>+</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          {/* ── Section 3: Context ── */}
+          {/* Wage / Budget */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("jobSectionContext")}</Text>
-
-            <Text style={[styles.label, styles.labelFirst]}>
-              {t("workMode")}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {(["onsite", "remote", "hybrid"] as WorkMode[]).map((v) => (
-                <Pressable
-                  key={v}
-                  style={[styles.chip, workMode === v && styles.chipActive]}
-                  onPress={() => setWorkMode(v)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      workMode === v && styles.chipTextActive,
-                    ]}
-                  >
-                    {v === "onsite"
-                      ? t("workOnsite")
-                      : v === "remote"
-                        ? t("workRemote")
-                        : t("workHybrid")}
-                  </Text>
-                </Pressable>
-              ))}
+            <Text style={styles.label}>{t("wageRange")}</Text>
+            <View style={styles.rangeRow}>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={budgetMin}
+                onChangeText={setBudgetMin}
+                placeholder={t("minRon")}
+                placeholderTextColor={theme.mutedText}
+                keyboardType="numeric"
+              />
+              <Text style={styles.rangeSep}>–</Text>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={budgetMax}
+                onChangeText={setBudgetMax}
+                placeholder={t("maxRon")}
+                placeholderTextColor={theme.mutedText}
+                keyboardType="numeric"
+              />
             </View>
-
-            <Text style={styles.label}>
-              {isOffering ? t("offeringExperience") : t("experienceLevel")}
-            </Text>
-            <View style={styles.chipsWrap}>
-              {(
-                ["any", "beginner", "experienced", "expert"] as Experience[]
-              ).map((v) => (
-                <Pressable
-                  key={v}
-                  style={[styles.chip, experience === v && styles.chipActive]}
-                  onPress={() => setExperience(v)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      experience === v && styles.chipTextActive,
-                    ]}
-                  >
-                    {v === "any"
-                      ? t("experienceAny")
-                      : v === "beginner"
-                        ? t("experienceBeginner")
-                        : v === "experienced"
-                          ? t("experienceExperienced")
-                          : t("experienceExpert")}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>{t("equipmentLabel")}</Text>
-            <View style={styles.chipsWrap}>
-              {(
-                ["not_needed", "pro_provides", "client_provides"] as Equipment[]
-              ).map((v) => (
-                <Pressable
-                  key={v}
-                  style={[styles.chip, equipment === v && styles.chipActive]}
-                  onPress={() => setEquipment(v)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      equipment === v && styles.chipTextActive,
-                    ]}
-                  >
-                    {v === "not_needed"
-                      ? t("equipmentNotNeeded")
-                      : v === "pro_provides"
-                        ? isOffering
-                          ? t("offeringEquipmentPro")
-                          : t("equipmentPro")
-                        : isOffering
-                          ? t("offeringEquipmentClient")
-                          : t("equipmentClient")}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>
-              {isOffering ? t("offeringAvailability") : t("preferredSchedule")}
-            </Text>
-            <SchedulePicker value={schedule} onChange={setSchedule} />
-
-            <Text style={[styles.label, { marginTop: 14 }]}>
-              {t("scheduleDateRange")}
-            </Text>
-            <Text style={styles.hint}>{t("scheduleDateRangeHint")}</Text>
-            <View style={styles.dateRangeRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dateLabel}>{t("startDate")}</Text>
-                <Pressable
-                  style={styles.datePickerBtn}
-                  onPress={() => {
-                    setShowEndPicker(false);
-                    setShowStartPicker((v) => !v);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.datePickerBtnText,
-                      !scheduleStart && styles.datePickerPlaceholder,
-                    ]}
-                  >
-                    {scheduleStart
-                      ? new Date(
-                          scheduleStart + "T00:00:00",
-                        ).toLocaleDateString(undefined, {
-                          weekday: "short",
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : t("selectDate")}
-                  </Text>
-                  <Text style={styles.datePickerIcon}>📅</Text>
-                </Pressable>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dateLabel}>{t("endDate")}</Text>
-                <Pressable
-                  style={styles.datePickerBtn}
-                  onPress={() => {
-                    setShowStartPicker(false);
-                    setShowEndPicker((v) => !v);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.datePickerBtnText,
-                      !scheduleEnd && styles.datePickerPlaceholder,
-                    ]}
-                  >
-                    {scheduleEnd
-                      ? new Date(scheduleEnd + "T00:00:00").toLocaleDateString(
-                          undefined,
-                          {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          },
-                        )
-                      : t("selectDate")}
-                  </Text>
-                  <Text style={styles.datePickerIcon}>📅</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {showStartPicker && (
-              <View style={styles.datePickerInline}>
-                <DateTimePicker
-                  value={
-                    scheduleStart
-                      ? new Date(scheduleStart + "T00:00:00")
-                      : new Date()
-                  }
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  minimumDate={new Date()}
-                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
-                    if (Platform.OS !== "ios") setShowStartPicker(false);
-                    if (date) {
-                      const iso = localISODate(date);
-                      setScheduleStart(iso);
-                      if (scheduleEnd && iso > scheduleEnd) setScheduleEnd("");
-                    }
-                  }}
-                />
-                {Platform.OS === "ios" && (
-                  <Pressable
-                    style={styles.datePickerDone}
-                    onPress={() => setShowStartPicker(false)}
-                  >
-                    <Text style={styles.datePickerDoneText}>{t("done")}</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-
-            {showEndPicker && (
-              <View style={styles.datePickerInline}>
-                <DateTimePicker
-                  value={
-                    scheduleEnd
-                      ? new Date(scheduleEnd + "T00:00:00")
-                      : scheduleStart
-                        ? new Date(scheduleStart + "T00:00:00")
-                        : new Date()
-                  }
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  minimumDate={
-                    scheduleStart
-                      ? new Date(scheduleStart + "T00:00:00")
-                      : new Date()
-                  }
-                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
-                    if (Platform.OS !== "ios") setShowEndPicker(false);
-                    if (date) {
-                      setScheduleEnd(localISODate(date));
-                    }
-                  }}
-                />
-                {Platform.OS === "ios" && (
-                  <Pressable
-                    style={styles.datePickerDone}
-                    onPress={() => setShowEndPicker(false)}
-                  >
-                    <Text style={styles.datePickerDoneText}>{t("done")}</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.label}>{t("specialRequirements")}</Text>
-            <TextInput
-              value={specialRequirements}
-              onChangeText={setSpecialRequirements}
-              placeholder={t("specialRequirementsPlaceholder")}
-              placeholderTextColor={theme.secondaryText}
-              style={[styles.input, styles.textareaSmall]}
-              multiline
-            />
           </View>
 
-          {/* ── Section 4: Photos ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t("jobSectionPhotos")}</Text>
-            <View style={styles.photoGrid}>
-              {photos.map((uri, idx) => (
-                <View key={`${uri}-${idx}`} style={styles.photoThumb}>
-                  <Image
-                    source={{ uri }}
-                    style={styles.photoImg}
-                    resizeMode="cover"
-                  />
-                  <Pressable
-                    style={styles.photoOverlay}
-                    onPress={() => removePhoto(idx)}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 13,
-                        fontWeight: "900",
-                        lineHeight: 16,
-                      }}
-                    >
-                      ✕
-                    </Text>
-                  </Pressable>
-                </View>
-              ))}
-              {photos.length < MAX_PHOTOS && (
-                <Pressable style={styles.addPhotoBtn} onPress={addPhoto}>
-                  <Text style={{ fontSize: 24, color: theme.secondaryText }}>
-                    +
-                  </Text>
-                  <Text style={styles.addPhotoBtnText}>{t("addPhotos")}</Text>
-                </Pressable>
-              )}
-            </View>
-            <Text style={styles.photoHint}>{t("photoHint")}</Text>
-          </View>
-
-          {/* ── Submit ── */}
+          {/* Submit */}
           <Pressable
-            onPress={submit}
-            disabled={!canSubmit || loading}
-            style={[
-              styles.submitBtn,
-              (!canSubmit || loading) && { opacity: 0.5 },
-            ]}
+            style={[styles.submitBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
           >
             <Text style={styles.submitBtnText}>
-              {loading
-                ? isEditMode
-                  ? t("saving")
-                  : t("uploadingPhotos")
-                : isEditMode
-                  ? t("saveChanges")
-                  : t("postARequest")}
+              {saving ? t("saving") : isEdit ? t("saveChanges") : t("postJob")}
             </Text>
           </Pressable>
         </ScrollView>

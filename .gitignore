@@ -78,6 +78,11 @@ android/app/build/
 
 ios/Pods/
 ios/build/
+
+# =========================
+# Supabase
+# =========================
+supabase/migrations/
 ios/.xcworkspace/
 ios/*.xcworkspace/
 ios/*.xcodeproj/

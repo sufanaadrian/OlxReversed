@@ -1,13 +1,14 @@
 import { StyleSheet } from "react-native";
 
 export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
+  primary: "#0D9488",
+  primaryLight: "#CCFBF1",
+  bg: "#F8FAFC",
   surface: "#FFFFFF",
-  primaryText: "#020617",
+  primaryText: "#0F172A",
   secondaryText: "#64748B",
-  border: "#E5E7EB",
-  accentSoft: "#DBEAFE",
+  border: "#E2E8F0",
+  accentSoft: "#CCFBF1",
 };
 
 export const styles = StyleSheet.create({
@@ -20,9 +21,9 @@ export const styles = StyleSheet.create({
 
   // the actual plus button
   plusBtn: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -71,7 +72,7 @@ export const styles = StyleSheet.create({
     height: 40,
     width: 40,
     borderRadius: 14,
-    backgroundColor: theme.accentSoft,
+    backgroundColor: theme.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },

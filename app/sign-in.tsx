@@ -1,7 +1,13 @@
 // app/sign-in.tsx
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    Pressable,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { useTranslation } from "../src/context/LanguageContext";
 import { supabase } from "../src/lib/supabase";
 
@@ -12,13 +18,35 @@ export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // If already signed in, go straight to app
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          router.replace("/(tabs)/marketplace" as any);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const goAfterAuth = () => {
     const target =
       redirect && redirect.startsWith("/") ? redirect : "/(tabs)/marketplace";
     router.replace(target as any);
   };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#0D9488" />
+      </View>
+    );
+  }
 
   const onSignIn = async () => {
     setLoading(true);

@@ -1,11 +1,12 @@
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
 } from "react-native";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
@@ -13,344 +14,246 @@ import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./profile.styles";
 
 type ProfileData = {
-  display_name: string | null;
-  phone: string | null;
-  city: string | null;
-  account_type: string | null;
-  intent: string | null;
+  username: string | null;
+  university: string | null;
+  study_year: number | null;
+  bio: string | null;
+  skills: string[] | null;
+  user_type: string | null;
   created_at: string | null;
 };
 
 export default function ProfileScreen() {
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [requestsCount, setRequestsCount] = useState(0);
-  const [offersCount, setOffersCount] = useState(0);
-
-  const [dealsCount, setDealsCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [postsCount, setPostsCount] = useState(0);
+  const [applicationsCount, setApplicationsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const { language, setLanguage } = useLanguage();
   const { currency, setCurrency } = useCurrency();
   const t = useTranslation();
 
-  const loadProfile = async () => {
-    setIsLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-
-    if (!user) {
-      setEmail(null);
-      setProfileData(null);
-      setRequestsCount(0);
-      setDealsCount(0);
-      setIsLoading(false);
-      return;
-    }
-
-    setEmail(user.email ?? null);
-
-    const [profileRes, requestsRes, offersRes, dealsRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("display_name,phone,city,account_type,intent,created_at")
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("requests")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-      supabase
-        .from("offers")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-      supabase
-        .from("deals")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-    ]);
-
-    setProfileData((profileRes.data as ProfileData) ?? null);
-    setRequestsCount(requestsRes.count ?? 0);
-    setOffersCount(offersRes.count ?? 0);
-    setDealsCount(dealsRes.count ?? 0);
-    setIsLoading(false);
-  };
-
   useEffect(() => {
     loadProfile();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      loadProfile();
-    });
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
   }, []);
 
-  const handleSignOut = async () => {
+  async function loadProfile() {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    setEmail(user.email ?? null);
+
+    const [{ data: prof }, { count: posts }, { count: apps }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "username, university, study_year, bio, skills, user_type, created_at",
+          )
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("requests")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id),
+        supabase
+          .from("offers")
+          .select("id", { count: "exact", head: true })
+          .eq("seller_id", user.id),
+      ]);
+
+    setProfile(prof as ProfileData | null);
+    setPostsCount(posts ?? 0);
+    setApplicationsCount(apps ?? 0);
+    setLoading(false);
+  }
+
+  async function handleSignOut() {
     await supabase.auth.signOut();
-  };
+    router.replace("/sign-in");
+  }
 
-  const isLoggedIn = !!email;
-  const isBusiness = profileData?.account_type === "business";
-
-  const displayName = profileData?.display_name ?? null;
-  const initials = displayName
-    ? displayName
-        .split(" ")
-        .slice(0, 2)
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
-    : (email?.[0] ?? "U").toUpperCase();
-
-  const memberSinceStr = profileData?.created_at
-    ? new Date(profileData.created_at).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-      })
-    : null;
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={styles.page}>
+        <ActivityIndicator
+          style={{ flex: 1 }}
+          size="large"
+          color={theme.primary}
+        />
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {isLoggedIn ? (
-        <>
-          {/* Hero card */}
-          <View style={styles.heroCard}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-
-            <Text style={styles.displayName}>{displayName ?? t("user")}</Text>
-
-            {/* Chips */}
-            <View style={styles.chipsRow}>
-              {profileData?.city ? (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>📍 {profileData.city}</Text>
-                </View>
-              ) : null}
-
-              {profileData?.account_type ? (
-                <View style={[styles.chip, isBusiness && styles.chipBusiness]}>
-                  <Text
-                    style={[
-                      styles.chipText,
-                      isBusiness && styles.chipTextBusiness,
-                    ]}
-                  >
-                    {isBusiness ? "🏢" : "👤"}{" "}
-                    {isBusiness ? t("business") : t("individual")}
-                  </Text>
-                </View>
-              ) : null}
-
-              {profileData?.intent ? (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>
-                    {profileData.intent === "buy"
-                      ? `🛒 ${t("intentBuy")}`
-                      : profileData.intent === "sell"
-                        ? `🏪 ${t("intentSell")}`
-                        : `🔄 ${t("intentBoth")}`}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            {memberSinceStr ? (
-              <Text style={styles.memberSince}>
-                {t("memberSince")} {memberSinceStr}
-              </Text>
-            ) : null}
-          </View>
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{requestsCount}</Text>
-              <Text style={styles.statLabel}>{t("activeRequests")}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{offersCount}</Text>
-              <Text style={styles.statLabel}>{t("activeOffers")}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{dealsCount}</Text>
-              <Text style={styles.statLabel}>{t("acceptedDeals")}</Text>
-            </View>
-          </View>
-        </>
-      ) : (
-        /* Guest hero */
-        <View style={styles.guestCard}>
-          <View style={styles.guestAvatar}>
-            <Text style={{ fontSize: 28 }}>👤</Text>
-          </View>
-          <Text style={styles.guestTitle}>{t("guest")}</Text>
-          <Text style={styles.guestSub}>{t("signInToSeeProfile")}</Text>
-          <Pressable
-            style={styles.signInBtn}
-            onPress={() =>
-              router.push({
-                pathname: "/sign-in",
-                params: { redirect: "/(tabs)/profile" },
-              } as any)
-            }
-          >
-            <Text style={styles.signInBtnText}>{t("signIn")}</Text>
-          </Pressable>
+    <ScrollView style={styles.page} contentContainerStyle={styles.scroll}>
+      {/* Avatar + name */}
+      <View style={styles.avatarSection}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarInitial}>
+            {(profile?.username ?? email ?? "?")[0].toUpperCase()}
+          </Text>
         </View>
-      )}
-
-      {/* Settings section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{t("settings")}</Text>
-        </View>
-
-        {/* Language */}
-        <View style={[styles.row, styles.rowFirst]}>
-          <View style={styles.rowIcon}>
-            <Text style={{ fontSize: 16 }}>🌐</Text>
-          </View>
-          <Text style={styles.rowLabel}>{t("language")}</Text>
-        </View>
-        <View style={styles.toggleRow}>
-          <Pressable
+        <Text style={styles.name}>{profile?.username ?? t("anonymous")}</Text>
+        {email ? <Text style={styles.email}>{email}</Text> : null}
+        {profile?.user_type ? (
+          <View
             style={[
-              styles.toggleBtn,
-              language === "en" && styles.toggleBtnActive,
+              styles.typeBadge,
+              {
+                backgroundColor:
+                  profile.user_type === "employer"
+                    ? theme.employerLight
+                    : theme.primaryLight,
+              },
             ]}
-            onPress={() => setLanguage("en")}
           >
             <Text
               style={[
-                styles.toggleBtnText,
-                language === "en" && styles.toggleBtnTextActive,
+                styles.typeBadgeText,
+                {
+                  color:
+                    profile.user_type === "employer"
+                      ? theme.employer
+                      : theme.primary,
+                },
               ]}
             >
-              🇬🇧 English
+              {t(profile.user_type)}
             </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.toggleBtn,
-              language === "ro" && styles.toggleBtnActive,
-            ]}
-            onPress={() => setLanguage("ro")}
-          >
-            <Text
-              style={[
-                styles.toggleBtnText,
-                language === "ro" && styles.toggleBtnTextActive,
-              ]}
-            >
-              🇷🇴 Română
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Currency */}
-        <View style={styles.row}>
-          <View style={styles.rowIcon}>
-            <Text style={{ fontSize: 16 }}>💱</Text>
           </View>
-          <Text style={styles.rowLabel}>{t("currency")}</Text>
+        ) : null}
+      </View>
+
+      {/* Stats */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{postsCount}</Text>
+          <Text style={styles.statLabel}>{t("posts")}</Text>
         </View>
-        <View style={styles.toggleRow}>
-          <Pressable
-            style={[
-              styles.toggleBtn,
-              currency === "ron" && styles.toggleBtnActive,
-            ]}
-            onPress={() => setCurrency("ron")}
-          >
-            <Text
-              style={[
-                styles.toggleBtnText,
-                currency === "ron" && styles.toggleBtnTextActive,
-              ]}
-            >
-              {t("ron")}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.toggleBtn,
-              currency === "eur" && styles.toggleBtnActive,
-            ]}
-            onPress={() => setCurrency("eur")}
-          >
-            <Text
-              style={[
-                styles.toggleBtnText,
-                currency === "eur" && styles.toggleBtnTextActive,
-              ]}
-            >
-              {t("eur")}
-            </Text>
-          </Pressable>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{applicationsCount}</Text>
+          <Text style={styles.statLabel}>{t("applications")}</Text>
         </View>
       </View>
 
-      {/* Account section */}
-      {isLoggedIn && (
+      {/* Bio */}
+      {profile?.bio ? (
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t("accountInfo")}</Text>
-          </View>
+          <Text style={styles.sectionTitle}>{t("about")}</Text>
+          <Text style={styles.bioText}>{profile.bio}</Text>
+        </View>
+      ) : null}
 
-          <View style={[styles.row, styles.rowFirst]}>
-            <View style={styles.rowIcon}>
-              <Text style={{ fontSize: 16 }}>📧</Text>
-            </View>
-            <Text style={styles.rowLabel}>{t("emailPlaceholder")}</Text>
-            <Text style={styles.rowValue}>{email}</Text>
-          </View>
-
-          {profileData?.phone ? (
-            <View style={styles.row}>
-              <View style={styles.rowIcon}>
-                <Text style={{ fontSize: 16 }}>📱</Text>
-              </View>
-              <Text style={styles.rowLabel}>{t("phone")}</Text>
-              <Text style={styles.rowValue}>{profileData.phone}</Text>
+      {/* University */}
+      {profile?.university || profile?.study_year ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("education")}</Text>
+          {profile.university ? (
+            <View style={styles.infoRow}>
+              <Feather name="book" size={14} color={theme.secondaryText} />
+              <Text style={styles.infoText}>{profile.university}</Text>
             </View>
           ) : null}
-
-          <View style={styles.row}>
-            <View style={[styles.rowIcon, styles.rowIconDanger]}>
-              <Text style={{ fontSize: 16 }}>🚪</Text>
-            </View>
-            <Pressable style={{ flex: 1 }} onPress={handleSignOut}>
-              <Text style={[styles.rowLabel, styles.rowLabelDanger]}>
-                {t("logOut")}
+          {profile.study_year ? (
+            <View style={styles.infoRow}>
+              <Feather name="calendar" size={14} color={theme.secondaryText} />
+              <Text style={styles.infoText}>
+                {t("year")} {profile.study_year}
               </Text>
-            </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Skills */}
+      {profile?.skills && profile.skills.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("skills")}</Text>
+          <View style={styles.skillsRow}>
+            {profile.skills.map((s, i) => (
+              <View key={i} style={styles.skillChip}>
+                <Text style={styles.skillChipText}>{s}</Text>
+              </View>
+            ))}
           </View>
         </View>
-      )}
+      ) : null}
 
-      <Text style={styles.version}>{t("version")} 1.0.0</Text>
+      {/* Settings */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t("settings")}</Text>
+
+        {/* Language */}
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <Feather name="globe" size={16} color={theme.secondaryText} />
+            <Text style={styles.settingLabel}>{t("language")}</Text>
+          </View>
+          <View style={styles.toggleRow}>
+            {(["en", "ro"] as const).map((lang) => (
+              <Pressable
+                key={lang}
+                style={[
+                  styles.langBtn,
+                  language === lang && styles.langBtnActive,
+                ]}
+                onPress={() => setLanguage(lang)}
+              >
+                <Text
+                  style={[
+                    styles.langBtnText,
+                    language === lang && styles.langBtnTextActive,
+                  ]}
+                >
+                  {lang.toUpperCase()}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Currency */}
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <Feather name="dollar-sign" size={16} color={theme.secondaryText} />
+            <Text style={styles.settingLabel}>{t("currency")}</Text>
+          </View>
+          <View style={styles.toggleRow}>
+            {(["ron", "eur"] as const).map((cur) => (
+              <Pressable
+                key={cur}
+                style={[
+                  styles.langBtn,
+                  currency === cur && styles.langBtnActive,
+                ]}
+                onPress={() => setCurrency(cur)}
+              >
+                <Text
+                  style={[
+                    styles.langBtnText,
+                    currency === cur && styles.langBtnTextActive,
+                  ]}
+                >
+                  {cur.toUpperCase()}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* Sign Out */}
+      <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
+        <Feather name="log-out" size={16} color={theme.error} />
+        <Text style={styles.signOutText}>{t("signOut")}</Text>
+      </Pressable>
     </ScrollView>
   );
 }

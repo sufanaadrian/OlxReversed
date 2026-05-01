@@ -1,648 +1,236 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
-import Swipeable from "react-native-gesture-handler/Swipeable";
-import { ImageViewer } from "../../src/components/ImageViewer";
-import {
-    SchedulePicker,
-    WeekSchedule,
-    emptyWeek,
-} from "../../src/components/SchedulePicker";
-import { useCurrency } from "../../src/context/CurrencyContext";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./my-requests.styles";
 
-type Filter = "all" | "active" | "matched" | "closed";
-
-const budgetTypeKeys: Record<string, string> = {
-  per_hour: "budgetPerHour",
-  per_day: "budgetPerDay",
-  fixed: "budgetFixed",
-};
-
-function getStatusLabel(t: any, status: "active" | "matched" | "closed") {
-  switch (status) {
-    case "active":
-      return t("open");
-    case "matched":
-      return t("negotiating");
-    case "closed":
-      return t("closed");
-  }
-}
-
-type RequestRow = {
+type JobPost = {
   id: string;
-  user_id: string;
   title: string;
-  description: string;
-  category: string;
-  budget_min: number | null;
-  budget_max: number | null;
+  category: string | null;
   location: string | null;
-  status: "active" | "matched" | "closed";
-  created_at: string;
-  open_budget: boolean | null;
+  status: string;
   posting_as: string | null;
-  budget_type: string | null;
-  timeline: string | null;
-  work_mode: string | null;
-  experience_level: string | null;
-  photos: string[] | null;
+  created_at: string;
+  offer_count: number;
 };
 
-// ✅ UPDATED: include withdrawn
-type OfferMini = {
-  id: string;
-  request_id: string;
-  status: "pending" | "accepted" | "rejected" | "withdrawn";
+const STATUS_COLOR: Record<string, string> = {
+  active: theme.success,
+  filled: theme.primary,
+  closed: theme.mutedText,
 };
 
-// ✅ UPDATED: include withdrawn
-type OfferCounts = {
-  total: number;
-  pending: number;
-  accepted: number;
-  withdrawn: number;
-};
-
-type CounterOfferMini = {
-  id: string;
-  request_id: string;
-  status: "pending" | "accepted" | "rejected" | "withdrawn";
-};
-
-type CounterCounts = { pending: number; accepted: number };
-
-export default function MyRequestsScreen() {
+export default function MyPostsScreen() {
   const t = useTranslation();
-  const { formatPrice } = useCurrency();
+  const [posts, setPosts] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
 
-  const [requests, setRequests] = useState<RequestRow[]>([]);
-  const [countsByRequestId, setCountsByRequestId] = useState<
-    Map<string, OfferCounts>
-  >(new Map());
-  const [counterCountsByRequestId, setCounterCountsByRequestId] = useState<
-    Map<string, CounterCounts>
-  >(new Map());
-  const [filter, setFilter] = useState<Filter>("all");
-  const [availabilityMap, setAvailabilityMap] = useState<
-    Map<string, WeekSchedule>
-  >(new Map());
+  const fetchPosts = useCallback(async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { requireAuth(); return; }
 
-  const openRowRef = useRef<Swipeable | null>(null);
-  const [viewerImages, setViewerImages] = useState<string[]>([]);
-  const [viewerVisible, setViewerVisible] = useState(false);
+    const { data: rows } = await supabase
+      .from("requests")
+      .select("id, title, category, location, status, posting_as, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
-  const load = useCallback(
-    async (showSpinner: boolean = true) => {
-      if (showSpinner) setLoading(true);
+    if (!rows) { setLoading(false); return; }
 
-      const { data: userRes } = await supabase.auth.getUser();
-      const user = userRes.user;
+    const ids = rows.map((r) => r.id);
+    const { data: counts } = ids.length
+      ? await supabase
+          .from("offers")
+          .select("request_id")
+          .in("request_id", ids)
+      : { data: [] };
 
-      if (!user) {
-        setIsGuest(true);
-        setRequests([]);
-        setCountsByRequestId(new Map());
-        setCounterCountsByRequestId(new Map());
-        if (showSpinner) setLoading(false);
-        return;
-      }
-      setIsGuest(false);
+    const countMap: Record<string, number> = {};
+    (counts ?? []).forEach((c: { request_id: string }) => {
+      countMap[c.request_id] = (countMap[c.request_id] ?? 0) + 1;
+    });
 
-      const { data: reqs, error: reqErr } = await supabase
-        .from("requests")
-        .select(
-          "id,user_id,title,description,category,budget_min,budget_max,location,status,created_at,open_budget,posting_as,budget_type,timeline,work_mode,experience_level,photos",
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (reqErr) {
-        Alert.alert(t("error"), reqErr.message);
-        setRequests([]);
-        setCountsByRequestId(new Map());
-        setCounterCountsByRequestId(new Map());
-        if (showSpinner) setLoading(false);
-        return;
-      }
-
-      const reqList = (reqs ?? []) as RequestRow[];
-      setRequests(reqList);
-
-      if (reqList.length === 0) {
-        setCountsByRequestId(new Map());
-        setCounterCountsByRequestId(new Map());
-        if (showSpinner) setLoading(false);
-        return;
-      }
-
-      const ids = reqList.map((r) => r.id);
-
-      // Offers counts (includes withdrawn)
-      const { data: offers, error: offErr } = await supabase
-        .from("offers")
-        .select("id,request_id,status")
-        .in("request_id", ids);
-
-      if (offErr) {
-        setCountsByRequestId(new Map());
-        setCounterCountsByRequestId(new Map());
-        if (showSpinner) setLoading(false);
-        return;
-      }
-
-      const offerMap = new Map<string, OfferCounts>();
-      (offers ?? []).forEach((o: any) => {
-        const row = o as OfferMini;
-        const prev = offerMap.get(row.request_id) ?? {
-          total: 0,
-          pending: 0,
-          accepted: 0,
-          withdrawn: 0,
-        };
-
-        offerMap.set(row.request_id, {
-          total: prev.total + 1,
-          pending: prev.pending + (row.status === "pending" ? 1 : 0),
-          accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
-          withdrawn: prev.withdrawn + (row.status === "withdrawn" ? 1 : 0),
-        });
-      });
-      setCountsByRequestId(offerMap);
-
-      // Counter offers counts
-      const { data: counters, error: coErr } = await supabase
-        .from("counter_offers")
-        .select("id,request_id,status")
-        .in("request_id", ids);
-
-      if (coErr) {
-        setCounterCountsByRequestId(new Map());
-        if (showSpinner) setLoading(false);
-        return;
-      }
-
-      const counterMap = new Map<string, CounterCounts>();
-      (counters ?? []).forEach((c: any) => {
-        const row = c as CounterOfferMini;
-        const prev = counterMap.get(row.request_id) ?? {
-          pending: 0,
-          accepted: 0,
-        };
-        counterMap.set(row.request_id, {
-          pending: prev.pending + (row.status === "pending" ? 1 : 0),
-          accepted: prev.accepted + (row.status === "accepted" ? 1 : 0),
-        });
-      });
-      setCounterCountsByRequestId(counterMap);
-
-      // Load availability for all requests
-      const { data: avail } = await supabase
-        .from("request_availability")
-        .select("id,request_id,day_of_week,start_time,end_time,is_booked,date")
-        .in("request_id", ids)
-        .order("day_of_week")
-        .order("start_time");
-
-      const availMap = new Map<string, WeekSchedule>();
-      (avail ?? []).forEach((row: any) => {
-        if (!availMap.has(row.request_id))
-          availMap.set(row.request_id, emptyWeek());
-        const week = availMap.get(row.request_id)!;
-        const day = week[row.day_of_week];
-        day.enabled = true;
-        day.slots.push({
-          id: row.id,
-          start: row.start_time.slice(0, 5),
-          end: row.end_time.slice(0, 5),
-          date: row.date ?? undefined,
-        });
-      });
-      setAvailabilityMap(availMap);
-
-      if (showSpinner) setLoading(false);
-    },
-    [t],
-  );
+    setPosts(rows.map((r) => ({ ...r, offer_count: countMap[r.id] ?? 0 })));
+    setLoading(false);
+  }, []);
 
   useFocusEffect(
-    useCallback(() => {
-      load(true);
-    }, [load]),
+    useCallback(() => { fetchPosts(); }, [fetchPosts])
   );
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await load(false);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [load]);
+  async function handleMarkFilled(id: string) {
+    Alert.alert(t("markFilled"), t("markFilledConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("confirm"),
+        style: "default",
+        onPress: async () => {
+          await supabase.from("requests").update({ status: "filled" }).eq("id", id);
+          fetchPosts();
+        },
+      },
+    ]);
+  }
 
-  const counts = useMemo(() => {
-    const all = requests.length;
-    const active = requests.filter((r) => r.status === "active").length;
-    const matched = requests.filter((r) => r.status === "matched").length;
-    const closed = requests.filter((r) => r.status === "closed").length;
-    return { all, active, matched, closed };
-  }, [requests]);
-
-  const filtered = useMemo(() => {
-    if (filter === "all") return requests;
-    return requests.filter((r) => r.status === filter);
-  }, [requests, filter]);
-
-  const confirmDelete = (req: RequestRow) => {
-    Alert.alert(t("deleteRequestConfirm"), t("deleteRequestMsg"), [
+  async function handleDelete(id: string) {
+    Alert.alert(t("deletePost"), t("deletePostConfirm"), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("delete"),
         style: "destructive",
-        onPress: () => deleteRequest(req),
+        onPress: async () => {
+          await supabase.from("requests").delete().eq("id", id);
+          fetchPosts();
+        },
       },
     ]);
-  };
-  const openEditRequest = (req: RequestRow) => {
-    openRowRef.current?.close();
-    router.push({
-      pathname: "/(modals)/create-request",
-      params: { requestId: req.id },
-    } as any);
-  };
+  }
 
-  const deleteRequest = async (req: RequestRow) => {
-    openRowRef.current?.close();
-
-    const prevRequests = requests;
-    const prevCounts = countsByRequestId;
-    const prevCounterCounts = counterCountsByRequestId;
-
-    setRequests((cur) => cur.filter((r) => r.id !== req.id));
-
-    setCountsByRequestId((cur) => {
-      const next = new Map(cur);
-      next.delete(req.id);
-      return next;
-    });
-    setCounterCountsByRequestId((cur) => {
-      const next = new Map(cur);
-      next.delete(req.id);
-      return next;
-    });
-
-    const { error } = await supabase.from("requests").delete().eq("id", req.id);
-
-    if (error) {
-      setRequests(prevRequests);
-      setCountsByRequestId(prevCounts);
-      setCounterCountsByRequestId(prevCounterCounts);
-      Alert.alert(t("error"), error.message);
-      return;
-    }
-  };
-
-  const renderRightActions = (req: RequestRow) => {
-    return (
-      <View style={styles.rightActionsWrap}>
-        <Pressable
-          onPress={() => confirmDelete(req)}
-          style={({ pressed }) => [
-            styles.deleteBtn,
-            pressed && { opacity: 0.9 },
-          ]}
-        >
-          <Feather name="trash-2" size={18} color="white" />
-        </Pressable>
-        <Pressable
-          onPress={() => openEditRequest(req)}
-          style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.9 }]}
-        >
-          <Feather name="edit-2" size={18} color="white" />
-        </Pressable>
-      </View>
-    );
-  };
-
-  const renderItem = ({ item }: { item: RequestRow }) => {
-    const offerCounts = countsByRequestId.get(item.id) ?? {
-      total: 0,
-      pending: 0,
-      accepted: 0,
-      withdrawn: 0,
-    };
-
-    const counterCounts = counterCountsByRequestId.get(item.id) ?? {
-      pending: 0,
-      accepted: 0,
-    };
-
-    const hasAcceptedDeal =
-      offerCounts.accepted > 0 || counterCounts.accepted > 0;
-    const hasPendingCounters = counterCounts.pending > 0;
-    const hasWithdrawnOffers = offerCounts.withdrawn > 0;
-    const firstPhoto =
-      item.photos && item.photos.length > 0 ? item.photos[0] : null;
+  function renderItem({ item }: { item: JobPost }) {
+    const isEmployer = item.posting_as === "employer";
+    const statusColor = STATUS_COLOR[item.status] ?? theme.mutedText;
 
     return (
-      <Swipeable
-        renderRightActions={() => renderRightActions(item)}
-        overshootRight={false}
-        onSwipeableWillOpen={() => {
-          if (openRowRef.current) openRowRef.current.close();
-        }}
-        onSwipeableOpen={(direction, swipeable) => {
-          openRowRef.current = swipeable;
-        }}
+      <Pressable
+        style={styles.card}
+        onPress={() => router.push(`/request/${item.id}`)}
       >
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/request/[id]",
-              params: { id: item.id },
-            } as any)
-          }
-          style={styles.card}
-        >
-          <View style={styles.cardInner}>
-            {/* Thumbnail */}
-            {firstPhoto && (
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setViewerImages(item.photos ?? []);
-                  setViewerVisible(true);
-                }}
+        <View style={styles.cardBody}>
+          <View style={styles.cardTop}>
+            <View style={styles.cardTopLeft}>
+              <View
+                style={[
+                  styles.typeBadge,
+                  {
+                    backgroundColor: isEmployer ? theme.employerLight : theme.primaryLight,
+                  },
+                ]}
               >
-                <Image
-                  source={{ uri: firstPhoto }}
-                  style={styles.cardThumb}
-                  resizeMode="cover"
-                />
-              </Pressable>
-            )}
-
-            <View style={styles.cardContent}>
-              {/* Top row: posted-as + status */}
-              <View style={styles.topRow}>
-                {item.posting_as === "offering" ? (
-                  <View style={styles.offeringTag}>
-                    <Text style={styles.offeringTagText}>
-                      {t("postingOffering")}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.seekingTag}>
-                    <Text style={styles.seekingTagText}>
-                      {t("postingSeeking")}
-                    </Text>
-                  </View>
-                )}
-                <View
+                <Text
                   style={[
-                    styles.statusPill,
-                    item.status === "active"
-                      ? styles.statusOpen
-                      : item.status === "matched"
-                        ? styles.statusNegotiating
-                        : styles.statusClosed,
+                    styles.typeBadgeText,
+                    { color: isEmployer ? theme.employer : theme.primary },
                   ]}
                 >
-                  <Text style={styles.statusText}>
-                    {getStatusLabel(t, item.status)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Title */}
-              <Text style={styles.title} numberOfLines={1}>
-                {item.title}
-              </Text>
-
-              {/* Budget */}
-              <View style={styles.metaRow}>
-                <Feather
-                  name="dollar-sign"
-                  size={13}
-                  color={theme.secondaryText}
-                />
-                <Text style={styles.metaStrong}>
-                  {item.open_budget
-                    ? t("openBudget")
-                    : item.budget_type &&
-                        item.budget_type !== "range" &&
-                        budgetTypeKeys[item.budget_type]
-                      ? `${formatPrice(item.budget_min ?? 0)} ${t(budgetTypeKeys[item.budget_type])}`
-                      : `${formatPrice(item.budget_min ?? 0)} – ${formatPrice(item.budget_max ?? 0)}`}
+                  {t(item.posting_as ?? "employer")}
                 </Text>
-                {!!item.location && (
-                  <>
-                    <Feather
-                      name="map-pin"
-                      size={13}
-                      color={theme.secondaryText}
-                    />
-                    <Text style={styles.metaMuted} numberOfLines={1}>
-                      {item.location}
-                    </Text>
-                  </>
-                )}
               </View>
+              {item.category ? (
+                <Text style={styles.categoryText}>{item.category}</Text>
+              ) : null}
+            </View>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          </View>
+
+          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+
+          <View style={styles.metaRow}>
+            {item.location ? (
+              <View style={styles.metaItem}>
+                <Feather name="map-pin" size={12} color={theme.secondaryText} />
+                <Text style={styles.metaText}>{item.location}</Text>
+              </View>
+            ) : null}
+            <View style={styles.metaItem}>
+              <Feather name="users" size={12} color={theme.secondaryText} />
+              <Text style={styles.metaText}>
+                {item.offer_count} {t("applicants")}
+              </Text>
             </View>
           </View>
 
-          {/* Availability */}
-          {availabilityMap.has(item.id) && (
-            <View style={styles.availWrap}>
-              <SchedulePicker value={availabilityMap.get(item.id)!} readOnly />
-            </View>
-          )}
-
-          {/* Footer: offers info + action */}
-          <View style={styles.footerRow}>
-            {offerCounts.total > 0 && (
-              <View style={styles.offerPill}>
-                <Text style={styles.offerPillText}>
-                  {offerCounts.total}{" "}
-                  {offerCounts.total === 1 ? t("offer") : t("offers")}
-                </Text>
-              </View>
-            )}
-
-            <View style={{ flex: 1 }} />
-
-            {hasAcceptedDeal ? (
+          <View style={styles.cardFooter}>
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {t(`status${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`)}
+            </Text>
+            <View style={styles.actions}>
+              {item.status === "active" && (
+                <Pressable
+                  style={styles.actionBtn}
+                  onPress={() => handleMarkFilled(item.id)}
+                >
+                  <Feather name="check-circle" size={16} color={theme.primary} />
+                </Pressable>
+              )}
               <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push({
-                    pathname: "/request/[id]/chat",
-                    params: { id: item.id },
-                  } as any);
-                }}
-                style={styles.reviewBtn}
+                style={styles.actionBtn}
+                onPress={() => router.push({ pathname: "/request/[id]/offers", params: { id: item.id } })}
               >
-                <Text style={styles.reviewBtnText}>{t("chat")}</Text>
+                <Feather name="eye" size={16} color={theme.secondaryText} />
               </Pressable>
-            ) : offerCounts.pending > 0 ? (
-              <View style={styles.reviewBtn}>
-                <Text style={styles.reviewBtnText}>
-                  {t("review")} ({offerCounts.pending})
-                </Text>
-              </View>
-            ) : hasPendingCounters ? (
-              <View style={styles.viewBtn}>
-                <Text style={styles.viewBtnText}>
-                  {t("counterPending")} ({counterCounts.pending})
-                </Text>
-              </View>
-            ) : hasWithdrawnOffers ? (
-              <Text style={styles.smallMuted}>
-                {t("withdrawnOffers")} ({offerCounts.withdrawn})
-              </Text>
-            ) : (
-              <Text style={styles.smallMuted}>
-                {offerCounts.total === 0
-                  ? t("noOffersYet")
-                  : t("noPendingOffers")}
-              </Text>
-            )}
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => router.push({ pathname: "/(modals)/create-request", params: { id: item.id } })}
+              >
+                <Feather name="edit-2" size={16} color={theme.secondaryText} />
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, styles.deleteBtn]}
+                onPress={() => handleDelete(item.id)}
+              >
+                <Feather name="trash-2" size={16} color={theme.error} />
+              </Pressable>
+            </View>
           </View>
-        </Pressable>
-      </Swipeable>
-    );
-  };
-
-  const ListEmpty = isGuest ? (
-    <View style={styles.centerCard}>
-      <Text style={styles.titleEmpty}>{t("signInRequired")}</Text>
-      <Text style={styles.muted}>{t("pleaseSignIn")}</Text>
-      <Pressable
-        onPress={() => router.push("/sign-in" as any)}
-        style={[styles.filterBtn, styles.filterBtnActive]}
-      >
-        <Text style={[styles.filterText, styles.filterTextActive]}>
-          {t("signIn")}
-        </Text>
+        </View>
       </Pressable>
-    </View>
-  ) : (
-    <View style={styles.centerCard}>
-      <Text style={styles.titleEmpty}>{t("nothingHere")}</Text>
-      <Text style={styles.muted}>{t("createARequest")}</Text>
-    </View>
-  );
+    );
+  }
 
   return (
     <View style={styles.page}>
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>{t("myRequests")}</Text>
-
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{t("myPosts")}</Text>
         <Pressable
-          onPress={() => router.push("/create-request")}
-          style={styles.createBtn}
+          style={styles.newBtn}
+          onPress={() => router.push("/(modals)/create-request")}
         >
-          <Feather name="plus" size={18} color="white" />
+          <Feather name="plus" size={18} color="#FFFFFF" />
+          <Text style={styles.newBtnText}>{t("newPost")}</Text>
         </Pressable>
       </View>
 
-      <View style={styles.filtersWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-        >
-          <FilterBtn
-            label={`${t("all")} (${counts.all})`}
-            active={filter === "all"}
-            onPress={() => setFilter("all")}
-          />
-
-          <FilterBtn
-            label={`${t("open")} (${counts.active})`}
-            active={filter === "active"}
-            onPress={() => setFilter("active")}
-          />
-
-          <FilterBtn
-            label={`${t("negotiating")} (${counts.matched})`}
-            active={filter === "matched"}
-            onPress={() => setFilter("matched")}
-          />
-
-          <FilterBtn
-            label={`${t("closed")} (${counts.closed})`}
-            active={filter === "closed"}
-            onPress={() => setFilter("closed")}
-          />
-        </ScrollView>
-      </View>
-
       {loading ? (
-        <View style={styles.centerCard}>
-          <Text style={styles.muted}>{t("loadingEllipsis")}</Text>
-        </View>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color={theme.primary} />
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
+          data={posts}
+          keyExtractor={(p) => p.id}
           renderItem={renderItem}
-          contentContainerStyle={[
-            styles.listContent,
-            filtered.length === 0 ? { flexGrow: 1 } : null,
-          ]}
-          ListEmptyComponent={ListEmpty}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          contentContainerStyle={[styles.list, posts.length === 0 && { flex: 1 }]}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          onRefresh={fetchPosts}
+          refreshing={loading}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyIcon}>
+                <Feather name="file-text" size={32} color={theme.mutedText} />
+              </View>
+              <Text style={styles.emptyTitle}>{t("noPostsYet")}</Text>
+              <Text style={styles.emptySubtitle}>{t("noPostsYetDesc")}</Text>
+              <Pressable
+                style={styles.emptyBtn}
+                onPress={() => router.push("/(modals)/create-request")}
+              >
+                <Text style={styles.emptyBtnText}>{t("createYourFirst")}</Text>
+              </Pressable>
+            </View>
           }
         />
       )}
-
-      {/* Fullscreen image viewer */}
-      <ImageViewer
-        images={viewerImages}
-        visible={viewerVisible}
-        initialIndex={0}
-        onClose={() => setViewerVisible(false)}
-      />
     </View>
-  );
-}
-
-function FilterBtn({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.filterBtn, active && styles.filterBtnActive]}
-    >
-      <Text style={[styles.filterText, active && styles.filterTextActive]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
