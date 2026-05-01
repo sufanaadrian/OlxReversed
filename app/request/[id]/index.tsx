@@ -5,7 +5,6 @@ import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
-    Linking,
     Pressable,
     ScrollView,
     Share,
@@ -42,7 +41,7 @@ type Applicant = {
     username: string | null;
     bio: string | null;
     skills: string[] | null;
-    cv_url: string | null;
+    linkedin_url: string | null;
     verified: boolean | null;
   } | null;
 };
@@ -163,7 +162,7 @@ export default function JobDetailScreen() {
         const { data: apps } = await supabase
           .from("offers")
           .select(
-            "id,status,cover_letter,created_at,profiles!seller_id(id,username,bio,skills,cv_url,verified)",
+            "id,status,cover_letter,created_at,profiles!seller_id(id,username,bio,skills,linkedin_url,verified)",
           )
           .eq("request_id", id)
           .order("created_at", { ascending: false });
@@ -581,23 +580,13 @@ export default function JobDetailScreen() {
                       </View>
                     )}
 
-                    {/* CV link */}
-                    {prof?.cv_url ? (
+                    {/* View profile */}
+                    {prof?.id ? (
                       <Pressable
                         style={styles.cvBtn}
-                        onPress={() => {
-                          const url = prof.cv_url!;
-                          const safe =
-                            url.startsWith("http://") ||
-                            url.startsWith("https://")
-                              ? url
-                              : `https://${url}`;
-                          Linking.openURL(safe).catch(() =>
-                            Alert.alert(t("error"), t("invalidUrl")),
-                          );
-                        }}
+                        onPress={() => router.push(`/cv/${prof.id}`)}
                       >
-                        <Feather name="file-text" size={13} color="#0D9488" />
+                        <Feather name="user" size={13} color="#0D9488" />
                         <Text style={styles.cvBtnText}>{t("viewCV")}</Text>
                       </Pressable>
                     ) : null}

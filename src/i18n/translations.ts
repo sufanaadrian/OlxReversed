@@ -307,6 +307,12 @@ export const translations = {
     tryAdjustingSearch: "Try adjusting your search or category.",
     employer: "Employer",
     student: "Student",
+    filterHiring: "Employers",
+    filterOffering: "Students",
+    marketplaceMode: "Marketplace Mode",
+    employerMode: "Employer mode — showing job posts",
+    studentMode: "Student mode — showing student offers",
+    allModeDesc: "All — showing everything",
     apply: "Apply",
     anonymous: "Anonymous",
     markFilled: "Mark as Filled",
@@ -376,9 +382,20 @@ export const translations = {
     avgRating: "Rating",
     noRatings: "No ratings yet",
     ratings: "ratings",
-    // CV link
-    cvLink: "CV / Portfolio link",
-    cvLinkPlaceholder: "https://linkedin.com/in/yourname or drive link",
+    // LinkedIn & in-app CV
+    cvLink: "LinkedIn Profile URL",
+    cvLinkPlaceholder: "linkedin.com/in/yourname",
+    linkedinUrl: "LinkedIn Profile URL",
+    openLinkedIn: "Open LinkedIn",
+    cvScreenTitle: "Candidate Profile",
+    profileNotFound: "Profile not found.",
+    viewProfile: "View Profile",
+    addBioHint: 'Tap "Edit Profile" to add a short description about yourself.',
+    addEducationHint:
+      'Tap "Edit Profile" to add your university and study year.',
+    addSkillsHint:
+      'Tap "Edit Profile" to add your skills (e.g. React, Excel, Design).',
+    addLinkedinHint: 'Tap "Edit Profile" to add your LinkedIn profile URL.',
     minAgo: "m ago",
     hAgo: "h ago",
     dAgo: "d ago",
@@ -781,6 +798,12 @@ export const translations = {
     tryAdjustingSearch: "Încearcă să ajustezi căutarea sau categoria.",
     employer: "Angajator",
     student: "Student",
+    filterHiring: "Angajatori",
+    filterOffering: "Studenți",
+    marketplaceMode: "Mod Marketplace",
+    employerMode: "Mod angajator — afișezi posturi",
+    studentMode: "Mod student — afișezi oferte studenti",
+    allModeDesc: "Toate — afișezi tot",
     apply: "Aplică",
     anonymous: "Anonim",
     markFilled: "Marchează ca Ocupat",
@@ -864,9 +887,22 @@ export const translations = {
     avgRating: "Evaluare",
     noRatings: "Nicio evaluare",
     ratings: "evaluări",
-    // CV link
-    cvLink: "Link CV / Portofoliu",
-    cvLinkPlaceholder: "https://linkedin.com/in/numetau sau link drive",
+    // LinkedIn & in-app CV
+    cvLink: "URL Profil LinkedIn",
+    cvLinkPlaceholder: "linkedin.com/in/numetau",
+    linkedinUrl: "URL Profil LinkedIn",
+    openLinkedIn: "Deschide LinkedIn",
+    cvScreenTitle: "Profil Candidat",
+    profileNotFound: "Profilul nu a fost găsit.",
+    viewProfile: "Vezi Profilul",
+    addBioHint:
+      'Apasă "Editează Profilul" pentru a adăuga o descriere despre tine.',
+    addEducationHint:
+      'Apasă "Editează Profilul" pentru a adăuga universitatea și anul de studiu.',
+    addSkillsHint:
+      'Apasă "Editează Profilul" pentru a adăuga competențele tale.',
+    addLinkedinHint:
+      'Apasă "Editează Profilul" pentru a adăuga URL-ul profilului tău LinkedIn.',
     viewCv: "Vezi CV",
     minAgo: "m acum",
     hAgo: "h acum",
@@ -912,7 +948,7 @@ export const translations = {
     rateNow: "Evaluează acum",
     rateLater: "Mai târziu",
     // Urgently hiring
-    isUrgent: "Angajare urgentă",
+    isUrgent: "Urgent",
     urgentBadge: "🔥 Urgent",
     screeningNote: "Notă pentru candidați",
     screeningNotePlaceholder:

@@ -6,7 +6,6 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
-    Linking,
     Pressable,
     Text,
     View,
@@ -45,7 +44,7 @@ type ReceivedApplication = {
     username: string | null;
     bio: string | null;
     skills: string[] | null;
-    cv_url: string | null;
+    linkedin_url: string | null;
     verified: boolean | null;
   } | null;
 };
@@ -131,7 +130,7 @@ export default function ApplicationsScreen() {
       ? await supabase
           .from("offers")
           .select(
-            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, cv_url, verified)",
+            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
           )
           .in("request_id", myRequestIds)
           .order("created_at", { ascending: false })
@@ -357,22 +356,13 @@ export default function ApplicationsScreen() {
               </View>
             )}
 
-            {/* CV link */}
-            {prof?.cv_url ? (
+            {/* View profile */}
+            {prof?.id ? (
               <Pressable
                 style={styles.cvBtn}
-                onPress={() => {
-                  const url = prof.cv_url!;
-                  const safe =
-                    url.startsWith("http://") || url.startsWith("https://")
-                      ? url
-                      : `https://${url}`;
-                  Linking.openURL(safe).catch(() =>
-                    Alert.alert(t("error"), t("invalidUrl")),
-                  );
-                }}
+                onPress={() => router.push(`/cv/${prof.id}`)}
               >
-                <Feather name="file-text" size={13} color={theme.primary} />
+                <Feather name="user" size={13} color={theme.primary} />
                 <Text style={styles.cvBtnText}>{t("viewCV")}</Text>
               </Pressable>
             ) : null}

@@ -82,6 +82,18 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 10,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: theme.mutedText,
+    fontStyle: "italic",
+    lineHeight: 18,
+  },
 
   bioText: { fontSize: 14, color: theme.secondaryText, lineHeight: 20 },
 
@@ -113,6 +125,50 @@ export const styles = StyleSheet.create({
   },
   settingLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   settingLabel: { fontSize: 14, color: theme.primaryText, fontWeight: "600" },
+  settingSubLabel: {
+    fontSize: 11,
+    color: theme.mutedText,
+    marginTop: 1,
+    marginBottom: 10,
+  },
+
+  modeSection: { paddingVertical: 4 },
+  modeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  modeTrack: {
+    flexDirection: "row",
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: 12,
+    padding: 3,
+    gap: 2,
+  },
+  modeOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  modeOptionActive: {
+    backgroundColor: theme.surface,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  modeOptionEmployerActive: { backgroundColor: "#EDE9FE" },
+  modeOptionStudentActive: { backgroundColor: theme.primaryLight },
+  modeOptionText: { fontSize: 12, fontWeight: "600", color: theme.mutedText },
+  modeOptionTextActive: { fontWeight: "800", color: theme.primaryText },
+  modeOptionTextEmployer: { color: "#7C3AED" },
+  modeOptionTextStudent: { color: theme.primary },
 
   toggleRow: { flexDirection: "row", gap: 4 },
   langBtn: {

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
+import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
 import { supabase } from "../../src/lib/supabase";
 import { styles, theme } from "./profile.styles";
 
@@ -25,6 +26,7 @@ type ProfileData = {
   user_type: string | null;
   created_at: string | null;
   cv_url: string | null;
+  linkedin_url: string | null;
   verified: boolean | null;
 };
 
@@ -41,7 +43,7 @@ export default function ProfileScreen() {
   const [editUniversity, setEditUniversity] = useState("");
   const [editStudyYear, setEditStudyYear] = useState("");
   const [editSkillsRaw, setEditSkillsRaw] = useState("");
-  const [editCvUrl, setEditCvUrl] = useState("");
+  const [editLinkedinUrl, setEditLinkedinUrl] = useState("");
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState(0);
   const [workHistory, setWorkHistory] = useState<
@@ -50,6 +52,7 @@ export default function ProfileScreen() {
   const { language, setLanguage } = useLanguage();
   const { currency, setCurrency } = useCurrency();
   const t = useTranslation();
+  const { marketplaceMode, setMarketplaceMode } = useMarketplaceMode();
 
   useEffect(() => {
     loadProfile();
@@ -71,7 +74,7 @@ export default function ProfileScreen() {
         supabase
           .from("profiles")
           .select(
-            "username, university, study_year, bio, skills, user_type, created_at, cv_url, verified",
+            "username, university, study_year, bio, skills, user_type, created_at, cv_url, linkedin_url, verified",
           )
           .eq("id", user.id)
           .single(),
@@ -131,7 +134,7 @@ export default function ProfileScreen() {
     setEditUniversity(profile.university ?? "");
     setEditStudyYear(profile.study_year ? String(profile.study_year) : "");
     setEditSkillsRaw((profile.skills ?? []).join(", "));
-    setEditCvUrl(profile.cv_url ?? "");
+    setEditLinkedinUrl(profile.linkedin_url ?? "");
     setEditing(true);
   }
 
@@ -158,7 +161,7 @@ export default function ProfileScreen() {
         university: editUniversity.trim() || null,
         study_year: editStudyYear ? parseInt(editStudyYear, 10) : null,
         skills: skills.length ? skills : null,
-        cv_url: editCvUrl.trim() || null,
+        linkedin_url: editLinkedinUrl.trim() || null,
       })
       .eq("id", user.id);
 
@@ -359,11 +362,11 @@ export default function ProfileScreen() {
           />
           <Text style={styles.fieldHint}>Separate skills with commas</Text>
 
-          <Text style={styles.fieldLabel}>{t("cvLink")}</Text>
+          <Text style={styles.fieldLabel}>{t("linkedinUrl")}</Text>
           <TextInput
             style={styles.fieldInput}
-            value={editCvUrl}
-            onChangeText={setEditCvUrl}
+            value={editLinkedinUrl}
+            onChangeText={setEditLinkedinUrl}
             placeholder={t("cvLinkPlaceholder")}
             placeholderTextColor={theme.mutedText}
             autoCapitalize="none"
@@ -390,42 +393,65 @@ export default function ProfileScreen() {
         /* ── View mode ── */
         <>
           {/* Bio */}
-          {profile?.bio ? (
-            <View style={styles.section}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Feather name="user" size={14} color={theme.primary} />
               <Text style={styles.sectionTitle}>{t("about")}</Text>
+            </View>
+            {profile?.bio ? (
               <Text style={styles.bioText}>{profile.bio}</Text>
-            </View>
-          ) : null}
+            ) : (
+              <Pressable onPress={startEditing}>
+                <Text style={styles.emptyHint}>{t("addBioHint")}</Text>
+              </Pressable>
+            )}
+          </View>
 
-          {/* University */}
-          {profile?.university || profile?.study_year ? (
-            <View style={styles.section}>
+          {/* Education */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Feather name="book" size={14} color={theme.primary} />
               <Text style={styles.sectionTitle}>{t("education")}</Text>
-              {profile.university ? (
-                <View style={styles.infoRow}>
-                  <Feather name="book" size={14} color={theme.secondaryText} />
-                  <Text style={styles.infoText}>{profile.university}</Text>
-                </View>
-              ) : null}
-              {profile.study_year ? (
-                <View style={styles.infoRow}>
-                  <Feather
-                    name="calendar"
-                    size={14}
-                    color={theme.secondaryText}
-                  />
-                  <Text style={styles.infoText}>
-                    {t("year")} {profile.study_year}
-                  </Text>
-                </View>
-              ) : null}
             </View>
-          ) : null}
+            {profile?.university || profile?.study_year ? (
+              <>
+                {profile.university ? (
+                  <View style={styles.infoRow}>
+                    <Feather
+                      name="book"
+                      size={14}
+                      color={theme.secondaryText}
+                    />
+                    <Text style={styles.infoText}>{profile.university}</Text>
+                  </View>
+                ) : null}
+                {profile.study_year ? (
+                  <View style={styles.infoRow}>
+                    <Feather
+                      name="calendar"
+                      size={14}
+                      color={theme.secondaryText}
+                    />
+                    <Text style={styles.infoText}>
+                      {t("year")} {profile.study_year}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <Pressable onPress={startEditing}>
+                <Text style={styles.emptyHint}>{t("addEducationHint")}</Text>
+              </Pressable>
+            )}
+          </View>
 
           {/* Skills */}
-          {profile?.skills && profile.skills.length > 0 ? (
-            <View style={styles.section}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Feather name="zap" size={14} color={theme.primary} />
               <Text style={styles.sectionTitle}>{t("skills")}</Text>
+            </View>
+            {profile?.skills && profile.skills.length > 0 ? (
               <View style={styles.skillsRow}>
                 {profile.skills.map((s, i) => (
                   <View key={i} style={styles.skillChip}>
@@ -433,30 +459,118 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
-            </View>
-          ) : null}
+            ) : (
+              <Pressable onPress={startEditing}>
+                <Text style={styles.emptyHint}>{t("addSkillsHint")}</Text>
+              </Pressable>
+            )}
+          </View>
 
-          {/* CV link */}
-          {profile?.cv_url ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t("cvLink")}</Text>
+          {/* LinkedIn */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Feather name="link" size={14} color={theme.primary} />
+              <Text style={styles.sectionTitle}>{t("linkedinUrl")}</Text>
+            </View>
+            {profile?.linkedin_url ? (
               <Pressable
                 style={styles.cvLinkRow}
-                onPress={() => openUrl(profile.cv_url!)}
+                onPress={() => openUrl(profile.linkedin_url!)}
               >
-                <Feather name="external-link" size={14} color={theme.primary} />
-                <Text style={styles.cvLinkText} numberOfLines={1}>
-                  {profile.cv_url}
+                <Feather name="link" size={14} color="#0A66C2" />
+                <Text
+                  style={[styles.cvLinkText, { color: "#0A66C2" }]}
+                  numberOfLines={1}
+                >
+                  {profile.linkedin_url}
                 </Text>
               </Pressable>
-            </View>
-          ) : null}
+            ) : (
+              <Pressable onPress={startEditing}>
+                <Text style={styles.emptyHint}>{t("addLinkedinHint")}</Text>
+              </Pressable>
+            )}
+          </View>
         </>
       )}
 
       {/* Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t("settings")}</Text>
+
+        {/* Marketplace mode */}
+        <View style={styles.modeSection}>
+          <View style={styles.modeHeaderRow}>
+            <Feather name="filter" size={14} color={theme.secondaryText} />
+            <Text style={styles.settingLabel}>{t("marketplaceMode")}</Text>
+          </View>
+          <Text style={styles.settingSubLabel}>
+            {marketplaceMode === "employer"
+              ? t("employerMode")
+              : marketplaceMode === "student"
+                ? t("studentMode")
+                : t("allModeDesc")}
+          </Text>
+          <View style={styles.modeTrack}>
+            {(
+              [
+                { key: "all", icon: "layers", label: t("all") },
+                {
+                  key: "employer",
+                  icon: "briefcase",
+                  label: t("filterHiring"),
+                },
+                { key: "student", icon: "user", label: t("filterOffering") },
+              ] as const
+            ).map(({ key, icon, label }) => {
+              const active = marketplaceMode === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[
+                    styles.modeOption,
+                    active && styles.modeOptionActive,
+                    active &&
+                      key === "employer" &&
+                      styles.modeOptionEmployerActive,
+                    active &&
+                      key === "student" &&
+                      styles.modeOptionStudentActive,
+                  ]}
+                  onPress={() => setMarketplaceMode(key)}
+                >
+                  <Feather
+                    name={icon}
+                    size={13}
+                    color={
+                      !active
+                        ? theme.mutedText
+                        : key === "employer"
+                          ? "#7C3AED"
+                          : key === "student"
+                            ? theme.primary
+                            : theme.primaryText
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.modeOptionText,
+                      active && styles.modeOptionTextActive,
+                      active &&
+                        key === "employer" &&
+                        styles.modeOptionTextEmployer,
+                      active &&
+                        key === "student" &&
+                        styles.modeOptionTextStudent,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         {/* Language */}
         <View style={styles.settingRow}>

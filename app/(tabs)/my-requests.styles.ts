@@ -98,6 +98,24 @@ export const styles = StyleSheet.create({
     backgroundColor: "#FEF3C7",
   },
   boostedBadgeText: { fontSize: 10, fontWeight: "800", color: "#D97706" },
+
+  // Boosted card accent — left border
+  cardBoosted: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#D97706",
+  },
+
+  // Boosted inline indicator in footer
+  boostedIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 5,
+    backgroundColor: "#FEF3C7",
+  },
+  boostedIndicatorText: { fontSize: 10, fontWeight: "700", color: "#D97706" },
   typeBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
   typeBadgeText: { fontSize: 11, fontWeight: "700" },
   categoryText: { fontSize: 12, color: theme.mutedText, fontWeight: "600" },

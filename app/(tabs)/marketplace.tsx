@@ -13,6 +13,7 @@ import {
     View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
 import { supabase } from "../../src/lib/supabase";
 import { CATEGORY_COLORS, styles, theme } from "./marketplace.styles";
 
@@ -102,6 +103,7 @@ function formatWage(min: number | null, max: number | null) {
 
 export default function JobsScreen() {
   const t = useTranslation();
+  const { marketplaceMode } = useMarketplaceMode();
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -306,6 +308,8 @@ export default function JobsScreen() {
   }
 
   const filtered = jobs.filter((j) => {
+    if (marketplaceMode !== "all" && j.posting_as !== marketplaceMode)
+      return false;
     const q = search.toLowerCase();
     return (
       !q ||
@@ -616,6 +620,38 @@ export default function JobsScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Mode indicator — only visible when a mode is active */}
+      {marketplaceMode !== "all" && (
+        <View style={styles.modePill}>
+          <Feather
+            name={marketplaceMode === "employer" ? "briefcase" : "user"}
+            size={11}
+            color={marketplaceMode === "employer" ? "#7C3AED" : theme.primary}
+          />
+          <Text
+            style={[
+              styles.modePillText,
+              marketplaceMode === "employer"
+                ? styles.modePillTextEmployer
+                : styles.modePillTextStudent,
+            ]}
+          >
+            {marketplaceMode === "employer"
+              ? t("employerMode")
+              : t("studentMode")}
+          </Text>
+          <Pressable
+            hitSlop={8}
+            onPress={() => {
+              /* navigate to profile to change */
+              router.push("/(tabs)/profile" as any);
+            }}
+          >
+            <Feather name="settings" size={11} color={theme.mutedText} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Save search pill — visible when a filter or search is active */}
       {userId && (search.trim() || selectedCategory !== "All") && (

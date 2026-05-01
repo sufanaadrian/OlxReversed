@@ -347,6 +347,25 @@ export const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  // Active mode indicator pill (shown below categories when mode is set)
+  modePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    gap: 5,
+    marginTop: 8,
+    marginBottom: 2,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  modePillText: { fontSize: 11, fontWeight: "700" },
+  modePillTextEmployer: { color: "#7C3AED" },
+  modePillTextStudent: { color: theme.primary },
+
   emptyWrap: {
     flex: 1,
     alignItems: "center",

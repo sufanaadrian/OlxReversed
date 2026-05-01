@@ -151,7 +151,7 @@ export default function MyPostsScreen() {
 
     return (
       <Pressable
-        style={styles.card}
+        style={[styles.card, isBoostedActive && styles.cardBoosted]}
         onPress={() => router.push(`/request/${item.id}`)}
       >
         <View style={styles.cardBody}>
@@ -184,13 +184,6 @@ export default function MyPostsScreen() {
               {item.is_urgent && (
                 <View style={styles.urgentBadge}>
                   <Text style={styles.urgentBadgeText}>🔥 {t("isUrgent")}</Text>
-                </View>
-              )}
-              {isBoostedActive && (
-                <View style={styles.boostedBadge}>
-                  <Text style={styles.boostedBadgeText}>
-                    {t("boostedBadge")}
-                  </Text>
                 </View>
               )}
               {item.status === "active" && daysLeft > 0 && daysLeft <= 7 && (
@@ -233,11 +226,23 @@ export default function MyPostsScreen() {
           </View>
 
           <View style={styles.cardFooter}>
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {t(
-                `status${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`,
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {t(
+                  `status${item.status.charAt(0).toUpperCase() + item.status.slice(1)}`,
+                )}
+              </Text>
+              {isBoostedActive && (
+                <View style={styles.boostedIndicator}>
+                  <Feather name="trending-up" size={10} color="#D97706" />
+                  <Text style={styles.boostedIndicatorText}>
+                    {t("boostedBadge")}
+                  </Text>
+                </View>
               )}
-            </Text>
+            </View>
             <View style={styles.actions}>
               {item.status === "active" && (
                 <Pressable
