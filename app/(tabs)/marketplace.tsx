@@ -11,7 +11,6 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { supabase } from "../../src/lib/supabase";
 import { CATEGORY_COLORS, styles, theme } from "./marketplace.styles";
@@ -102,12 +101,15 @@ export default function JobsScreen() {
     } = await supabase.auth.getUser();
     setUserId(user?.id ?? null);
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+
     let query = supabase
       .from("requests")
       .select(
         "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,profiles(username)",
       )
       .eq("status", "active")
+      .gte("created_at", thirtyDaysAgo)
       .order("created_at", { ascending: false });
     if (selectedCategory !== "All")
       query = query.eq("category", selectedCategory);
@@ -194,7 +196,7 @@ export default function JobsScreen() {
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
     const daysLeft = Math.ceil(msLeft / 86400000);
-    const expiringSoon = daysLeft <= 5 && daysLeft > 0;
+    const expiringSoon = daysLeft > 0;
 
     return (
       <Pressable
@@ -305,14 +307,22 @@ export default function JobsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.page} edges={["top"]}>
+    <View style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{t("findJobs")}</Text>
-          <Text style={styles.headerSub}>
-            {filtered.length} {t("jobsAvailable")}
-          </Text>
+          <View>
+            <Text style={styles.headerTitle}>{t("findJobs")}</Text>
+            <Text style={styles.headerSub}>
+              {filtered.length} {t("jobsAvailable")}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => router.push("/saved-jobs" as any)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="bookmark" size={22} color={theme.primaryDark} />
+          </Pressable>
         </View>
         <View style={styles.searchBox}>
           <Feather name="search" size={16} color={theme.mutedText} />
@@ -430,6 +440,6 @@ export default function JobsScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

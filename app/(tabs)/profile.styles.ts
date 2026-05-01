@@ -19,7 +19,12 @@ export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  avatarSection: { alignItems: "center", paddingTop: 32, paddingBottom: 20, gap: 6 },
+  avatarSection: {
+    alignItems: "center",
+    paddingTop: 32,
+    paddingBottom: 20,
+    gap: 6,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -53,7 +58,12 @@ export const styles = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: "center" },
   statValue: { fontSize: 24, fontWeight: "900", color: theme.primaryText },
-  statLabel: { fontSize: 12, color: theme.mutedText, fontWeight: "600", marginTop: 2 },
+  statLabel: {
+    fontSize: 12,
+    color: theme.mutedText,
+    fontWeight: "600",
+    marginTop: 2,
+  },
   statDivider: { width: 1, backgroundColor: theme.border },
 
   section: {
@@ -75,7 +85,12 @@ export const styles = StyleSheet.create({
 
   bioText: { fontSize: 14, color: theme.secondaryText, lineHeight: 20 },
 
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
   infoText: { fontSize: 14, color: theme.secondaryText },
 
   skillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
@@ -128,4 +143,67 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   signOutText: { fontSize: 15, fontWeight: "700", color: theme.error },
+
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
+  },
+  editBtnText: { fontSize: 13, fontWeight: "700", color: theme.primary },
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.mutedText,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  fieldInput: {
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: theme.primaryText,
+  },
+  fieldTextarea: { minHeight: 80, textAlignVertical: "top" },
+  fieldHint: { fontSize: 11, color: theme.mutedText, marginTop: 4 },
+
+  editActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.secondaryText,
+  },
+  saveBtn: {
+    flex: 2,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+  },
+  saveBtnText: { fontSize: 14, fontWeight: "800", color: "#FFFFFF" },
 });

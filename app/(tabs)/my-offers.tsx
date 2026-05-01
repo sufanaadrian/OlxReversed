@@ -323,7 +323,8 @@ export default function ApplicationsScreen() {
                 activeTab === tab && styles.tabBtnTextActive,
               ]}
             >
-              {t(tab === "sent" ? "sent" : "received")}
+              {t(tab === "sent" ? "sent" : "received")} (
+              {tab === "sent" ? sent.length : received.length})
             </Text>
           </Pressable>
         ))}

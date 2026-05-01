@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
   header: {
     backgroundColor: theme.surface,
     paddingHorizontal: 16,
-    paddingTop: 6,
+    paddingTop: 14,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderColor: theme.border,
@@ -71,32 +71,6 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: { flex: 1, color: theme.primaryText, fontSize: 15 },
-
-  chipsRow: { paddingVertical: 10, paddingLeft: 16, gap: 7 },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: theme.surface,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipActive: {
-    backgroundColor: theme.primary,
-    borderColor: theme.primary,
-  },
-  chipText: {
-    color: theme.secondaryText,
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  chipTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-  },
 
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 },
   separator: { height: 12 },
@@ -254,8 +228,13 @@ export const styles = StyleSheet.create({
   bannerDismiss: { padding: 2 },
 
   // Chips ScrollView
-  chipsScroll: { flexGrow: 0 },
-  chipsRow: { paddingVertical: 10, paddingHorizontal: 16, gap: 8 },
+  chipsScroll: { flexShrink: 0 },
+  chipsRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+    flexDirection: "row",
+  },
   chip: {
     paddingVertical: 7,
     paddingHorizontal: 16,
@@ -263,6 +242,8 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.surface,
     borderWidth: 1.5,
     borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   chipActive: {
     backgroundColor: theme.primary,

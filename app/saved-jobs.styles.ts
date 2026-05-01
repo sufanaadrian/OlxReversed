@@ -1,0 +1,175 @@
+import { StyleSheet } from "react-native";
+
+export const theme = {
+  primary: "#0D9488",
+  primaryLight: "#CCFBF1",
+  primaryDark: "#0F766E",
+  bg: "#F8FAFC",
+  surface: "#FFFFFF",
+  primaryText: "#0F172A",
+  secondaryText: "#64748B",
+  mutedText: "#94A3B8",
+  border: "#E2E8F0",
+  employer: "#7C3AED",
+  employerLight: "#EDE9FE",
+  warning: "#F59E0B",
+  warningLight: "#FEF3C7",
+};
+
+export const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  Hospitality: { bg: "#FEF3C7", text: "#92400E" },
+  Retail: { bg: "#E0F2FE", text: "#0369A1" },
+  Tutoring: { bg: "#EDE9FE", text: "#5B21B6" },
+  Events: { bg: "#FCE7F3", text: "#9D174D" },
+  Delivery: { bg: "#D1FAE5", text: "#065F46" },
+  IT: { bg: "#DBEAFE", text: "#1D4ED8" },
+  Office: { bg: "#F1F5F9", text: "#475569" },
+  Marketing: { bg: "#FEE2E2", text: "#991B1B" },
+  Other: { bg: "#F1F5F9", text: "#64748B" },
+};
+
+export const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: theme.bg },
+
+  navbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    gap: 4,
+  },
+  navBack: { padding: 10, borderRadius: 10 },
+  navTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "800",
+    color: theme.primaryText,
+    marginLeft: 4,
+  },
+  navCount: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.mutedText,
+    marginRight: 8,
+  },
+
+  list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
+  separator: { height: 12 },
+
+  card: {
+    backgroundColor: theme.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: "hidden",
+  },
+  cardStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  cardStripText: { fontSize: 12, fontWeight: "700" },
+  stripRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  expiryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: theme.warningLight,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  expiryBadgeText: { fontSize: 11, fontWeight: "700", color: "#92400E" },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  roleBadgeText: { fontSize: 11, fontWeight: "700" },
+
+  cardBody: { padding: 14 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 4,
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.primaryText,
+    flex: 1,
+  },
+  unsaveBtn: { padding: 4 },
+  cardDesc: {
+    fontSize: 13,
+    color: theme.secondaryText,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: theme.bg,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  metaChipText: {
+    fontSize: 12,
+    color: theme.secondaryText,
+    fontWeight: "500",
+  },
+
+  emptyWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: theme.primaryText,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.mutedText,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  browseBtn: {
+    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    backgroundColor: theme.primary,
+    borderRadius: 14,
+  },
+  browseBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+});
