@@ -234,51 +234,46 @@ export default function ProfileScreen() {
         </View>
         <Text style={styles.name}>{profile?.username ?? t("anonymous")}</Text>
         {email ? <Text style={styles.email}>{email}</Text> : null}
-        {profile?.user_type ? (
-          <View
-            style={[
-              styles.typeBadge,
-              {
-                backgroundColor:
-                  profile.user_type === "employer"
-                    ? theme.employerLight
-                    : theme.primaryLight,
-              },
-            ]}
-          >
-            <Text
+        <View style={styles.badgesRow}>
+          {profile?.user_type ? (
+            <View
               style={[
-                styles.typeBadgeText,
+                styles.typeBadge,
                 {
-                  color:
+                  backgroundColor:
                     profile.user_type === "employer"
-                      ? theme.employer
-                      : theme.primary,
+                      ? theme.employerLight
+                      : theme.primaryLight,
                 },
               ]}
             >
-              {t(profile.user_type)}
-            </Text>
-          </View>
-        ) : null}
-        {profile?.verified && (
-          <View style={styles.verifiedBadge}>
-            <Feather name="check-circle" size={12} color="#0D9488" />
-            <Text style={styles.verifiedText}>{t("verified")}</Text>
-          </View>
-        )}
-        {!profile?.verified && !editing && (
-          <Pressable style={styles.verifyBtn} onPress={handleVerify}>
-            <Feather name="shield" size={13} color="#7C3AED" />
-            <Text style={styles.verifyBtnText}>{t("verifyIdentity")}</Text>
-          </Pressable>
-        )}
-        {!editing && (
-          <Pressable style={styles.editBtn} onPress={startEditing}>
-            <Feather name="edit-2" size={14} color={theme.primary} />
-            <Text style={styles.editBtnText}>{t("editProfile")}</Text>
-          </Pressable>
-        )}
+              <Text
+                style={[
+                  styles.typeBadgeText,
+                  {
+                    color:
+                      profile.user_type === "employer"
+                        ? theme.employer
+                        : theme.primary,
+                  },
+                ]}
+              >
+                {t(profile.user_type)}
+              </Text>
+            </View>
+          ) : null}
+          {profile?.verified ? (
+            <View style={styles.verifiedBadge}>
+              <Feather name="check-circle" size={12} color="#0D9488" />
+              <Text style={styles.verifiedText}>{t("verified")}</Text>
+            </View>
+          ) : !editing ? (
+            <Pressable style={styles.verifyBtn} onPress={handleVerify}>
+              <Feather name="shield" size={13} color="#7C3AED" />
+              <Text style={styles.verifyBtnText}>{t("verifyIdentity")}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {/* Stats */}
@@ -481,51 +476,54 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* LinkedIn */}
+          {/* Contact */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Feather name="link" size={14} color={theme.primary} />
-              <Text style={styles.sectionTitle}>{t("linkedinUrl")}</Text>
+              <Feather name="at-sign" size={14} color={theme.primary} />
+              <Text style={styles.sectionTitle}>{t("contact")}</Text>
             </View>
-            {profile?.linkedin_url ? (
-              <Pressable
-                style={styles.cvLinkRow}
-                onPress={() => openUrl(profile.linkedin_url!)}
-              >
-                <Feather name="link" size={14} color="#0A66C2" />
-                <Text
-                  style={[styles.cvLinkText, { color: "#0A66C2" }]}
-                  numberOfLines={1}
+            {/* LinkedIn */}
+            <View style={styles.contactRow}>
+              <View style={styles.contactLabel}>
+                <Feather name="link-2" size={13} color="#0A66C2" />
+                <Text style={styles.contactLabelText}>LinkedIn</Text>
+              </View>
+              {profile?.linkedin_url ? (
+                <Pressable
+                  style={styles.contactValue}
+                  onPress={() => openUrl(profile.linkedin_url!)}
                 >
-                  {profile.linkedin_url}
-                </Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={startEditing}>
-                <Text style={styles.emptyHint}>{t("addLinkedinHint")}</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Phone */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Feather name="phone" size={14} color={theme.primary} />
-              <Text style={styles.sectionTitle}>{t("phone")}</Text>
+                  <Text style={styles.contactLinkText} numberOfLines={1}>
+                    {profile.linkedin_url}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={startEditing}>
+                  <Text style={styles.contactEmpty}>{t("add")}</Text>
+                </Pressable>
+              )}
             </View>
-            {profile?.phone_number ? (
-              <Pressable
-                style={styles.cvLinkRow}
-                onPress={() => Linking.openURL(`tel:${profile.phone_number}`)}
-              >
-                <Feather name="phone" size={14} color={theme.primary} />
-                <Text style={styles.cvLinkText}>{profile.phone_number}</Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={startEditing}>
-                <Text style={styles.emptyHint}>{t("addPhoneHint")}</Text>
-              </Pressable>
-            )}
+            {/* Phone */}
+            <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.contactLabel}>
+                <Feather name="phone" size={13} color={theme.primary} />
+                <Text style={styles.contactLabelText}>{t("phone")}</Text>
+              </View>
+              {profile?.phone_number ? (
+                <Pressable
+                  style={styles.contactValue}
+                  onPress={() => Linking.openURL(`tel:${profile.phone_number}`)}
+                >
+                  <Text style={styles.contactLinkText} numberOfLines={1}>
+                    {profile.phone_number}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={startEditing}>
+                  <Text style={styles.contactEmpty}>{t("add")}</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         </>
       )}
@@ -533,6 +531,18 @@ export default function ProfileScreen() {
       {/* Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t("settings")}</Text>
+
+        {!editing && (
+          <Pressable style={styles.settingRow} onPress={startEditing}>
+            <View style={styles.settingLeft}>
+              <Feather name="edit-2" size={14} color={theme.primary} />
+              <Text style={[styles.settingLabel, { color: theme.primary }]}>
+                {t("editProfile")}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={14} color={theme.mutedText} />
+          </Pressable>
+        )}
 
         {/* Marketplace mode */}
         <View style={styles.modeSection}>
@@ -669,16 +679,27 @@ export default function ProfileScreen() {
 
       {/* Work History */}
       {workHistory.length > 0 && (
-        <View style={styles.workHistorySection}>
-          <Text style={styles.workHistorySectionTitle}>{t("workHistory")}</Text>
-          {workHistory.map((job) => (
-            <View key={job.id} style={styles.workHistoryItem}>
-              <Feather name="briefcase" size={14} color={theme.primary} />
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Feather name="briefcase" size={14} color={theme.primary} />
+            <Text style={styles.sectionTitle}>{t("workHistory")}</Text>
+          </View>
+          {workHistory.map((job, idx) => (
+            <View
+              key={job.id}
+              style={[
+                styles.workHistoryItem,
+                idx === workHistory.length - 1 && {
+                  borderBottomWidth: 0,
+                },
+              ]}
+            >
+              <Feather name="check-circle" size={14} color={theme.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.workHistoryTitle}>{job.title}</Text>
                 {job.posted_by ? (
                   <Text style={styles.workHistoryMeta}>
-                    {t("workedAs")} {job.posted_by}
+                    {t("postedBy")} {job.posted_by}
                   </Text>
                 ) : null}
               </View>

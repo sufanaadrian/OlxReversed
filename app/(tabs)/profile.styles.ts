@@ -47,6 +47,38 @@ export const styles = StyleSheet.create({
   },
   typeBadgeText: { fontSize: 12, fontWeight: "700" },
 
+  badgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  contactLabel: { flexDirection: "row", alignItems: "center", gap: 6 },
+  contactLabelText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  contactValue: { flex: 1, alignItems: "flex-end", paddingLeft: 12 },
+  contactLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0D9488",
+    textAlign: "right",
+  },
+  contactEmpty: { fontSize: 12, color: "#94A3B8", fontStyle: "italic" },
+
   statsRow: {
     flexDirection: "row",
     backgroundColor: theme.surface,

@@ -401,6 +401,9 @@ export const translations = {
     addLinkedinHint: 'Tap "Edit Profile" to add your LinkedIn profile URL.',
     addPhoneHint:
       'Tap "Edit Profile" to add your phone number so employers can reach you.',
+    contact: "Contact",
+    viewPost: "View Post",
+    add: "Add",
     minAgo: "m ago",
     hAgo: "h ago",
     dAgo: "d ago",
@@ -468,6 +471,7 @@ export const translations = {
     workHistory: "Work History",
     noWorkHistory: "No completed jobs yet",
     workedAs: "as",
+    postedBy: "Posted by",
     // Chat templates
     quickReplies: "Quick replies",
     tplAvailable: "I'm available!",
@@ -921,6 +925,9 @@ export const translations = {
       'Apasă "Editează Profilul" pentru a adăuga URL-ul profilului tău LinkedIn.',
     addPhoneHint:
       'Apasă "Editează Profilul" pentru a adăuga numărul tău de telefon.',
+    contact: "Contact",
+    viewPost: "Vezi Anunțul",
+    add: "Adaugă",
     viewCv: "Vezi CV",
     minAgo: "m acum",
     hAgo: "h acum",
@@ -989,6 +996,7 @@ export const translations = {
     workHistory: "Istoric de muncă",
     noWorkHistory: "Niciun job finalizat încă",
     workedAs: "ca",
+    postedBy: "Postat de",
     // Chat quick-reply templates
     quickReplies: "Răspunsuri rapide",
     tplAvailable: "Sunt disponibil!",

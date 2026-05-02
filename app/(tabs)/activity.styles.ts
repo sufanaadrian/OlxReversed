@@ -153,6 +153,26 @@ export const styles = StyleSheet.create({
   actionBtnDanger: { borderColor: "#FEE2E2", backgroundColor: "#FFF5F5" },
   actionBtnText: { fontSize: 12, fontWeight: "700", color: theme.primary },
 
+  coverLetterBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderLeftWidth: 3,
+    borderLeftColor: "#0D9488",
+    padding: 10,
+    marginBottom: 10,
+  },
+  coverLetterText: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+  },
+  coverLetterChevron: {
+    alignSelf: "flex-end",
+    marginTop: 4,
+  },
+
   chatBtn: {
     flexDirection: "row",
     alignItems: "center",

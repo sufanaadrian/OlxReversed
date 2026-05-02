@@ -94,6 +94,18 @@ export default function ActivityScreen() {
   const [sentApps, setSentApps] = useState<Application[]>([]);
   const [receivedApps, setReceivedApps] = useState<ReceivedApplication[]>([]);
   const [appsLoading, setAppsLoading] = useState(true);
+  const [expandedLetters, setExpandedLetters] = useState<Set<string>>(
+    new Set(),
+  );
+
+  function toggleLetter(id: string) {
+    setExpandedLetters((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // ── Fetch Posts ──
 
@@ -315,10 +327,7 @@ export default function ActivityScreen() {
     const req = item.requests;
     const canChat = item.status === "accepted" && req;
     return (
-      <Pressable
-        style={styles.card}
-        onPress={() => req && router.push(`/request/${req.id}` as any)}
-      >
+      <View style={styles.card}>
         <View style={styles.cardTop}>
           <Text style={styles.cardTitle} numberOfLines={2}>
             {req?.title ?? "—"}
@@ -334,7 +343,40 @@ export default function ActivityScreen() {
             {t("by")} {req.profiles.username}
           </Text>
         ) : null}
+        {item.cover_letter ? (
+          <Pressable
+            style={styles.coverLetterBox}
+            onPress={() => toggleLetter(item.id)}
+          >
+            <Text
+              style={styles.coverLetterText}
+              numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+            >
+              {item.cover_letter}
+            </Text>
+            {item.cover_letter.split("\n").join(" ").length > 80 && (
+              <View style={styles.coverLetterChevron}>
+                <Feather
+                  name={
+                    expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
+                  }
+                  size={13}
+                  color={theme.primary}
+                />
+              </View>
+            )}
+          </Pressable>
+        ) : null}
         <View style={styles.cardActions}>
+          {req && (
+            <Pressable
+              style={styles.actionBtn}
+              onPress={() => router.push(`/request/${req.id}` as any)}
+            >
+              <Feather name="eye" size={13} color={theme.primary} />
+              <Text style={styles.actionBtnText}>{t("viewPost")}</Text>
+            </Pressable>
+          )}
           {canChat && (
             <Pressable
               style={styles.chatBtn}
@@ -355,7 +397,7 @@ export default function ActivityScreen() {
             </Pressable>
           )}
         </View>
-      </Pressable>
+      </View>
     );
   }
 
@@ -380,6 +422,30 @@ export default function ActivityScreen() {
         </View>
         {prof?.username ? (
           <Text style={styles.cardSub}>{prof.username}</Text>
+        ) : null}
+        {item.cover_letter ? (
+          <Pressable
+            style={styles.coverLetterBox}
+            onPress={() => toggleLetter(item.id)}
+          >
+            <Text
+              style={styles.coverLetterText}
+              numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+            >
+              {item.cover_letter}
+            </Text>
+            {item.cover_letter.split("\n").join(" ").length > 80 && (
+              <View style={styles.coverLetterChevron}>
+                <Feather
+                  name={
+                    expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
+                  }
+                  size={13}
+                  color={theme.primary}
+                />
+              </View>
+            )}
+          </Pressable>
         ) : null}
         <View style={styles.cardActions}>
           {prof?.id && (
