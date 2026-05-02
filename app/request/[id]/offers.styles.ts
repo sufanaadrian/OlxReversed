@@ -1,21 +1,11 @@
 import { StyleSheet } from "react-native";
+import type { Colors } from "../../../src/theme/colors";
 
-export const theme = {
-  primary: "#1E40AF",
-  bg: "#F9FAFB",
-  surface: "#FFFFFF",
-  primaryText: "#020617",
-  secondaryText: "#64748B",
-  border: "#E5E7EB",
-  accentSoft: "#DBEAFE",
-  success: "#16A34A",
-  danger: "#DC2626",
-};
-
-export const styles = StyleSheet.create({
+export function makeStyles(c: Colors) {
+  return StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: theme.bg,
+    backgroundColor: c.bg,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
@@ -30,19 +20,19 @@ export const styles = StyleSheet.create({
     height: 40,
     width: 40,
     borderRadius: 14,
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: { fontSize: 18, fontWeight: "900", color: theme.primaryText },
-  headerSub: { fontSize: 12, color: theme.secondaryText },
+  headerTitle: { fontSize: 18, fontWeight: "900", color: c.primaryText },
+  headerSub: { fontSize: 12, color: c.secondaryText },
 
   filtersWrap: {
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 16,
     padding: 6,
     marginBottom: 6,
@@ -67,31 +57,31 @@ export const styles = StyleSheet.create({
   scrollHintArrow: {
     fontSize: 22,
     fontWeight: "900",
-    color: theme.secondaryText,
+    color: c.secondaryText,
   },
   filterBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12 },
-  filterBtnActive: { backgroundColor: theme.accentSoft },
-  filterText: { fontWeight: "800", color: theme.secondaryText, fontSize: 12 },
-  filterTextActive: { color: theme.primaryText },
+  filterBtnActive: { backgroundColor: c.accentSoft },
+  filterText: { fontWeight: "800", color: c.secondaryText, fontSize: 12 },
+  filterTextActive: { color: c.primaryText },
 
   centerCard: {
     flex: 1,
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 18,
     padding: 18,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
   },
-  titleEmpty: { fontSize: 16, fontWeight: "900", color: theme.primaryText },
-  muted: { color: theme.secondaryText, textAlign: "center" },
+  titleEmpty: { fontSize: 16, fontWeight: "900", color: c.primaryText },
+  muted: { color: c.secondaryText, textAlign: "center" },
 
   card: {
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 18,
     padding: 14,
     marginTop: 12,
@@ -101,22 +91,22 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  seller: { fontSize: 13, fontWeight: "900", color: theme.primaryText },
+  seller: { fontSize: 13, fontWeight: "900", color: c.primaryText },
 
   statusPill: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999 },
-  pillPending: { backgroundColor: theme.accentSoft },
+  pillPending: { backgroundColor: c.accentSoft },
   pillAccepted: { backgroundColor: "#DCFCE7" },
   pillRejected: { backgroundColor: "#FEE2E2" },
   pillWithdrawn: { backgroundColor: "#E5E7EB" },
-  statusText: { fontSize: 12, fontWeight: "900", color: theme.primaryText },
+  statusText: { fontSize: 12, fontWeight: "900", color: c.primaryText },
 
   price: {
     marginTop: 10,
     fontSize: 18,
     fontWeight: "900",
-    color: theme.primaryText,
+    color: c.primaryText,
   },
-  desc: { marginTop: 6, color: theme.secondaryText, lineHeight: 18 },
+  desc: { marginTop: 6, color: c.secondaryText, lineHeight: 18 },
 
   slotsWrap: {
     marginTop: 8,
@@ -135,7 +125,7 @@ export const styles = StyleSheet.create({
     gap: 6,
   },
   slotChip: {
-    backgroundColor: theme.accentSoft,
+    backgroundColor: c.accentSoft,
     borderRadius: 8,
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -143,24 +133,24 @@ export const styles = StyleSheet.create({
   slotChipText: {
     fontSize: 11,
     fontWeight: "800",
-    color: theme.primary,
+    color: c.primary,
   },
 
   counterBox: {
     marginTop: 10,
-    backgroundColor: theme.bg,
+    backgroundColor: c.bg,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 14,
     padding: 10,
     gap: 4,
   },
-  counterTitle: { fontWeight: "900", color: theme.primaryText },
-  counterMsg: { color: theme.secondaryText },
+  counterTitle: { fontWeight: "900", color: c.primaryText },
+  counterMsg: { color: c.secondaryText },
   counterStatus: {
     fontSize: 12,
     fontWeight: "900",
-    color: theme.secondaryText,
+    color: c.secondaryText,
   },
 
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
@@ -171,14 +161,14 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  btnPrimary: { backgroundColor: theme.primary },
+  btnPrimary: { backgroundColor: c.primary },
   btnPrimaryText: { color: "white", fontWeight: "900" },
   btnSecondary: {
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
   },
-  btnSecondaryText: { color: theme.primaryText, fontWeight: "900" },
+  btnSecondaryText: { color: c.primaryText, fontWeight: "900" },
 
   warnBox: {
     flexDirection: "row",
@@ -194,8 +184,9 @@ export const styles = StyleSheet.create({
   },
   warnText: {
     flex: 1,
-    color: theme.danger,
+    color: c.danger,
     fontWeight: "800",
     fontSize: 12,
   },
-});
+  });
+}

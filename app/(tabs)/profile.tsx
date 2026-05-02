@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Linking,
     Pressable,
     ScrollView,
+    Switch,
     Text,
     TextInput,
     View,
@@ -14,8 +15,9 @@ import {
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
 import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./profile.styles";
+import { makeStyles } from "./profile.styles";
 
 type ProfileData = {
   username: string | null;
@@ -55,6 +57,8 @@ export default function ProfileScreen() {
   const { currency, setCurrency } = useCurrency();
   const t = useTranslation();
   const { marketplaceMode, setMarketplaceMode } = useMarketplaceMode();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     loadProfile();
@@ -217,7 +221,7 @@ export default function ProfileScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       </View>
     );
@@ -242,8 +246,8 @@ export default function ProfileScreen() {
                 {
                   backgroundColor:
                     profile.user_type === "employer"
-                      ? theme.employerLight
-                      : theme.primaryLight,
+                      ? colors.employerLight
+                      : colors.primaryLight,
                 },
               ]}
             >
@@ -253,8 +257,8 @@ export default function ProfileScreen() {
                   {
                     color:
                       profile.user_type === "employer"
-                        ? theme.employer
-                        : theme.primary,
+                        ? colors.employer
+                        : colors.primary,
                   },
                 ]}
               >
@@ -316,7 +320,7 @@ export default function ProfileScreen() {
             value={editUsername}
             onChangeText={setEditUsername}
             placeholder={t("username")}
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
           />
 
           <Text style={styles.fieldLabel}>{t("bio")}</Text>
@@ -325,7 +329,7 @@ export default function ProfileScreen() {
             value={editBio}
             onChangeText={setEditBio}
             placeholder="Introduce yourself…"
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
@@ -337,7 +341,7 @@ export default function ProfileScreen() {
             value={editUniversity}
             onChangeText={setEditUniversity}
             placeholder="e.g. UBB Cluj"
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
           />
 
           <Text style={styles.fieldLabel}>{t("studyYear")}</Text>
@@ -346,7 +350,7 @@ export default function ProfileScreen() {
             value={editStudyYear}
             onChangeText={setEditStudyYear}
             placeholder="1 – 6"
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
             keyboardType="number-pad"
             maxLength={1}
           />
@@ -357,7 +361,7 @@ export default function ProfileScreen() {
             value={editSkillsRaw}
             onChangeText={setEditSkillsRaw}
             placeholder="React, Design, Excel…"
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
           />
           <Text style={styles.fieldHint}>Separate skills with commas</Text>
 
@@ -367,7 +371,7 @@ export default function ProfileScreen() {
             value={editLinkedinUrl}
             onChangeText={setEditLinkedinUrl}
             placeholder={t("cvLinkPlaceholder")}
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
             autoCapitalize="none"
             keyboardType="url"
           />
@@ -378,7 +382,7 @@ export default function ProfileScreen() {
             value={editPhoneNumber}
             onChangeText={setEditPhoneNumber}
             placeholder={t("phonePlaceholder")}
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
             keyboardType="phone-pad"
             autoCapitalize="none"
           />
@@ -405,7 +409,7 @@ export default function ProfileScreen() {
           {/* Bio */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Feather name="user" size={14} color={theme.primary} />
+              <Feather name="user" size={14} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("about")}</Text>
             </View>
             {profile?.bio ? (
@@ -420,7 +424,7 @@ export default function ProfileScreen() {
           {/* Education */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Feather name="book" size={14} color={theme.primary} />
+              <Feather name="book" size={14} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("education")}</Text>
             </View>
             {profile?.university || profile?.study_year ? (
@@ -430,7 +434,7 @@ export default function ProfileScreen() {
                     <Feather
                       name="book"
                       size={14}
-                      color={theme.secondaryText}
+                      color={colors.secondaryText}
                     />
                     <Text style={styles.infoText}>{profile.university}</Text>
                   </View>
@@ -440,7 +444,7 @@ export default function ProfileScreen() {
                     <Feather
                       name="calendar"
                       size={14}
-                      color={theme.secondaryText}
+                      color={colors.secondaryText}
                     />
                     <Text style={styles.infoText}>
                       {t("year")} {profile.study_year}
@@ -458,7 +462,7 @@ export default function ProfileScreen() {
           {/* Skills */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Feather name="zap" size={14} color={theme.primary} />
+              <Feather name="zap" size={14} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("skills")}</Text>
             </View>
             {profile?.skills && profile.skills.length > 0 ? (
@@ -479,7 +483,7 @@ export default function ProfileScreen() {
           {/* Contact */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Feather name="at-sign" size={14} color={theme.primary} />
+              <Feather name="at-sign" size={14} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("contact")}</Text>
             </View>
             {/* LinkedIn */}
@@ -506,7 +510,7 @@ export default function ProfileScreen() {
             {/* Phone */}
             <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
               <View style={styles.contactLabel}>
-                <Feather name="phone" size={13} color={theme.primary} />
+                <Feather name="phone" size={13} color={colors.primary} />
                 <Text style={styles.contactLabelText}>{t("phone")}</Text>
               </View>
               {profile?.phone_number ? (
@@ -535,19 +539,19 @@ export default function ProfileScreen() {
         {!editing && (
           <Pressable style={styles.settingRow} onPress={startEditing}>
             <View style={styles.settingLeft}>
-              <Feather name="edit-2" size={14} color={theme.primary} />
-              <Text style={[styles.settingLabel, { color: theme.primary }]}>
+              <Feather name="edit-2" size={14} color={colors.primary} />
+              <Text style={[styles.settingLabel, { color: colors.primary }]}>
                 {t("editProfile")}
               </Text>
             </View>
-            <Feather name="chevron-right" size={14} color={theme.mutedText} />
+            <Feather name="chevron-right" size={14} color={colors.mutedText} />
           </Pressable>
         )}
 
         {/* Marketplace mode */}
         <View style={styles.modeSection}>
           <View style={styles.modeHeaderRow}>
-            <Feather name="filter" size={14} color={theme.secondaryText} />
+            <Feather name="filter" size={14} color={colors.secondaryText} />
             <Text style={styles.settingLabel}>{t("marketplaceMode")}</Text>
           </View>
           <Text style={styles.settingSubLabel}>
@@ -590,12 +594,12 @@ export default function ProfileScreen() {
                     size={13}
                     color={
                       !active
-                        ? theme.mutedText
+                        ? colors.mutedText
                         : key === "employer"
-                          ? "#7C3AED"
+                          ? colors.employer
                           : key === "student"
-                            ? theme.primary
-                            : theme.primaryText
+                            ? colors.primary
+                            : colors.primaryText
                     }
                   />
                   <Text
@@ -621,7 +625,7 @@ export default function ProfileScreen() {
         {/* Language */}
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
-            <Feather name="globe" size={16} color={theme.secondaryText} />
+            <Feather name="globe" size={16} color={colors.secondaryText} />
             <Text style={styles.settingLabel}>{t("language")}</Text>
           </View>
           <View style={styles.toggleRow}>
@@ -650,7 +654,11 @@ export default function ProfileScreen() {
         {/* Currency */}
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
-            <Feather name="dollar-sign" size={16} color={theme.secondaryText} />
+            <Feather
+              name="dollar-sign"
+              size={16}
+              color={colors.secondaryText}
+            />
             <Text style={styles.settingLabel}>{t("currency")}</Text>
           </View>
           <View style={styles.toggleRow}>
@@ -675,13 +683,26 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
+        {/* Dark Mode */}
+        <View style={styles.settingRow}>
+          <View style={styles.settingLeft}>
+            <Feather name="moon" size={16} color={colors.secondaryText} />
+            <Text style={styles.settingLabel}>{t("darkMode")}</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={colors.surface}
+          />
+        </View>
       </View>
 
       {/* Work History */}
       {workHistory.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Feather name="briefcase" size={14} color={theme.primary} />
+            <Feather name="briefcase" size={14} color={colors.primary} />
             <Text style={styles.sectionTitle}>{t("workHistory")}</Text>
           </View>
           {workHistory.map((job, idx) => (
@@ -694,7 +715,7 @@ export default function ProfileScreen() {
                 },
               ]}
             >
-              <Feather name="check-circle" size={14} color={theme.primary} />
+              <Feather name="check-circle" size={14} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.workHistoryTitle}>{job.title}</Text>
                 {job.posted_by ? (
@@ -710,7 +731,7 @@ export default function ProfileScreen() {
 
       {/* Sign Out */}
       <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
-        <Feather name="log-out" size={16} color={theme.error} />
+        <Feather name="log-out" size={16} color={colors.error} />
         <Text style={styles.signOutText}>{t("signOut")}</Text>
       </Pressable>
     </ScrollView>

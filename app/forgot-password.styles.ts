@@ -1,21 +1,11 @@
 import { StyleSheet } from "react-native";
+import type { Colors } from "../src/theme/colors";
 
-export const theme = {
-  primary: "#0D9488",
-  bg: "#F8FAFC",
-  surface: "#FFFFFF",
-  primaryText: "#0F172A",
-  secondaryText: "#64748B",
-  border: "#E2E8F0",
-  accentSoft: "#CCFBF1",
-  danger: "#DC2626",
-  success: "#10B981",
-};
-
-export const styles = StyleSheet.create({
+export function makeStyles(c: Colors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
+    backgroundColor: c.bg,
   },
   inner: {
     flex: 1,
@@ -25,36 +15,36 @@ export const styles = StyleSheet.create({
   h1: {
     fontSize: 24,
     fontWeight: "900",
-    color: theme.primaryText,
+    color: c.primaryText,
     letterSpacing: -0.5,
     marginBottom: 8,
   },
   hint: {
     fontSize: 14,
-    color: theme.secondaryText,
+    color: c.secondaryText,
     lineHeight: 20,
     marginBottom: 28,
   },
   label: {
     fontSize: 13,
     fontWeight: "800",
-    color: theme.primaryText,
+    color: c.primaryText,
     marginBottom: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 12,
     padding: 12,
     fontSize: 15,
-    color: theme.primaryText,
-    backgroundColor: theme.surface,
+    color: c.primaryText,
+    backgroundColor: c.surface,
     marginBottom: 20,
   },
   sendBtn: {
     height: 50,
     borderRadius: 14,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -67,14 +57,14 @@ export const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorMsg: {
-    color: theme.danger,
+    color: c.danger,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
   },
   successMsg: {
-    color: theme.success,
+    color: c.success,
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
@@ -88,6 +78,7 @@ export const styles = StyleSheet.create({
   backLinkText: {
     fontSize: 13,
     fontWeight: "800",
-    color: theme.primary,
+    color: c.primary,
   },
-});
+  });
+}

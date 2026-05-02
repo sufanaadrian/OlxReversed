@@ -1,28 +1,9 @@
 import { StyleSheet } from "react-native";
+import type { Colors } from "../../../src/theme/colors";
 
-export const theme = {
-  primary: "#0D9488",
-  primaryLight: "#CCFBF1",
-  primaryDark: "#0F766E",
-  bg: "#F8FAFC",
-  surface: "#FFFFFF",
-  surfaceAlt: "#F1F5F9",
-  primaryText: "#0F172A",
-  secondaryText: "#64748B",
-  mutedText: "#94A3B8",
-  border: "#E2E8F0",
-  success: "#10B981",
-  successLight: "#D1FAE5",
-  warning: "#F59E0B",
-  warningLight: "#FEF3C7",
-  error: "#EF4444",
-  errorLight: "#FEE2E2",
-  employer: "#7C3AED",
-  employerLight: "#EDE9FE",
-};
-
-export const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.bg },
+export function makeStyles(c: Colors) {
+  return StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
 
   navbar: {
     flexDirection: "row",
@@ -30,8 +11,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     gap: 4,
   },
   navBtn: { padding: 10, borderRadius: 10 },
@@ -40,16 +21,16 @@ export const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "800",
-    color: theme.primaryText,
+    color: c.primaryText,
   },
 
   scroll: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
 
   heroCard: {
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     padding: 18,
     marginBottom: 12,
     shadowColor: "#000",
@@ -71,9 +52,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
   },
-  catBadgeText: { fontSize: 12, fontWeight: "600", color: theme.secondaryText },
+  catBadgeText: { fontSize: 12, fontWeight: "600", color: c.secondaryText },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -88,7 +69,7 @@ export const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: "900",
-    color: theme.primaryText,
+    color: c.primaryText,
     lineHeight: 30,
     marginBottom: 8,
     letterSpacing: -0.3,
@@ -103,7 +84,7 @@ export const styles = StyleSheet.create({
   slotsText: {
     fontSize: 13,
     fontWeight: "700",
-    color: theme.primary,
+    color: c.primary,
   },
 
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
@@ -114,9 +95,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 11,
     borderRadius: 10,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
   },
-  metaText: { fontSize: 13, color: theme.secondaryText, fontWeight: "600" },
+  metaText: { fontSize: 13, color: c.secondaryText, fontWeight: "600" },
   wageChip: { backgroundColor: "#ECFDF5" },
   wageText: { color: "#065F46", fontWeight: "700" },
 
@@ -126,25 +107,25 @@ export const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontSize: 14, fontWeight: "800", color: theme.primaryDark },
-  posterName: { fontSize: 14, fontWeight: "800", color: theme.primaryText },
-  posterLabel: { fontSize: 12, color: theme.mutedText },
+  avatarText: { fontSize: 14, fontWeight: "800", color: c.primaryDark },
+  posterName: { fontSize: 14, fontWeight: "800", color: c.primaryText },
+  posterLabel: { fontSize: 12, color: c.mutedText },
 
   section: {
-    backgroundColor: theme.surface,
+    backgroundColor: c.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     padding: 16,
     marginBottom: 12,
   },
@@ -157,10 +138,10 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: theme.primaryText,
+    color: c.primaryText,
     flex: 1,
   },
-  descText: { fontSize: 14, color: theme.secondaryText, lineHeight: 22 },
+  descText: { fontSize: 14, color: c.secondaryText, lineHeight: 22 },
 
   appliedBanner: {
     flexDirection: "row",
@@ -169,14 +150,14 @@ export const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     marginBottom: 12,
-    backgroundColor: theme.primaryLight,
+    backgroundColor: c.primaryLight,
     borderWidth: 1.5,
-    borderColor: theme.primary,
+    borderColor: c.primary,
   },
-  appliedText: { fontSize: 15, fontWeight: "700", color: theme.primaryDark },
+  appliedText: { fontSize: 15, fontWeight: "700", color: c.primaryDark },
 
   pendingBadge: {
-    backgroundColor: theme.warning,
+    backgroundColor: c.warning,
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 6,
@@ -184,15 +165,15 @@ export const styles = StyleSheet.create({
   pendingBadgeText: { fontSize: 11, fontWeight: "800", color: "#FFFFFF" },
 
   emptyApplicants: { alignItems: "center", paddingVertical: 24, gap: 8 },
-  emptyApplicantsText: { color: theme.mutedText, fontSize: 14 },
+  emptyApplicantsText: { color: c.mutedText, fontSize: 14 },
 
   applicantCard: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     padding: 14,
     marginTop: 8,
-    backgroundColor: theme.bg,
+    backgroundColor: c.bg,
   },
   applicantHeader: {
     flexDirection: "row",
@@ -204,20 +185,20 @@ export const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: theme.primaryLight,
+    backgroundColor: c.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
   applicantAvatarText: {
     fontSize: 12,
     fontWeight: "800",
-    color: theme.primaryDark,
+    color: c.primaryDark,
   },
-  applicantName: { fontSize: 14, fontWeight: "800", color: theme.primaryText },
-  coverLetterPreview: { fontSize: 12, color: theme.mutedText, marginTop: 2 },
+  applicantName: { fontSize: 14, fontWeight: "800", color: c.primaryText },
+  coverLetterPreview: { fontSize: 12, color: c.mutedText, marginTop: 2 },
   coverLetterFull: {
     fontSize: 13,
-    color: theme.secondaryText,
+    color: c.secondaryText,
     lineHeight: 19,
     fontStyle: "italic",
     marginBottom: 10,
@@ -236,11 +217,11 @@ export const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: theme.errorLight,
+    backgroundColor: c.errorLight,
     borderWidth: 1,
     borderColor: "#FECACA",
   },
-  rejectBtnText: { fontWeight: "700", color: theme.error, fontSize: 13 },
+  rejectBtnText: { fontWeight: "700", color: c.error, fontSize: 13 },
   acceptBtn: {
     flex: 1,
     flexDirection: "row",
@@ -249,7 +230,7 @@ export const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
   },
   acceptBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
   chatBtn: {
@@ -259,7 +240,7 @@ export const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
     marginTop: 4,
   },
   chatBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
@@ -273,16 +254,16 @@ export const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
-    backgroundColor: theme.primaryLight,
+    backgroundColor: c.primaryLight,
   },
   candidateVerifiedText: {
     fontSize: 10,
     fontWeight: "700",
-    color: theme.primaryDark,
+    color: c.primaryDark,
   },
   candidateBio: {
     fontSize: 12,
-    color: theme.mutedText,
+    color: c.mutedText,
     marginTop: 2,
     lineHeight: 16,
   },
@@ -291,16 +272,16 @@ export const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 9,
     borderRadius: 8,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
   },
   skillChipText: {
     fontSize: 11,
     fontWeight: "700",
-    color: theme.secondaryText,
+    color: c.secondaryText,
   },
-  skillMore: { fontSize: 11, color: theme.mutedText, alignSelf: "center" },
+  skillMore: { fontSize: 11, color: c.mutedText, alignSelf: "center" },
   cvBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -311,20 +292,20 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.primary,
-    backgroundColor: theme.primaryLight,
+    borderColor: c.primary,
+    backgroundColor: c.primaryLight,
   },
-  cvBtnText: { fontSize: 12, fontWeight: "700", color: theme.primaryDark },
+  cvBtnText: { fontSize: 12, fontWeight: "700", color: c.primaryDark },
   coverLetterBox: {
     marginTop: 10,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
   },
   coverLetterLabel: {
     fontSize: 10,
     fontWeight: "800",
-    color: theme.mutedText,
+    color: c.mutedText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 5,
@@ -334,8 +315,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
   },
   applyBtn: {
     flexDirection: "row",
@@ -344,7 +325,7 @@ export const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 15,
     borderRadius: 16,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
   },
   applyBtnText: { fontSize: 17, fontWeight: "800", color: "#FFFFFF" },
 
@@ -354,12 +335,12 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
   },
-  notFoundText: { fontSize: 16, fontWeight: "700", color: theme.secondaryText },
+  notFoundText: { fontSize: 16, fontWeight: "700", color: c.secondaryText },
   backLink: {
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 10,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
   },
   backLinkText: { color: "#FFFFFF", fontWeight: "700" },
 
@@ -371,9 +352,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
   },
-  viewChipText: { fontSize: 12, color: theme.mutedText, fontWeight: "600" },
+  viewChipText: { fontSize: 12, color: c.mutedText, fontWeight: "600" },
 
   // Verified badge on poster row
   posterVerified: {
@@ -385,4 +366,5 @@ export const styles = StyleSheet.create({
   posterVerifiedText: { fontSize: 11, fontWeight: "700", color: "#0F766E" },
 
   // Report modal overlay handled via Alert; just need flag btn style
-});
+  });
+}

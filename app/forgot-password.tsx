@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo} from "react";
 import {
     KeyboardAvoidingView,
     Platform,
@@ -11,9 +11,12 @@ import {
 import { Screen } from "../src/components/Screen";
 import { useTranslation } from "../src/context/LanguageContext";
 import { supabase } from "../src/lib/supabase";
-import { styles } from "./forgot-password.styles";
+import { makeStyles } from "./forgot-password.styles";
+import { useTheme } from "../src/context/ThemeContext";
 
 export default function ForgotPasswordScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
 
   const [email, setEmail] = useState("");

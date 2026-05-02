@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo} from "react";
 import {
     Alert,
     KeyboardAvoidingView,
@@ -15,7 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./create-request.styles";
+import { makeStyles } from "./create-request.styles";
+import { useTheme } from "../../src/context/ThemeContext";
 
 const CATEGORIES = [
   "Hospitality",
@@ -44,6 +45,8 @@ const CATEGORY_KEYS: Record<string, string> = {
 type PostingAs = "employer" | "student";
 
 export default function CreateJobScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const params = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!params.id;
@@ -146,7 +149,7 @@ export default function CreateJobScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} style={styles.backBtn}>
-              <Feather name="x" size={22} color={theme.primaryText} />
+              <Feather name="x" size={22} color={colors.primaryText} />
             </Pressable>
             <Text style={styles.headerTitle}>
               {isEdit ? t("editPost") : t("createPost")}
@@ -167,10 +170,10 @@ export default function CreateJobScreen() {
                     postingAs === role && {
                       backgroundColor:
                         role === "employer"
-                          ? theme.employerLight
-                          : theme.primaryLight,
+                          ? colors.employerLight
+                          : colors.primaryLight,
                       borderColor:
-                        role === "employer" ? theme.employer : theme.primary,
+                        role === "employer" ? colors.employer : colors.primary,
                     },
                   ]}
                   onPress={() => setPostingAs(role)}
@@ -180,7 +183,7 @@ export default function CreateJobScreen() {
                       styles.toggleBtnText,
                       postingAs === role && {
                         color:
-                          role === "employer" ? theme.employer : theme.primary,
+                          role === "employer" ? colors.employer : colors.primary,
                         fontWeight: "700",
                       },
                     ]}
@@ -204,7 +207,7 @@ export default function CreateJobScreen() {
                   ? t("jobTitlePlaceholderEmployer")
                   : t("jobTitlePlaceholderStudent")
               }
-              placeholderTextColor={theme.mutedText}
+              placeholderTextColor={colors.mutedText}
               maxLength={120}
             />
           </View>
@@ -217,7 +220,7 @@ export default function CreateJobScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder={t("descriptionPlaceholder")}
-              placeholderTextColor={theme.mutedText}
+              placeholderTextColor={colors.mutedText}
               multiline
               numberOfLines={4}
               maxLength={800}
@@ -258,7 +261,7 @@ export default function CreateJobScreen() {
               value={location}
               onChangeText={setLocation}
               placeholder={t("locationPlaceholder")}
-              placeholderTextColor={theme.mutedText}
+              placeholderTextColor={colors.mutedText}
             />
           </View>
 
@@ -271,7 +274,7 @@ export default function CreateJobScreen() {
                 value={budgetMin}
                 onChangeText={setBudgetMin}
                 placeholder={t("minRon")}
-                placeholderTextColor={theme.mutedText}
+                placeholderTextColor={colors.mutedText}
                 keyboardType="numeric"
               />
               <Text style={styles.rangeSep}>–</Text>
@@ -280,7 +283,7 @@ export default function CreateJobScreen() {
                 value={budgetMax}
                 onChangeText={setBudgetMax}
                 placeholder={t("maxRon")}
-                placeholderTextColor={theme.mutedText}
+                placeholderTextColor={colors.mutedText}
                 keyboardType="numeric"
               />
             </View>
@@ -294,7 +297,7 @@ export default function CreateJobScreen() {
               value={screeningNote}
               onChangeText={setScreeningNote}
               placeholder={t("screeningNotePlaceholder")}
-              placeholderTextColor={theme.mutedText}
+              placeholderTextColor={colors.mutedText}
               multiline
               numberOfLines={3}
               maxLength={400}
@@ -318,7 +321,7 @@ export default function CreateJobScreen() {
                   <Feather
                     name="minus"
                     size={18}
-                    color={workersNeeded <= 1 ? theme.mutedText : theme.primary}
+                    color={workersNeeded <= 1 ? colors.mutedText : colors.primary}
                   />
                 </Pressable>
                 <Text style={styles.stepperValue}>{workersNeeded}</Text>
@@ -334,7 +337,7 @@ export default function CreateJobScreen() {
                     name="plus"
                     size={18}
                     color={
-                      workersNeeded >= 20 ? theme.mutedText : theme.primary
+                      workersNeeded >= 20 ? colors.mutedText : colors.primary
                     }
                   />
                 </Pressable>

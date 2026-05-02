@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
+import { useTheme } from "../../../src/context/ThemeContext";
 import { supabase } from "../../../src/lib/supabase";
-import { styles, theme } from "./index.styles";
+import type { Colors } from "../../../src/theme/colors";
+import { makeStyles } from "./index.styles";
 
 type JobDetail = {
   id: string;
@@ -60,27 +62,16 @@ const CATEGORY_KEYS: Record<string, string> = {
   Other: "other",
 };
 
-const OFFER_STATUS: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  pending: {
-    bg: theme.warningLight,
-    text: theme.warning,
-    label: "offerPending",
-  },
-  accepted: {
-    bg: theme.successLight,
-    text: theme.success,
-    label: "offerAccepted",
-  },
-  rejected: { bg: theme.errorLight, text: theme.error, label: "offerRejected" },
-  withdrawn: {
-    bg: theme.surfaceAlt,
-    text: theme.mutedText,
-    label: "offerWithdrawn",
-  },
-};
+function getOfferStatus(
+  c: Colors,
+): Record<string, { bg: string; text: string; label: string }> {
+  return {
+    pending: { bg: c.warningLight, text: c.warning, label: "offerPending" },
+    accepted: { bg: c.successLight, text: c.success, label: "offerAccepted" },
+    rejected: { bg: c.errorLight, text: c.error, label: "offerRejected" },
+    withdrawn: { bg: c.surfaceAlt, text: c.mutedText, label: "offerWithdrawn" },
+  };
+}
 
 function initials(name: string | null | undefined) {
   if (!name) return "?";
@@ -93,6 +84,8 @@ function initials(name: string | null | undefined) {
 }
 
 export default function JobDetailScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [job, setJob] = useState<JobDetail | null>(null);
@@ -291,7 +284,7 @@ export default function JobDetailScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       </SafeAreaView>
     );
@@ -301,7 +294,7 @@ export default function JobDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.notFound}>
-          <Feather name="alert-circle" size={48} color={theme.mutedText} />
+          <Feather name="alert-circle" size={48} color={colors.mutedText} />
           <Text style={styles.notFoundText}>{t("jobNotFound")}</Text>
           <Pressable onPress={() => router.back()} style={styles.backLink}>
             <Text style={styles.backLinkText}>{t("goBack")}</Text>
@@ -329,7 +322,7 @@ export default function JobDetailScreen() {
       {/* Nav bar */}
       <View style={styles.navbar}>
         <Pressable onPress={() => router.back()} style={styles.navBtn}>
-          <Feather name="arrow-left" size={20} color={theme.primaryText} />
+          <Feather name="arrow-left" size={20} color={colors.primaryText} />
         </Pressable>
         <Text style={styles.navTitle} numberOfLines={1}>
           {job.title}
@@ -340,25 +333,25 @@ export default function JobDetailScreen() {
               <Feather
                 name="bookmark"
                 size={20}
-                color={isSaved ? theme.primary : theme.mutedText}
+                color={isSaved ? colors.primary : colors.mutedText}
               />
             </Pressable>
           )}
           <Pressable onPress={handleShare} style={styles.navBtn}>
-            <Feather name="share-2" size={20} color={theme.primaryText} />
+            <Feather name="share-2" size={20} color={colors.primaryText} />
           </Pressable>
           {userId && !isOwner && (
             <Pressable onPress={handleReport} style={styles.navBtn}>
               <Feather
                 name="flag"
                 size={18}
-                color={alreadyReported ? theme.error : theme.mutedText}
+                color={alreadyReported ? colors.error : colors.mutedText}
               />
             </Pressable>
           )}
           {isOwner && job.status === "active" ? (
             <Pressable onPress={handleClose} style={styles.navBtn}>
-              <Feather name="x-circle" size={20} color={theme.error} />
+              <Feather name="x-circle" size={20} color={colors.error} />
             </Pressable>
           ) : null}
         </View>
@@ -377,8 +370,8 @@ export default function JobDetailScreen() {
                 styles.roleBadge,
                 {
                   backgroundColor: isEmployer
-                    ? theme.employerLight
-                    : theme.primaryLight,
+                    ? colors.employerLight
+                    : colors.primaryLight,
                 },
               ]}
             >
@@ -386,7 +379,7 @@ export default function JobDetailScreen() {
                 style={[
                   styles.roleBadgeText,
                   {
-                    color: isEmployer ? theme.employer : theme.primaryDark,
+                    color: isEmployer ? colors.employer : colors.primaryDark,
                   },
                 ]}
               >
@@ -406,8 +399,8 @@ export default function JobDetailScreen() {
                 {
                   backgroundColor:
                     job.status === "active"
-                      ? theme.successLight
-                      : theme.surfaceAlt,
+                      ? colors.successLight
+                      : colors.surfaceAlt,
                 },
               ]}
             >
@@ -416,7 +409,9 @@ export default function JobDetailScreen() {
                   styles.statusDot,
                   {
                     backgroundColor:
-                      job.status === "active" ? theme.success : theme.mutedText,
+                      job.status === "active"
+                        ? colors.success
+                        : colors.mutedText,
                   },
                 ]}
               />
@@ -425,7 +420,9 @@ export default function JobDetailScreen() {
                   styles.statusText,
                   {
                     color:
-                      job.status === "active" ? theme.success : theme.mutedText,
+                      job.status === "active"
+                        ? colors.success
+                        : colors.mutedText,
                   },
                 ]}
               >
@@ -445,13 +442,13 @@ export default function JobDetailScreen() {
                 name="users"
                 size={13}
                 color={
-                  job.status === "filled" ? theme.mutedText : theme.primary
+                  job.status === "filled" ? colors.mutedText : colors.primary
                 }
               />
               <Text
                 style={[
                   styles.slotsText,
-                  job.status === "filled" && { color: theme.mutedText },
+                  job.status === "filled" && { color: colors.mutedText },
                 ]}
               >
                 {job.status === "filled"
@@ -465,18 +462,18 @@ export default function JobDetailScreen() {
           <View style={styles.metaRow}>
             {job.location && (
               <View style={styles.metaChip}>
-                <Feather name="map-pin" size={13} color={theme.primary} />
+                <Feather name="map-pin" size={13} color={colors.primary} />
                 <Text style={styles.metaText}>{job.location}</Text>
               </View>
             )}
             {wage && (
               <View style={[styles.metaChip, styles.wageChip]}>
-                <Feather name="dollar-sign" size={13} color={theme.success} />
+                <Feather name="dollar-sign" size={13} color={colors.success} />
                 <Text style={[styles.metaText, styles.wageText]}>{wage}</Text>
               </View>
             )}
             <View style={styles.viewChip}>
-              <Feather name="eye" size={11} color={theme.mutedText} />
+              <Feather name="eye" size={11} color={colors.mutedText} />
               <Text style={styles.viewChipText}>
                 {viewCount} {t("viewCount")}
               </Text>
@@ -509,7 +506,7 @@ export default function JobDetailScreen() {
         {job.description ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="file-text" size={16} color={theme.primary} />
+              <Feather name="file-text" size={16} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("description")}</Text>
             </View>
             <Text style={styles.descText}>{job.description}</Text>
@@ -519,7 +516,7 @@ export default function JobDetailScreen() {
         {/* Already applied banner */}
         {!isOwner && hasApplied && (
           <View style={styles.appliedBanner}>
-            <Feather name="check-circle" size={18} color={theme.primary} />
+            <Feather name="check-circle" size={18} color={colors.primary} />
             <Text style={styles.appliedText}>{t("alreadyApplied")}</Text>
           </View>
         )}
@@ -528,7 +525,7 @@ export default function JobDetailScreen() {
         {isOwner && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="users" size={16} color={theme.primary} />
+              <Feather name="users" size={16} color={colors.primary} />
               <Text style={styles.sectionTitle}>
                 {t("applicants")} ({applicants.length})
               </Text>
@@ -543,14 +540,15 @@ export default function JobDetailScreen() {
 
             {applicants.length === 0 ? (
               <View style={styles.emptyApplicants}>
-                <Feather name="inbox" size={28} color={theme.mutedText} />
+                <Feather name="inbox" size={28} color={colors.mutedText} />
                 <Text style={styles.emptyApplicantsText}>
                   {t("noApplicantsYet")}
                 </Text>
               </View>
             ) : (
               applicants.map((app) => {
-                const s = OFFER_STATUS[app.status] ?? OFFER_STATUS.pending;
+                const offerStatus = getOfferStatus(colors);
+                const s = offerStatus[app.status] ?? offerStatus.pending;
                 const prof = (app as any).profiles;
                 const appName = prof?.username ?? t("anonymous");
                 const avatarLetters = appName
@@ -647,7 +645,7 @@ export default function JobDetailScreen() {
                           style={styles.rejectBtn}
                           onPress={() => handleReject(app.id)}
                         >
-                          <Feather name="x" size={14} color={theme.error} />
+                          <Feather name="x" size={14} color={colors.error} />
                           <Text style={styles.rejectBtnText}>
                             {t("reject")}
                           </Text>

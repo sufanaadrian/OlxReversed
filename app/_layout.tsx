@@ -6,6 +6,7 @@ import { AppProvider } from "../src/context/AppContext";
 import { CurrencyProvider } from "../src/context/CurrencyContext";
 import { LanguageProvider } from "../src/context/LanguageContext";
 import { MarketplaceModeProvider } from "../src/context/MarketplaceModeContext";
+import { ThemeProvider } from "../src/context/ThemeContext";
 import { supabase } from "../src/lib/supabase";
 
 export default function RootLayout() {
@@ -34,25 +35,27 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <LanguageProvider>
-          <CurrencyProvider>
-            <MarketplaceModeProvider>
-              <AppProvider>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="(modals)"
-                    options={{ presentation: "modal" }}
-                  />
-                  <Stack.Screen name="sign-in" />
-                  <Stack.Screen name="sign-up" />
-                  <Stack.Screen name="onboarding" />
-                  <Stack.Screen name="forgot-password" />
-                </Stack>
-              </AppProvider>
-            </MarketplaceModeProvider>
-          </CurrencyProvider>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <CurrencyProvider>
+              <MarketplaceModeProvider>
+                <AppProvider>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen
+                      name="(modals)"
+                      options={{ presentation: "modal" }}
+                    />
+                    <Stack.Screen name="sign-in" />
+                    <Stack.Screen name="sign-up" />
+                    <Stack.Screen name="onboarding" />
+                    <Stack.Screen name="forgot-password" />
+                  </Stack>
+                </AppProvider>
+              </MarketplaceModeProvider>
+            </CurrencyProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

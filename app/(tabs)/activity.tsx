@@ -1,20 +1,37 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./activity.styles";
+import type { Colors } from "../../src/theme/colors";
+import { makeStyles } from "./activity.styles";
+
+function getPostStatusColor(c: Colors): Record<string, string> {
+  return { active: c.success, filled: c.primary, closed: c.mutedText };
+}
+
+function getAppStatusColors(
+  c: Colors,
+): Record<string, { bg: string; text: string }> {
+  return {
+    pending: { bg: c.warningLight, text: c.warning },
+    accepted: { bg: c.successLight, text: c.success },
+    rejected: { bg: c.errorLight, text: c.error },
+    withdrawn: { bg: c.surfaceAlt, text: c.mutedText },
+  };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -63,25 +80,14 @@ type ReceivedApplication = {
   } | null;
 };
 
-const POST_STATUS_COLOR: Record<string, string> = {
-  active: theme.success,
-  filled: theme.primary,
-  closed: theme.mutedText,
-};
-
-const APP_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  pending: { bg: theme.warningLight, text: theme.warning },
-  accepted: { bg: theme.successLight, text: theme.success },
-  rejected: { bg: theme.errorLight, text: theme.error },
-  withdrawn: { bg: theme.surfaceAlt, text: theme.mutedText },
-};
-
 type MainTab = "posts" | "applications";
 type AppTab = "sent" | "received";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ActivityScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const [mainTab, setMainTab] = useState<MainTab>("posts");
   const [appTab, setAppTab] = useState<AppTab>("sent");
@@ -259,7 +265,8 @@ export default function ActivityScreen() {
   // ── Render helpers ──
 
   function renderPost({ item }: { item: JobPost }) {
-    const color = POST_STATUS_COLOR[item.status] ?? theme.mutedText;
+    const postStatusColor = getPostStatusColor(colors);
+    const color = postStatusColor[item.status] ?? colors.mutedText;
     const isBoosted =
       item.is_boosted &&
       item.boosted_until &&
@@ -283,18 +290,18 @@ export default function ActivityScreen() {
           ) : null}
           {item.location ? (
             <View style={styles.metaItem}>
-              <Feather name="map-pin" size={11} color={theme.mutedText} />
+              <Feather name="map-pin" size={11} color={colors.mutedText} />
               <Text style={styles.metaText}>{item.location}</Text>
             </View>
           ) : null}
           <View style={styles.metaItem}>
-            <Feather name="clock" size={11} color={theme.mutedText} />
+            <Feather name="clock" size={11} color={colors.mutedText} />
             <Text style={styles.metaText}>{timeAgo(item.created_at)}</Text>
           </View>
           {item.offer_count > 0 && (
             <View style={styles.metaItem}>
-              <Feather name="users" size={11} color={theme.primary} />
-              <Text style={[styles.metaText, { color: theme.primary }]}>
+              <Feather name="users" size={11} color={colors.primary} />
+              <Text style={[styles.metaText, { color: colors.primary }]}>
                 {item.offer_count}
               </Text>
             </View>
@@ -305,15 +312,15 @@ export default function ActivityScreen() {
             style={styles.actionBtn}
             onPress={() => router.push(`/request/${item.id}` as any)}
           >
-            <Feather name="eye" size={13} color={theme.primary} />
+            <Feather name="eye" size={13} color={colors.primary} />
             <Text style={styles.actionBtnText}>{t("view")}</Text>
           </Pressable>
           <Pressable
             style={[styles.actionBtn, styles.actionBtnDanger]}
             onPress={() => deletePost(item.id)}
           >
-            <Feather name="trash-2" size={13} color={theme.error} />
-            <Text style={[styles.actionBtnText, { color: theme.error }]}>
+            <Feather name="trash-2" size={13} color={colors.error} />
+            <Text style={[styles.actionBtnText, { color: colors.error }]}>
               {t("delete")}
             </Text>
           </Pressable>
@@ -323,7 +330,8 @@ export default function ActivityScreen() {
   }
 
   function renderSentApp({ item }: { item: Application }) {
-    const col = APP_STATUS_COLORS[item.status] ?? APP_STATUS_COLORS.pending;
+    const appStatusColors = getAppStatusColors(colors);
+    const col = appStatusColors[item.status] ?? appStatusColors.pending;
     const req = item.requests;
     const canChat = item.status === "accepted" && req;
     return (
@@ -361,7 +369,7 @@ export default function ActivityScreen() {
                     expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
                   }
                   size={13}
-                  color={theme.primary}
+                  color={colors.primary}
                 />
               </View>
             )}
@@ -373,7 +381,7 @@ export default function ActivityScreen() {
               style={styles.actionBtn}
               onPress={() => router.push(`/request/${req.id}` as any)}
             >
-              <Feather name="eye" size={13} color={theme.primary} />
+              <Feather name="eye" size={13} color={colors.primary} />
               <Text style={styles.actionBtnText}>{t("viewPost")}</Text>
             </Pressable>
           )}
@@ -391,7 +399,7 @@ export default function ActivityScreen() {
               style={[styles.actionBtn, styles.actionBtnDanger]}
               onPress={() => withdrawApp(item.id)}
             >
-              <Text style={[styles.actionBtnText, { color: theme.error }]}>
+              <Text style={[styles.actionBtnText, { color: colors.error }]}>
                 {t("withdraw")}
               </Text>
             </Pressable>
@@ -402,7 +410,8 @@ export default function ActivityScreen() {
   }
 
   function renderReceivedApp({ item }: { item: ReceivedApplication }) {
-    const col = APP_STATUS_COLORS[item.status] ?? APP_STATUS_COLORS.pending;
+    const appStatusColors = getAppStatusColors(colors);
+    const col = appStatusColors[item.status] ?? appStatusColors.pending;
     const req = item.requests;
     const prof = item.profiles;
     return (
@@ -441,7 +450,7 @@ export default function ActivityScreen() {
                     expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
                   }
                   size={13}
-                  color={theme.primary}
+                  color={colors.primary}
                 />
               </View>
             )}
@@ -453,7 +462,7 @@ export default function ActivityScreen() {
               style={styles.actionBtn}
               onPress={() => router.push(`/cv/${prof.id}` as any)}
             >
-              <Feather name="user" size={13} color={theme.primary} />
+              <Feather name="user" size={13} color={colors.primary} />
               <Text style={styles.actionBtnText}>{t("viewCV")}</Text>
             </Pressable>
           )}
@@ -490,7 +499,7 @@ export default function ActivityScreen() {
                   fetchApplications();
                 }}
               >
-                <Text style={[styles.actionBtnText, { color: theme.error }]}>
+                <Text style={[styles.actionBtnText, { color: colors.error }]}>
                   {t("reject")}
                 </Text>
               </Pressable>
@@ -505,11 +514,6 @@ export default function ActivityScreen() {
 
   return (
     <SafeAreaView style={styles.page} edges={[]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t("activity")}</Text>
-      </View>
-
       {/* Main tab pill */}
       <View style={styles.mainTabRow}>
         <Pressable
@@ -522,7 +526,7 @@ export default function ActivityScreen() {
           <Feather
             name="file-text"
             size={14}
-            color={mainTab === "posts" ? theme.primary : theme.mutedText}
+            color={mainTab === "posts" ? colors.primary : colors.mutedText}
           />
           <Text
             style={[
@@ -548,7 +552,9 @@ export default function ActivityScreen() {
           <Feather
             name="inbox"
             size={14}
-            color={mainTab === "applications" ? theme.primary : theme.mutedText}
+            color={
+              mainTab === "applications" ? colors.primary : colors.mutedText
+            }
           />
           <Text
             style={[
@@ -611,7 +617,7 @@ export default function ActivityScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       ) : mainTab === "posts" ? (
         <FlatList
@@ -621,7 +627,7 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Feather name="file-text" size={40} color={theme.border} />
+              <Feather name="file-text" size={40} color={colors.border} />
               <Text style={styles.emptyText}>{t("noPostsYet")}</Text>
             </View>
           }
@@ -634,7 +640,7 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Feather name="inbox" size={40} color={theme.border} />
+              <Feather name="inbox" size={40} color={colors.border} />
               <Text style={styles.emptyText}>{t("noApplicationsYet")}</Text>
             </View>
           }
@@ -647,7 +653,7 @@ export default function ActivityScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Feather name="users" size={40} color={theme.border} />
+              <Feather name="users" size={40} color={colors.border} />
               <Text style={styles.emptyText}>{t("noApplicationsYet")}</Text>
             </View>
           }
