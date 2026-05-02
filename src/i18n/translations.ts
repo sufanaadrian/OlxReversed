@@ -143,6 +143,9 @@ export const translations = {
     deletePostConfirm: "Delete this post?",
     deletePostMsg:
       "This will permanently remove the post and all its applications.",
+    deleteConversation: "Delete conversation",
+    deleteConversationConfirm:
+      "This will delete all messages in this conversation. This cannot be undone.",
     editPost: "Edit post",
     createPost: "Create Post",
     postJob: "Post Job",
@@ -198,6 +201,8 @@ export const translations = {
     chatContextOffer: "Agreed price",
     chatContextBudget: "Budget",
     viewRequest: "View request",
+    noPhoneTitle: "No phone number",
+    noPhoneDesc: "This user hasn't added a phone number yet.",
     online: "online",
     offline: "offline",
     chatNotAvailable: "Chat not available yet",
@@ -683,6 +688,9 @@ export const translations = {
     deletePostConfirm: "Ştergi această postare?",
     deletePostMsg:
       "Aceasta va elimina permanent postarea și toate candidaturile.",
+    deleteConversation: "Șterge conversația",
+    deleteConversationConfirm:
+      "Aceasta va șterge toate mesajele din această conversație. Nu se poate anula.",
     editPost: "Editează postarea",
     createPost: "Creează postare",
     postJob: "Postează jobul",
@@ -734,6 +742,8 @@ export const translations = {
     chatRoleSeller: "Vânzător",
     chatContextRequest: "Cerere",
     chatContextOffer: "Preț acceptat",
+    noPhoneTitle: "Fără număr de telefon",
+    noPhoneDesc: "Acest utilizator nu a adăugat încă un număr de telefon.",
     chatContextBudget: "Buget",
     viewRequest: "Vezi cererea",
     online: "online",

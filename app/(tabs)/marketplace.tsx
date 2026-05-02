@@ -345,7 +345,7 @@ export default function JobsScreen() {
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
     const daysLeft = Math.ceil(msLeft / 86400000);
-    const expiringSoon = daysLeft > 0 && daysLeft <= 7;
+    const showExpiry = daysLeft > 0;
 
     return (
       <Pressable
@@ -374,9 +374,9 @@ export default function JobsScreen() {
             )}
           </View>
           <View style={styles.stripRight}>
-            {expiringSoon && (
+            {showExpiry && (
               <View style={styles.expiryBadge}>
-                <Feather name="clock" size={10} color="#92400E" />
+                <Feather name="clock" size={10} color={colors.warning} />
                 <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
               </View>
             )}

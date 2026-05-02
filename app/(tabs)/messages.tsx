@@ -4,11 +4,13 @@ import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
   View,
 } from "react-native";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { useTheme } from "../../src/context/ThemeContext";
@@ -48,6 +50,22 @@ export default function MessagesScreen() {
   const t = useTranslation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+
+  async function deleteConversation(requestId: string) {
+    Alert.alert(t("deleteConversation"), t("deleteConversationConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: async () => {
+          await supabase.from("messages").delete().eq("request_id", requestId);
+          setConversations((prev) =>
+            prev.filter((c) => c.requestId !== requestId),
+          );
+        },
+      },
+    ]);
+  }
 
   const fetchConversations = useCallback(async () => {
     setLoading(true);
@@ -177,85 +195,103 @@ export default function MessagesScreen() {
     const hasUnread = item.unreadCount > 0;
 
     return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.row,
-          hasUnread && styles.rowUnread,
-          pressed && { opacity: 0.75 },
-        ]}
-        onPress={() => router.push(`/request/${item.requestId}/chat` as any)}
+      <ReanimatedSwipeable
+        renderRightActions={(_, __, swipeable) => (
+          <Pressable
+            style={styles.deleteAction}
+            onPress={() => {
+              swipeable.close();
+              deleteConversation(item.requestId);
+            }}
+          >
+            <Feather name="trash-2" size={20} color="#FFFFFF" />
+            <Text style={styles.deleteActionText}>{t("delete")}</Text>
+          </Pressable>
+        )}
       >
-        {/* Avatar with unread dot */}
-        <View style={styles.avatarWrap}>
-          <View style={[styles.avatar, isBuyer && styles.avatarBuyer]}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.row,
+            hasUnread && styles.rowUnread,
+            pressed && { opacity: 0.75 },
+          ]}
+          onPress={() => router.push(`/request/${item.requestId}/chat` as any)}
+        >
+          {/* Avatar with unread dot */}
+          <View style={styles.avatarWrap}>
+            <View style={[styles.avatar, isBuyer && styles.avatarBuyer]}>
+              <Text
+                style={[styles.avatarText, isBuyer && styles.avatarTextBuyer]}
+              >
+                {initials}
+              </Text>
+            </View>
+            {hasUnread && <View style={styles.unreadDot} />}
+          </View>
+
+          {/* Content */}
+          <View style={styles.rowContent}>
+            <View style={styles.rowTop}>
+              <View style={styles.nameRow}>
+                <Text style={styles.username} numberOfLines={1}>
+                  {item.otherUsername ?? t("anonymous")}
+                </Text>
+                <View
+                  style={[styles.roleBadge, isBuyer && styles.roleBadgeBuyer]}
+                >
+                  <Text
+                    style={[
+                      styles.roleBadgeText,
+                      isBuyer && styles.roleBadgeTextBuyer,
+                    ]}
+                  >
+                    {isBuyer ? t("chatRoleBuyer") : t("chatRoleSeller")}
+                  </Text>
+                </View>
+              </View>
+              {item.lastMessageAt && (
+                <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
+              )}
+            </View>
+
+            <View style={styles.jobRow}>
+              <Feather name="briefcase" size={11} color={colors.mutedText} />
+              <Text style={styles.jobTitle} numberOfLines={1}>
+                {item.requestTitle}
+              </Text>
+            </View>
+
             <Text
-              style={[styles.avatarText, isBuyer && styles.avatarTextBuyer]}
+              style={[
+                styles.lastMessage,
+                hasUnread && styles.lastMessageUnread,
+              ]}
+              numberOfLines={1}
             >
-              {initials}
+              {item.lastMessage
+                ? (item.lastMessageIsMe ? `${t("youTyped")}: ` : "") +
+                  item.lastMessage
+                : t("noMessages")}
             </Text>
           </View>
-          {hasUnread && <View style={styles.unreadDot} />}
-        </View>
 
-        {/* Content */}
-        <View style={styles.rowContent}>
-          <View style={styles.rowTop}>
-            <View style={styles.nameRow}>
-              <Text style={styles.username} numberOfLines={1}>
-                {item.otherUsername ?? t("anonymous")}
-              </Text>
-              <View
-                style={[styles.roleBadge, isBuyer && styles.roleBadgeBuyer]}
-              >
-                <Text
-                  style={[
-                    styles.roleBadgeText,
-                    isBuyer && styles.roleBadgeTextBuyer,
-                  ]}
-                >
-                  {isBuyer ? t("chatRoleBuyer") : t("chatRoleSeller")}
-                </Text>
+          {/* Right side */}
+          <View style={styles.rowRight}>
+            {hasUnread ? (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
               </View>
-            </View>
-            {item.lastMessageAt && (
-              <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
+            ) : (
+              <Feather
+                name="chevron-right"
+                size={18}
+                color={colors.mutedText}
+                style={styles.chevron}
+              />
             )}
           </View>
-
-          <View style={styles.jobRow}>
-            <Feather name="briefcase" size={11} color={colors.mutedText} />
-            <Text style={styles.jobTitle} numberOfLines={1}>
-              {item.requestTitle}
-            </Text>
-          </View>
-
-          <Text
-            style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]}
-            numberOfLines={1}
-          >
-            {item.lastMessage
-              ? (item.lastMessageIsMe ? `${t("youTyped")}: ` : "") +
-                item.lastMessage
-              : t("noMessages")}
-          </Text>
-        </View>
-
-        {/* Right side */}
-        <View style={styles.rowRight}>
-          {hasUnread ? (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
-            </View>
-          ) : (
-            <Feather
-              name="chevron-right"
-              size={18}
-              color={colors.mutedText}
-              style={styles.chevron}
-            />
-          )}
-        </View>
-      </Pressable>
+        </Pressable>
+      </ReanimatedSwipeable>
     );
   }
 

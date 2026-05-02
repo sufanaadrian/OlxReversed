@@ -373,14 +373,24 @@ export default function ChatScreen() {
               <Feather name="user" size={18} color={colors.primaryText} />
             </Pressable>
           )}
-          {otherPhone ? (
+          {otherUser && (
             <Pressable
-              style={[styles.headerIconBtn, styles.headerCallBtn]}
-              onPress={() => Linking.openURL(`tel:${otherPhone}`)}
+              style={[
+                styles.headerIconBtn,
+                styles.headerCallBtn,
+                !otherPhone && styles.headerCallBtnDisabled,
+              ]}
+              onPress={() => {
+                if (otherPhone) {
+                  Linking.openURL(`tel:${otherPhone}`);
+                } else {
+                  Alert.alert(t("noPhoneTitle"), t("noPhoneDesc"));
+                }
+              }}
             >
               <Feather name="phone" size={18} color="#FFFFFF" />
             </Pressable>
-          ) : null}
+          )}
         </View>
         {isOwner && !jobClosed && (
           <Pressable onPress={handleComplete} style={styles.completeBtn}>

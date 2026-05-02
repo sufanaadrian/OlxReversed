@@ -162,5 +162,14 @@ export function makeStyles(c: Colors) {
       borderRadius: 14,
     },
     emptyBtnText: { fontSize: 14, fontWeight: "800", color: "#FFFFFF" },
+
+    deleteAction: {
+      backgroundColor: c.error,
+      justifyContent: "center",
+      alignItems: "center",
+      width: 80,
+      gap: 4,
+    },
+    deleteActionText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
   });
 }

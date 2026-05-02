@@ -137,9 +137,9 @@ export function makeStyles(c: Colors) {
       paddingVertical: 2,
       paddingHorizontal: 6,
       borderRadius: 5,
-      backgroundColor: "#FEF3C7",
+      backgroundColor: c.warningLight,
     },
-    expiryBadgeText: { fontSize: 10, fontWeight: "700", color: "#92400E" },
+    expiryBadgeText: { fontSize: 10, fontWeight: "700", color: c.warning },
     urgentBadge: {
       paddingVertical: 2,
       paddingHorizontal: 7,

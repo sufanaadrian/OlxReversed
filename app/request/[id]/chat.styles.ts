@@ -48,6 +48,10 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.success,
       borderColor: c.success,
     },
+    headerCallBtnDisabled: {
+      backgroundColor: c.mutedText,
+      borderColor: c.mutedText,
+    },
 
     messageList: { padding: 16, gap: 8, flexGrow: 1 },
 
