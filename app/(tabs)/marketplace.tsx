@@ -1,21 +1,28 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { supabase } from "../../src/lib/supabase";
-import { CATEGORY_COLORS, styles, theme } from "./marketplace.styles";
+import { makeStyles } from "./marketplace.styles";
 
 const CATEGORIES = [
   "All",
@@ -104,6 +111,8 @@ function formatWage(min: number | null, max: number | null) {
 export default function JobsScreen() {
   const t = useTranslation();
   const { marketplaceMode } = useMarketplaceMode();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -322,8 +331,6 @@ export default function JobsScreen() {
   function renderItem({ item }: { item: JobRequest }) {
     const isEmployer = item.posting_as === "employer";
     const wage = formatWage(item.budget_min, item.budget_max);
-    const catColor =
-      CATEGORY_COLORS[item.category ?? "Other"] ?? CATEGORY_COLORS.Other;
     const posterName = item.profiles?.username ?? null;
     const isSaved = savedIds.has(item.id);
     const hasApplied = appliedIds.has(item.id);
@@ -338,17 +345,21 @@ export default function JobsScreen() {
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
     const daysLeft = Math.ceil(msLeft / 86400000);
-    const expiringSoon = daysLeft > 0 && daysLeft <= 7;
+    const showExpiry = daysLeft > 0;
 
     return (
       <Pressable
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        style={({ pressed }) => [
+          styles.card,
+          isEmployer ? styles.cardEmployer : styles.cardStudent,
+          pressed && styles.cardPressed,
+        ]}
         onPress={() => router.push(`/request/${item.id}`)}
       >
         {/* Colored category strip */}
-        <View style={[styles.cardStrip, { backgroundColor: catColor.bg }]}>
+        <View style={styles.cardStrip}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={[styles.cardStripText, { color: catColor.text }]}>
+            <Text style={styles.cardStripText}>
               {t(CATEGORY_KEYS[item.category ?? "Other"] ?? "other")}
             </Text>
             {item.is_urgent && (
@@ -363,28 +374,14 @@ export default function JobsScreen() {
             )}
           </View>
           <View style={styles.stripRight}>
-            {expiringSoon && (
+            {showExpiry && (
               <View style={styles.expiryBadge}>
-                <Feather name="clock" size={10} color="#92400E" />
+                <Feather name="clock" size={10} color={colors.warning} />
                 <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
               </View>
             )}
-            <View
-              style={[
-                styles.roleBadge,
-                {
-                  backgroundColor: isEmployer
-                    ? theme.employerLight
-                    : theme.primaryLight,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.roleBadgeText,
-                  { color: isEmployer ? theme.employer : theme.primaryDark },
-                ]}
-              >
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>
                 {isEmployer ? t("employer") : t("student")}
               </Text>
             </View>
@@ -405,7 +402,7 @@ export default function JobsScreen() {
                 <Feather
                   name={isSaved ? "bookmark" : "bookmark"}
                   size={18}
-                  color={isSaved ? theme.primary : theme.mutedText}
+                  color={isSaved ? colors.primary : colors.mutedText}
                 />
               </Pressable>
             )}
@@ -421,7 +418,11 @@ export default function JobsScreen() {
           <View style={styles.metaRow}>
             {item.location ? (
               <View style={styles.metaChip}>
-                <Feather name="map-pin" size={11} color={theme.secondaryText} />
+                <Feather
+                  name="map-pin"
+                  size={11}
+                  color={colors.secondaryText}
+                />
                 <Text style={styles.metaChipText} numberOfLines={1}>
                   {item.location}
                 </Text>
@@ -429,7 +430,7 @@ export default function JobsScreen() {
             ) : null}
             {wage ? (
               <View style={[styles.metaChip, styles.wageChip]}>
-                <Feather name="dollar-sign" size={11} color={theme.success} />
+                <Feather name="dollar-sign" size={11} color={colors.success} />
                 <Text style={[styles.metaChipText, styles.wageChipText]}>
                   {wage}
                 </Text>
@@ -454,7 +455,7 @@ export default function JobsScreen() {
             </View>
             {hasApplied ? (
               <View style={styles.appliedBadge}>
-                <Feather name="check" size={12} color={theme.primary} />
+                <Feather name="check" size={12} color={colors.primary} />
                 <Text style={styles.appliedBadgeText}>{t("appliedBadge")}</Text>
               </View>
             ) : (
@@ -471,7 +472,7 @@ export default function JobsScreen() {
                     <Feather
                       name="heart"
                       size={13}
-                      color={isInterested ? "#EF4444" : theme.mutedText}
+                      color={isInterested ? "#EF4444" : colors.mutedText}
                     />
                     {iCount > 0 && (
                       <Text
@@ -499,46 +500,33 @@ export default function JobsScreen() {
 
   return (
     <View style={styles.page}>
-      {/* Header */}
+      {/* Compact header: search row + recent searches */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>{t("findJobs")}</Text>
-            <Text style={styles.headerSub}>
-              {filtered.length} {t("jobsAvailable")}
-            </Text>
+          <View style={styles.searchBox}>
+            <Feather name="search" size={15} color={colors.mutedText} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t("searchJobs")}
+              placeholderTextColor={colors.mutedText}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+              onSubmitEditing={() => commitSearch(search)}
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch("")}>
+                <Feather name="x" size={15} color={colors.mutedText} />
+              </Pressable>
+            )}
           </View>
-          <View style={{ flexDirection: "row", gap: 4 }}>
-            <Pressable
-              onPress={() => router.push("/saved-searches" as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="bell" size={20} color={theme.primaryDark} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push("/saved-jobs" as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="bookmark" size={22} color={theme.primaryDark} />
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.searchBox}>
-          <Feather name="search" size={16} color={theme.mutedText} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t("searchJobs")}
-            placeholderTextColor={theme.mutedText}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            onSubmitEditing={() => commitSearch(search)}
-          />
-          {search.length > 0 && (
-            <Pressable onPress={() => setSearch("")}>
-              <Feather name="x" size={16} color={theme.mutedText} />
-            </Pressable>
-          )}
+          <Pressable
+            style={styles.headerIconBtn}
+            onPress={() => router.push("/saved-jobs" as any)}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            <Feather name="bookmark" size={18} color={colors.primaryDark} />
+          </Pressable>
         </View>
 
         {/* Recent searches */}
@@ -555,7 +543,7 @@ export default function JobsScreen() {
                 style={styles.recentChip}
                 onPress={() => setSearch(s)}
               >
-                <Feather name="clock" size={11} color={theme.mutedText} />
+                <Feather name="clock" size={11} color={colors.mutedText} />
                 <Text style={styles.recentChipText}>{s}</Text>
               </Pressable>
             ))}
@@ -572,7 +560,7 @@ export default function JobsScreen() {
             fetchJobs();
           }}
         >
-          <Feather name="bell" size={14} color={theme.primaryDark} />
+          <Feather name="bell" size={14} color={colors.primaryDark} />
           <Text style={styles.newJobsBannerText}>
             {newJobsCount} {t("newJobsBanner")} — {t("tapToRefresh")}
           </Text>
@@ -582,7 +570,7 @@ export default function JobsScreen() {
       {/* Profile completeness banner */}
       {profileIncomplete && showBanner && (
         <View style={styles.banner}>
-          <Feather name="user" size={15} color={theme.primaryDark} />
+          <Feather name="user" size={15} color={colors.primaryDark} />
           <Text style={styles.bannerText}>{t("completeProfileBanner")}</Text>
           <View style={styles.bannerActions}>
             <Pressable onPress={() => router.push("/profile" as any)}>
@@ -592,7 +580,7 @@ export default function JobsScreen() {
               onPress={() => setShowBanner(false)}
               style={styles.bannerDismiss}
             >
-              <Feather name="x" size={14} color={theme.primaryDark} />
+              <Feather name="x" size={14} color={colors.primaryDark} />
             </Pressable>
           </View>
         </View>
@@ -627,7 +615,9 @@ export default function JobsScreen() {
           <Feather
             name={marketplaceMode === "employer" ? "briefcase" : "user"}
             size={11}
-            color={marketplaceMode === "employer" ? "#7C3AED" : theme.primary}
+            color={
+              marketplaceMode === "employer" ? colors.employer : colors.primary
+            }
           />
           <Text
             style={[
@@ -648,7 +638,7 @@ export default function JobsScreen() {
               router.push("/(tabs)/profile" as any);
             }}
           >
-            <Feather name="settings" size={11} color={theme.mutedText} />
+            <Feather name="settings" size={11} color={colors.mutedText} />
           </Pressable>
         </View>
       )}
@@ -656,7 +646,7 @@ export default function JobsScreen() {
       {/* Save search pill — visible when a filter or search is active */}
       {userId && (search.trim() || selectedCategory !== "All") && (
         <Pressable style={styles.saveSearchBtn} onPress={saveSearch}>
-          <Feather name="bell" size={12} color={theme.primaryDark} />
+          <Feather name="bell" size={12} color={colors.primaryDark} />
           <Text style={styles.saveSearchText}>{t("saveSearch")}</Text>
         </Pressable>
       )}
@@ -665,7 +655,7 @@ export default function JobsScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       ) : (
         <FlatList
@@ -682,7 +672,7 @@ export default function JobsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
-                <Feather name="briefcase" size={32} color={theme.mutedText} />
+                <Feather name="briefcase" size={32} color={colors.mutedText} />
               </View>
               <Text style={styles.emptyTitle}>{t("noJobsFound")}</Text>
               <Text style={styles.emptySubtitle}>

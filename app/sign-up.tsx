@@ -1,20 +1,23 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { Screen } from "../src/components/Screen";
 import { useTranslation } from "../src/context/LanguageContext";
+import { useTheme } from "../src/context/ThemeContext";
 import { supabase } from "../src/lib/supabase";
-import { styles } from "./sign-up.styles";
+import { makeStyles } from "./sign-up.styles";
 
 export default function SignUpScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
 
   const [email, setEmail] = useState("");
@@ -29,7 +32,12 @@ export default function SignUpScreen() {
     setMsg("");
     setIsError(false);
 
-    if (!email.trim() || !password.trim() || !confirmPassword.trim() || !username.trim()) {
+    if (
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim() ||
+      !username.trim()
+    ) {
       setMsg(t("fillAllRequired"));
       setIsError(true);
       return;
@@ -69,7 +77,10 @@ export default function SignUpScreen() {
     if (data.session && data.user) {
       await supabase
         .from("profiles")
-        .upsert({ id: data.user.id, username: username.trim() }, { onConflict: "id" });
+        .upsert(
+          { id: data.user.id, username: username.trim() },
+          { onConflict: "id" },
+        );
       router.replace("/onboarding" as any);
     } else {
       // email confirmation enabled
@@ -79,7 +90,7 @@ export default function SignUpScreen() {
   };
 
   return (
-    <Screen>
+    <Screen backgroundColor={colors.bg}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -88,7 +99,9 @@ export default function SignUpScreen() {
           <Text style={styles.h1}>{t("createAccount")}</Text>
           <Text style={styles.subtitle}>{t("signUpSubtitle")}</Text>
 
-          <Text style={styles.label}>{t("username")} <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>
+            {t("username")} <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             value={username}
@@ -98,7 +111,9 @@ export default function SignUpScreen() {
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>{t("email")} <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>
+            {t("email")} <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -109,7 +124,9 @@ export default function SignUpScreen() {
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>{t("password")} <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>
+            {t("password")} <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -118,7 +135,9 @@ export default function SignUpScreen() {
             secureTextEntry
           />
 
-          <Text style={styles.label}>{t("confirmPassword")} <Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>
+            {t("confirmPassword")} <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             value={confirmPassword}
@@ -128,7 +147,9 @@ export default function SignUpScreen() {
           />
 
           {msg ? (
-            <Text style={isError ? styles.errorMsg : styles.successMsg}>{msg}</Text>
+            <Text style={isError ? styles.errorMsg : styles.successMsg}>
+              {msg}
+            </Text>
           ) : null}
 
           <Pressable

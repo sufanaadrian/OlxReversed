@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useMemo} from "react";
 import { View, ActivityIndicator } from "react-native";
+import { useTheme } from "../../../src/context/ThemeContext";
 
 export default function OffersRedirect() {
   const { id } = useLocalSearchParams<{ id: string }>();

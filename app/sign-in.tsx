@@ -1,17 +1,24 @@
 // app/sign-in.tsx
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
     Pressable,
+    ScrollView,
     Text,
     TextInput,
-    View,
 } from "react-native";
+import { Screen } from "../src/components/Screen";
 import { useTranslation } from "../src/context/LanguageContext";
+import { useTheme } from "../src/context/ThemeContext";
 import { supabase } from "../src/lib/supabase";
+import { makeStyles } from "./sign-in.styles";
 
 export default function SignInScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
 
@@ -21,7 +28,6 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If already signed in, go straight to app
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
@@ -42,9 +48,13 @@ export default function SignInScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#0D9488" />
-      </View>
+      <Screen backgroundColor={colors.bg}>
+        <ActivityIndicator
+          style={{ flex: 1 }}
+          size="large"
+          color={colors.primary}
+        />
+      </Screen>
     );
   }
 
@@ -68,74 +78,64 @@ export default function SignInScreen() {
   };
 
   return (
-    <View style={{ flex: 1, padding: 20, justifyContent: "center", gap: 12 }}>
-      <Text style={{ fontSize: 22, fontWeight: "800" }}>
-        {t("signinHeader")}
-      </Text>
-
-      <TextInput
-        placeholder={t("emailPlaceholder")}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        style={{ borderWidth: 1, padding: 12, borderRadius: 12 }}
-      />
-
-      <TextInput
-        placeholder={t("passwordPlaceholder")}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        style={{ borderWidth: 1, padding: 12, borderRadius: 12 }}
-      />
-
-      <Pressable
-        onPress={() => router.push("/forgot-password" as any)}
-        style={{ alignSelf: "flex-end" }}
+    <Screen backgroundColor={colors.bg}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Text style={{ fontSize: 13, color: "#1E40AF", fontWeight: "700" }}>
-          {t("forgotPassword")}
-        </Text>
-      </Pressable>
+        <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={styles.h1}>{t("signinHeader")}</Text>
+          <Text style={styles.subtitle}>{t("signInSubtitle")}</Text>
 
-      {!!msg && <Text style={{ color: "#334155" }}>{msg}</Text>}
+          <Text style={styles.label}>{t("email")}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("emailPlaceholder")}
+            placeholderTextColor={colors.mutedText}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+            autoCorrect={false}
+          />
 
-      <Pressable
-        onPress={onSignIn}
-        disabled={loading}
-        style={{
-          padding: 14,
-          borderRadius: 12,
-          backgroundColor: "#1E40AF",
-          opacity: loading ? 0.7 : 1,
-        }}
-      >
-        <Text
-          style={{ color: "white", textAlign: "center", fontWeight: "800" }}
-        >
-          {loading ? t("working") : t("signIn")}
-        </Text>
-      </Pressable>
+          <Text style={styles.label}>{t("password")}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("passwordPlaceholder")}
+            placeholderTextColor={colors.mutedText}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 4,
-          marginTop: 8,
-        }}
-      >
-        <Text style={{ fontSize: 13, color: "#64748B" }}>
-          {t("dontHaveAccount")}
-        </Text>
-        <Pressable onPress={() => router.replace("/sign-up" as any)}>
-          <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E40AF" }}>
-            {t("signUp")}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
+          <Pressable
+            onPress={() => router.push("/forgot-password" as any)}
+            style={styles.forgotBtn}
+          >
+            <Text style={styles.forgotText}>{t("forgotPassword")}</Text>
+          </Pressable>
+
+          {!!msg && <Text style={styles.errorMsg}>{msg}</Text>}
+
+          <Pressable
+            onPress={onSignIn}
+            disabled={loading}
+            style={[styles.continueBtn, loading && styles.continueBtnDisabled]}
+          >
+            <Text style={styles.continueBtnText}>
+              {loading ? t("working") : t("signIn")}
+            </Text>
+          </Pressable>
+
+          <KeyboardAvoidingView style={styles.footer}>
+            <Text style={styles.footerText}>{t("dontHaveAccount")}</Text>
+            <Pressable onPress={() => router.replace("/sign-up" as any)}>
+              <Text style={styles.footerLink}>{t("signUp")}</Text>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }

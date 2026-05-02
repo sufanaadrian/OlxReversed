@@ -1,23 +1,33 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Linking,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
+import { useTheme } from "../../../src/context/ThemeContext";
 import { supabase } from "../../../src/lib/supabase";
-import { styles, theme } from "./chat.styles";
+import { makeStyles } from "./chat.styles";
 
 type Message = {
   id: string;
@@ -32,8 +42,23 @@ type Profile = {
   username: string | null;
 };
 
+type RequestInfo = {
+  title: string;
+  category: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  location: string | null;
+};
+
+type OfferInfo = {
+  price: number;
+};
+
 export default function ChatScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
@@ -43,6 +68,8 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [jobClosed, setJobClosed] = useState(false);
+  const [requestInfo, setRequestInfo] = useState<RequestInfo | null>(null);
+  const [offerInfo, setOfferInfo] = useState<OfferInfo | null>(null);
   const flatRef = useRef<FlatList>(null);
 
   const fetchMessages = useCallback(async () => {
@@ -80,18 +107,29 @@ export default function ChatScreen() {
       if (!user) return;
       const { data: req } = await supabase
         .from("requests")
-        .select("user_id, status, profiles(id, username)")
+        .select(
+          "user_id, status, title, category, budget_min, budget_max, location, profiles(id, username)",
+        )
         .eq("id", id)
         .single();
       if (!req) return;
       const owner = req.user_id === user.id;
       setIsOwner(owner);
       setJobClosed(req.status === "closed" || req.status === "filled");
+      setRequestInfo({
+        title: (req as any).title,
+        category: (req as any).category ?? null,
+        budget_min: (req as any).budget_min ?? null,
+        budget_max: (req as any).budget_max ?? null,
+        location: (req as any).location ?? null,
+      });
       if (owner) {
         // I'm the owner, find the accepted applicant
         const { data: offer } = await supabase
           .from("offers")
-          .select("seller_id, profiles!seller_id(id, username, phone_number)")
+          .select(
+            "seller_id, price, profiles!seller_id(id, username, phone_number)",
+          )
           .eq("request_id", id)
           .eq("status", "accepted")
           .maybeSingle();
@@ -101,6 +139,7 @@ export default function ChatScreen() {
           };
           setOtherUser(prof);
           setOtherPhone(prof?.phone_number ?? null);
+          setOfferInfo({ price: (offer as any).price });
         }
       } else {
         const prof = (req as any).profiles as Profile & {
@@ -114,6 +153,15 @@ export default function ChatScreen() {
           .single();
         setOtherUser(prof);
         setOtherPhone((empProf as any)?.phone_number ?? null);
+        // Fetch my accepted offer price
+        const { data: myOffer } = await supabase
+          .from("offers")
+          .select("price")
+          .eq("request_id", id)
+          .eq("seller_id", user.id)
+          .eq("status", "accepted")
+          .maybeSingle();
+        if (myOffer) setOfferInfo({ price: (myOffer as any).price });
       }
     }
     fetchOther();
@@ -219,12 +267,94 @@ export default function ChatScreen() {
     });
   }
 
+  function formatBudget(min: number | null, max: number | null) {
+    if (!min && !max) return null;
+    if (min && max) return `${min}–${max} RON`;
+    if (min) return `${min}+ RON`;
+    return `~${max} RON`;
+  }
+
+  function ContextCard() {
+    if (!requestInfo) return null;
+    const budget = formatBudget(requestInfo.budget_min, requestInfo.budget_max);
+    return (
+      <View style={styles.contextCard}>
+        <View style={styles.contextCardBody}>
+          <View style={styles.contextCardIcon}>
+            <Feather name="briefcase" size={20} color={colors.primary} />
+          </View>
+          <View style={styles.contextCardInfo}>
+            <Text style={styles.contextCardTitle} numberOfLines={2}>
+              {requestInfo.title}
+            </Text>
+            <View style={styles.contextCardChips}>
+              {requestInfo.category ? (
+                <View style={styles.contextChip}>
+                  <Feather name="tag" size={10} color={colors.secondaryText} />
+                  <Text style={styles.contextChipText}>
+                    {requestInfo.category}
+                  </Text>
+                </View>
+              ) : null}
+              {budget ? (
+                <View style={styles.contextChip}>
+                  <Feather
+                    name="dollar-sign"
+                    size={10}
+                    color={colors.secondaryText}
+                  />
+                  <Text style={styles.contextChipText}>{budget}</Text>
+                </View>
+              ) : null}
+              {offerInfo && offerInfo.price > 0 ? (
+                <View style={[styles.contextChip, styles.contextChipGreen]}>
+                  <Feather
+                    name="check-circle"
+                    size={10}
+                    color={colors.success}
+                  />
+                  <Text
+                    style={[
+                      styles.contextChipText,
+                      styles.contextChipTextGreen,
+                    ]}
+                  >
+                    {t("chatContextOffer")}: {offerInfo.price} RON
+                  </Text>
+                </View>
+              ) : null}
+              {requestInfo.location ? (
+                <View style={styles.contextChip}>
+                  <Feather
+                    name="map-pin"
+                    size={10}
+                    color={colors.secondaryText}
+                  />
+                  <Text style={styles.contextChipText}>
+                    {requestInfo.location}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+        <Pressable
+          style={styles.contextCardViewBtn}
+          onPress={() => router.push(`/request/${id}` as any)}
+        >
+          <Text style={styles.contextCardViewBtnText}>{t("viewRequest")}</Text>
+          <Feather name="external-link" size={13} color={colors.primary} />
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={theme.primaryText} />
+          <Feather name="arrow-left" size={22} color={colors.primaryText} />
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>
@@ -240,21 +370,31 @@ export default function ChatScreen() {
               style={styles.headerIconBtn}
               onPress={() => router.push(`/cv/${otherUser.id}` as any)}
             >
-              <Feather name="user" size={18} color={theme.primaryText} />
+              <Feather name="user" size={18} color={colors.primaryText} />
             </Pressable>
           )}
-          {otherPhone ? (
+          {otherUser && (
             <Pressable
-              style={[styles.headerIconBtn, styles.headerCallBtn]}
-              onPress={() => Linking.openURL(`tel:${otherPhone}`)}
+              style={[
+                styles.headerIconBtn,
+                styles.headerCallBtn,
+                !otherPhone && styles.headerCallBtnDisabled,
+              ]}
+              onPress={() => {
+                if (otherPhone) {
+                  Linking.openURL(`tel:${otherPhone}`);
+                } else {
+                  Alert.alert(t("noPhoneTitle"), t("noPhoneDesc"));
+                }
+              }}
             >
               <Feather name="phone" size={18} color="#FFFFFF" />
             </Pressable>
-          ) : null}
+          )}
         </View>
         {isOwner && !jobClosed && (
           <Pressable onPress={handleComplete} style={styles.completeBtn}>
-            <Feather name="check-circle" size={16} color={theme.success} />
+            <Feather name="check-circle" size={16} color={colors.success} />
             <Text style={styles.completeBtnText}>{t("markComplete")}</Text>
           </Pressable>
         )}
@@ -273,6 +413,7 @@ export default function ChatScreen() {
           onContentSizeChange={() =>
             flatRef.current?.scrollToEnd({ animated: false })
           }
+          ListHeaderComponent={<ContextCard />}
           renderItem={({ item }) => {
             const isMe = item.sender_id === userId;
             return (
@@ -318,7 +459,11 @@ export default function ChatScreen() {
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyWrap}>
-                <Feather name="message-circle" size={40} color={theme.border} />
+                <Feather
+                  name="message-circle"
+                  size={40}
+                  color={colors.border}
+                />
                 <Text style={styles.emptyText}>{t("noMessagesYet")}</Text>
               </View>
             ) : null
@@ -352,13 +497,18 @@ export default function ChatScreen() {
         )}
 
         {/* Input */}
-        <View style={styles.inputRow}>
+        <View
+          style={[
+            styles.inputRow,
+            { paddingBottom: Math.max(10, insets.bottom) },
+          ]}
+        >
           <TextInput
             style={styles.input}
             value={text}
             onChangeText={setText}
             placeholder={t("typeMessage")}
-            placeholderTextColor={theme.mutedText}
+            placeholderTextColor={colors.mutedText}
             multiline
             maxLength={1000}
             returnKeyType="send"

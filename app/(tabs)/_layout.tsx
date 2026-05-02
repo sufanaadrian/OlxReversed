@@ -1,15 +1,19 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Tabs, router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import React, { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./_layout.styles";
+import { makeStyles } from "./_layout.styles";
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const { language } = useLanguage();
   const t = useTranslation();
@@ -100,9 +104,10 @@ export default function TabsLayout() {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: "#F9FAFB" }}
+      style={{ flex: 1, backgroundColor: colors.bg }}
       edges={["top"]}
     >
+      <StatusBar style={colors.isDark ? "light" : "dark"} />
       <>
         <Tabs
           key={language}
@@ -110,11 +115,11 @@ export default function TabsLayout() {
           screenOptions={{
             headerShown: false,
             tabBarShowLabel: true,
-            tabBarActiveTintColor: theme.primary,
-            tabBarInactiveTintColor: theme.secondaryText,
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.secondaryText,
             tabBarStyle: {
-              backgroundColor: theme.surface,
-              borderTopColor: theme.border,
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
               height: 66,
               paddingTop: 4,
               paddingBottom: 10,
@@ -139,7 +144,7 @@ export default function TabsLayout() {
               tabBarBadge:
                 pendingApplicants > 0 ? pendingApplicants : undefined,
               tabBarBadgeStyle: {
-                backgroundColor: theme.primary,
+                backgroundColor: colors.primary,
                 fontSize: 10,
               },
               tabBarIcon: ({ color, size }) => (
@@ -183,7 +188,7 @@ export default function TabsLayout() {
               title: t("messages"),
               tabBarBadge: newResponses > 0 ? newResponses : undefined,
               tabBarBadgeStyle: {
-                backgroundColor: theme.primary,
+                backgroundColor: colors.primary,
                 fontSize: 10,
               },
               tabBarIcon: ({ color, size }) => (
@@ -222,7 +227,7 @@ export default function TabsLayout() {
 
             <Pressable style={styles.actionCard} onPress={goCreateRequest}>
               <View style={styles.actionIcon}>
-                <Feather name="plus-circle" size={20} color={theme.primary} />
+                <Feather name="plus-circle" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.actionTitle}>{t("postARequest")}</Text>
@@ -234,7 +239,7 @@ export default function TabsLayout() {
 
             <Pressable style={styles.actionCard} onPress={goMarketplace}>
               <View style={styles.actionIcon}>
-                <Feather name="search" size={20} color={theme.primary} />
+                <Feather name="search" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.actionTitle}>

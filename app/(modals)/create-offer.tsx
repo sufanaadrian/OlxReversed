@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo} from "react";
 import {
     Alert,
     KeyboardAvoidingView,
@@ -15,9 +15,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./create-offer.styles";
+import { makeStyles } from "./create-offer.styles";
+import { useTheme } from "../../src/context/ThemeContext";
 
 export default function ApplyModal() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const { requestId, title } = useLocalSearchParams<{
     requestId: string;
@@ -97,7 +100,7 @@ export default function ApplyModal() {
       >
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-            <Feather name="x" size={22} color={theme.primaryText} />
+            <Feather name="x" size={22} color={colors.primaryText} />
           </Pressable>
           <Text style={styles.headerTitle}>{t("applyForJob")}</Text>
           <View style={{ width: 38 }} />
@@ -115,7 +118,7 @@ export default function ApplyModal() {
         <View style={styles.body}>
           {alreadyApplied ? (
             <View style={styles.alreadyApplied}>
-              <Feather name="check-circle" size={20} color={theme.primary} />
+              <Feather name="check-circle" size={20} color={colors.primary} />
               <Text style={styles.alreadyAppliedText}>
                 {t("alreadyApplied")}
               </Text>
@@ -174,7 +177,7 @@ export default function ApplyModal() {
                 value={coverLetter}
                 onChangeText={setCoverLetter}
                 placeholder={t("coverLetterPlaceholder")}
-                placeholderTextColor={theme.mutedText}
+                placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={6}
                 maxLength={600}

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Linking,
@@ -11,8 +11,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { supabase } from "../../src/lib/supabase";
-import { styles, theme } from "./[userId].styles";
+import { makeStyles } from "./[userId].styles";
 
 type CVProfile = {
   id: string;
@@ -39,6 +40,8 @@ function initials(name: string | null | undefined) {
 }
 
 export default function CVScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const [profile, setProfile] = useState<CVProfile | null>(null);
@@ -65,7 +68,7 @@ export default function CVScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       </SafeAreaView>
     );
@@ -97,7 +100,7 @@ export default function CVScreen() {
       {/* Navbar */}
       <View style={styles.navbar}>
         <Pressable onPress={() => router.back()} style={styles.navBtn}>
-          <Feather name="arrow-left" size={20} color={theme.primaryText} />
+          <Feather name="arrow-left" size={20} color={colors.primaryText} />
         </Pressable>
         <Text style={styles.navTitle}>{t("cvScreenTitle")}</Text>
         <View style={{ width: 40 }} />
@@ -120,15 +123,15 @@ export default function CVScreen() {
                   styles.typeBadge,
                   {
                     backgroundColor: isStudent
-                      ? theme.primaryLight
-                      : theme.employerLight,
+                      ? colors.primaryLight
+                      : colors.employerLight,
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.typeBadgeText,
-                    { color: isStudent ? theme.primary : theme.employer },
+                    { color: isStudent ? colors.primary : colors.employer },
                   ]}
                 >
                   {t(profile.user_type)}
@@ -137,7 +140,7 @@ export default function CVScreen() {
             ) : null}
             {profile.verified && (
               <View style={styles.verifiedBadge}>
-                <Feather name="check-circle" size={12} color={theme.primary} />
+                <Feather name="check-circle" size={12} color={colors.primary} />
                 <Text style={styles.verifiedText}>{t("verified")}</Text>
               </View>
             )}
@@ -153,7 +156,7 @@ export default function CVScreen() {
         {profile.bio ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="user" size={15} color={theme.primary} />
+              <Feather name="user" size={15} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("about")}</Text>
             </View>
             <Text style={styles.bioText}>{profile.bio}</Text>
@@ -164,7 +167,7 @@ export default function CVScreen() {
         {profile.university || profile.study_year ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="book" size={15} color={theme.primary} />
+              <Feather name="book" size={15} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("education")}</Text>
             </View>
             {profile.university ? (
@@ -182,7 +185,7 @@ export default function CVScreen() {
         {profile.skills && profile.skills.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="zap" size={15} color={theme.primary} />
+              <Feather name="zap" size={15} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("skills")}</Text>
             </View>
             <View style={styles.skillsRow}>
@@ -199,7 +202,7 @@ export default function CVScreen() {
         {profile.linkedin_url ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="link" size={15} color={theme.primary} />
+              <Feather name="link" size={15} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("linkedinUrl")}</Text>
             </View>
             <Pressable
@@ -213,7 +216,7 @@ export default function CVScreen() {
                 Linking.openURL(safe);
               }}
             >
-              <Feather name="external-link" size={14} color={theme.linkedin} />
+              <Feather name="external-link" size={14} color={colors.info} />
               <Text style={styles.linkedinBtnText}>{t("openLinkedIn")}</Text>
             </Pressable>
           </View>
@@ -223,15 +226,15 @@ export default function CVScreen() {
         {profile.phone_number ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Feather name="phone" size={15} color={theme.primary} />
+              <Feather name="phone" size={15} color={colors.primary} />
               <Text style={styles.sectionTitle}>{t("phone")}</Text>
             </View>
             <Pressable
               style={styles.linkedinBtn}
               onPress={() => Linking.openURL(`tel:${profile.phone_number}`)}
             >
-              <Feather name="phone" size={14} color={theme.primary} />
-              <Text style={[styles.linkedinBtnText, { color: theme.primary }]}>
+              <Feather name="phone" size={14} color={colors.info} />
+              <Text style={[styles.linkedinBtnText, { color: colors.info }]}>
                 {profile.phone_number}
               </Text>
             </Pressable>

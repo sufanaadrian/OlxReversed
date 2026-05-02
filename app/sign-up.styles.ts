@@ -1,51 +1,43 @@
 import { StyleSheet } from "react-native";
+import type { Colors } from "../src/theme/colors";
 
-export const theme = {
-  primary: "#0D9488",
-  bg: "#F8FAFC",
-  surface: "#FFFFFF",
-  primaryText: "#0F172A",
-  secondaryText: "#64748B",
-  border: "#E2E8F0",
-  danger: "#DC2626",
-};
-
-export const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg },
+export function makeStyles(c: Colors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
   scroll: { flex: 1, padding: 24 },
   h1: {
     fontSize: 26,
     fontWeight: "900",
-    color: theme.primaryText,
+    color: c.primaryText,
     marginTop: 24,
     marginBottom: 4,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: theme.secondaryText,
+    color: c.secondaryText,
     marginBottom: 28,
     lineHeight: 20,
   },
   label: {
     fontSize: 13,
     fontWeight: "800",
-    color: theme.primaryText,
+    color: c.primaryText,
     marginBottom: 6,
     marginTop: 16,
   },
-  required: { color: theme.danger },
+  required: { color: c.danger },
   input: {
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: c.border,
     borderRadius: 12,
     padding: 13,
     fontSize: 15,
-    color: theme.primaryText,
-    backgroundColor: theme.surface,
+    color: c.primaryText,
+    backgroundColor: c.surface,
   },
   errorMsg: {
-    color: theme.danger,
+    color: c.danger,
     fontSize: 13,
     fontWeight: "600",
     marginTop: 14,
@@ -62,7 +54,7 @@ export const styles = StyleSheet.create({
     marginTop: 28,
     height: 52,
     borderRadius: 14,
-    backgroundColor: theme.primary,
+    backgroundColor: c.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -76,6 +68,7 @@ export const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 32,
   },
-  footerText: { fontSize: 13, color: theme.secondaryText },
-  footerLink: { fontSize: 13, fontWeight: "800", color: theme.primary },
-});
+  footerText: { fontSize: 13, color: c.secondaryText },
+  footerLink: { fontSize: 13, fontWeight: "800", color: c.primary },
+  });
+}

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -11,8 +11,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../src/context/LanguageContext";
+import { useTheme } from "../src/context/ThemeContext";
 import { supabase } from "../src/lib/supabase";
-import { CATEGORY_COLORS, styles, theme } from "./saved-jobs.styles";
+import {
+    CATEGORY_COLORS,
+    CATEGORY_COLORS_DARK,
+    makeStyles,
+} from "./saved-jobs.styles";
 
 type SavedJob = {
   saveId: string;
@@ -49,10 +54,14 @@ function formatWage(min: number | null, max: number | null) {
 }
 
 export default function SavedJobsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+
+  const catColors = colors.isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS;
 
   const fetchSaved = useCallback(async () => {
     setLoading(true);
@@ -106,8 +115,7 @@ export default function SavedJobsScreen() {
   function renderItem({ item }: { item: SavedJob }) {
     const isEmployer = item.posting_as === "employer";
     const wage = formatWage(item.budget_min, item.budget_max);
-    const catColor =
-      CATEGORY_COLORS[item.category ?? "Other"] ?? CATEGORY_COLORS.Other;
+    const catColor = catColors[item.category ?? "Other"] ?? catColors.Other;
 
     const msLeft =
       new Date(item.created_at).getTime() + 30 * 86400000 - Date.now();
@@ -125,7 +133,7 @@ export default function SavedJobsScreen() {
           <View style={styles.stripRight}>
             {daysLeft > 0 && (
               <View style={styles.expiryBadge}>
-                <Feather name="clock" size={10} color="#92400E" />
+                <Feather name="clock" size={10} color={colors.warning} />
                 <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
               </View>
             )}
@@ -134,15 +142,15 @@ export default function SavedJobsScreen() {
                 styles.roleBadge,
                 {
                   backgroundColor: isEmployer
-                    ? theme.employerLight
-                    : theme.primaryLight,
+                    ? colors.employerLight
+                    : colors.primaryLight,
                 },
               ]}
             >
               <Text
                 style={[
                   styles.roleBadgeText,
-                  { color: isEmployer ? theme.employer : theme.primaryDark },
+                  { color: isEmployer ? colors.employer : colors.primaryDark },
                 ]}
               >
                 {isEmployer ? t("employer") : t("student")}
@@ -161,7 +169,7 @@ export default function SavedJobsScreen() {
               onPress={() => handleUnsave(item.saveId, item.id)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="bookmark" size={18} color={theme.primary} />
+              <Feather name="bookmark" size={18} color={colors.primary} />
             </Pressable>
           </View>
 
@@ -174,7 +182,11 @@ export default function SavedJobsScreen() {
           <View style={styles.metaRow}>
             {item.location ? (
               <View style={styles.metaChip}>
-                <Feather name="map-pin" size={11} color={theme.secondaryText} />
+                <Feather
+                  name="map-pin"
+                  size={11}
+                  color={colors.secondaryText}
+                />
                 <Text style={styles.metaChipText} numberOfLines={1}>
                   {item.location}
                 </Text>
@@ -185,14 +197,14 @@ export default function SavedJobsScreen() {
                 <Feather
                   name="dollar-sign"
                   size={11}
-                  color={theme.secondaryText}
+                  color={colors.secondaryText}
                 />
                 <Text style={styles.metaChipText}>{wage}</Text>
               </View>
             ) : null}
             {item.username ? (
               <View style={styles.metaChip}>
-                <Feather name="user" size={11} color={theme.secondaryText} />
+                <Feather name="user" size={11} color={colors.secondaryText} />
                 <Text style={styles.metaChipText}>{item.username}</Text>
               </View>
             ) : null}
@@ -206,7 +218,7 @@ export default function SavedJobsScreen() {
     <SafeAreaView style={styles.page} edges={["top"]}>
       <View style={styles.navbar}>
         <Pressable style={styles.navBack} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={theme.primaryText} />
+          <Feather name="arrow-left" size={20} color={colors.primaryText} />
         </Pressable>
         <Text style={styles.navTitle}>{t("savedJobs")}</Text>
         {!loading && <Text style={styles.navCount}>{jobs.length}</Text>}
@@ -216,7 +228,7 @@ export default function SavedJobsScreen() {
         <ActivityIndicator
           style={{ flex: 1 }}
           size="large"
-          color={theme.primary}
+          color={colors.primary}
         />
       ) : (
         <FlatList
@@ -233,7 +245,7 @@ export default function SavedJobsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
-                <Feather name="bookmark" size={32} color={theme.primaryDark} />
+                <Feather name="bookmark" size={32} color={colors.primaryDark} />
               </View>
               <Text style={styles.emptyTitle}>{t("noSavedJobs")}</Text>
               <Text style={styles.emptySubtitle}>{t("noSavedJobsHint")}</Text>
