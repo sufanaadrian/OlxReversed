@@ -306,7 +306,7 @@ export default function ChatScreen() {
                   <Text style={styles.contextChipText}>{budget}</Text>
                 </View>
               ) : null}
-              {offerInfo ? (
+              {offerInfo && offerInfo.price > 0 ? (
                 <View style={[styles.contextChip, styles.contextChipGreen]}>
                   <Feather
                     name="check-circle"

@@ -22,7 +22,7 @@ import { useTranslation } from "../../src/context/LanguageContext";
 import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { supabase } from "../../src/lib/supabase";
-import { getCategoryColors, makeStyles } from "./marketplace.styles";
+import { makeStyles } from "./marketplace.styles";
 
 const CATEGORIES = [
   "All",
@@ -113,10 +113,6 @@ export default function JobsScreen() {
   const { marketplaceMode } = useMarketplaceMode();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const catColors = useMemo(
-    () => getCategoryColors(colors.isDark),
-    [colors.isDark],
-  );
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -335,7 +331,6 @@ export default function JobsScreen() {
   function renderItem({ item }: { item: JobRequest }) {
     const isEmployer = item.posting_as === "employer";
     const wage = formatWage(item.budget_min, item.budget_max);
-    const catColor = catColors[item.category ?? "Other"] ?? catColors.Other;
     const posterName = item.profiles?.username ?? null;
     const isSaved = savedIds.has(item.id);
     const hasApplied = appliedIds.has(item.id);
@@ -362,9 +357,9 @@ export default function JobsScreen() {
         onPress={() => router.push(`/request/${item.id}`)}
       >
         {/* Colored category strip */}
-        <View style={[styles.cardStrip, { backgroundColor: catColor.bg }]}>
+        <View style={styles.cardStrip}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={[styles.cardStripText, { color: catColor.text }]}>
+            <Text style={styles.cardStripText}>
               {t(CATEGORY_KEYS[item.category ?? "Other"] ?? "other")}
             </Text>
             {item.is_urgent && (
@@ -385,22 +380,8 @@ export default function JobsScreen() {
                 <Text style={styles.expiryBadgeText}>{daysLeft}d left</Text>
               </View>
             )}
-            <View
-              style={[
-                styles.roleBadge,
-                {
-                  backgroundColor: isEmployer
-                    ? colors.employerLight
-                    : colors.primaryLight,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.roleBadgeText,
-                  { color: isEmployer ? colors.employer : colors.primaryDark },
-                ]}
-              >
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>
                 {isEmployer ? t("employer") : t("student")}
               </Text>
             </View>

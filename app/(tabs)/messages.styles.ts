@@ -36,12 +36,9 @@ export function makeStyles(c: Colors) {
       alignItems: "center",
       paddingHorizontal: 16,
       paddingVertical: 14,
-      backgroundColor: c.surface,
       gap: 14,
     },
-    rowUnread: {
-      backgroundColor: c.isDark ? "#1a2740" : "#F0FFFE",
-    },
+    rowUnread: {},
 
     avatarWrap: { position: "relative", flexShrink: 0 },
     avatar: {

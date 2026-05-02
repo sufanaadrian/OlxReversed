@@ -101,9 +101,9 @@ export function makeStyles(c: Colors) {
     },
     cardPressed: { opacity: 0.92, transform: [{ scale: 0.99 }] },
 
-    // Left accent borders differentiate employer vs student cards
-    cardEmployer: { borderLeftWidth: 4, borderLeftColor: "#7C3AED" },
-    cardStudent: { borderLeftWidth: 4, borderLeftColor: "#0D9488" },
+    // Left accent borders removed — keep type signal in role badge only
+    cardEmployer: {},
+    cardStudent: {},
 
     cardStrip: {
       flexDirection: "row",
@@ -113,16 +113,23 @@ export function makeStyles(c: Colors) {
       paddingVertical: 7,
       borderTopLeftRadius: 15,
       borderTopRightRadius: 15,
+      backgroundColor: c.surfaceAlt,
     },
     cardStripText: {
       fontSize: 11,
-      fontWeight: "800",
+      fontWeight: "700",
+      color: c.secondaryText,
       textTransform: "uppercase",
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
     },
     stripRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-    roleBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
-    roleBadgeText: { fontSize: 11, fontWeight: "700" },
+    roleBadge: {
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+      backgroundColor: c.isDark ? "#2C2C2E" : "#E2E8F0",
+    },
+    roleBadgeText: { fontSize: 11, fontWeight: "700", color: c.secondaryText },
     expiryBadge: {
       flexDirection: "row",
       alignItems: "center",
