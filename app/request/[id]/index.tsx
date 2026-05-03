@@ -3,13 +3,13 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Share,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    Share,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
@@ -67,7 +67,12 @@ function getOfferStatus(
 ): Record<string, { bg: string; text: string; label: string }> {
   return {
     pending: { bg: c.warningLight, text: c.warning, label: "offerPending" },
-    accepted: { bg: c.successLight, text: c.success, label: "offerAccepted" },
+    accepted: {
+      bg: c.primaryLight,
+      text: c.primaryDark,
+      label: "offerAccepted",
+    },
+    hired: { bg: c.successLight, text: c.success, label: "offerHired" },
     rejected: { bg: c.errorLight, text: c.error, label: "offerRejected" },
     withdrawn: { bg: c.surfaceAlt, text: c.mutedText, label: "offerWithdrawn" },
   };
@@ -198,26 +203,58 @@ export default function JobDetailScreen() {
     }, [fetchData]),
   );
 
+  // Accept = invite to chat only. Does NOT count toward slots or fill the job.
   async function handleAccept(offerId: string) {
     await supabase
       .from("offers")
       .update({ status: "accepted" })
       .eq("id", offerId);
-
-    // Increment accepted_count and conditionally mark filled
-    const newCount = (job?.accepted_count ?? 0) + 1;
-    const needed = job?.workers_needed ?? 1;
-    const nowFilled = newCount >= needed;
-
-    await supabase
-      .from("requests")
-      .update({
-        accepted_count: newCount,
-        ...(nowFilled ? { status: "filled" } : {}),
-      })
-      .eq("id", id);
-
     fetchData();
+  }
+
+  // Hire = final decision after chatting. Increments accepted_count, possibly fills job.
+  async function handleHire(offerId: string) {
+    Alert.alert(t("hire"), t("hireConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("hire"),
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "hired" })
+            .eq("id", offerId);
+          const newCount = (job?.accepted_count ?? 0) + 1;
+          const needed = job?.workers_needed ?? 1;
+          const nowFilled = newCount >= needed;
+          await supabase
+            .from("requests")
+            .update({
+              accepted_count: newCount,
+              ...(nowFilled ? { status: "filled" } : {}),
+            })
+            .eq("id", id);
+          fetchData();
+        },
+      },
+    ]);
+  }
+
+  // Release = employer decided not to hire after chatting. Frees up the slot.
+  async function handleRelease(offerId: string) {
+    Alert.alert(t("release"), t("releaseConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("release"),
+        style: "destructive",
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "rejected" })
+            .eq("id", offerId);
+          fetchData();
+        },
+      },
+    ]);
   }
 
   async function handleReject(offerId: string) {
@@ -226,6 +263,22 @@ export default function JobDetailScreen() {
       .update({ status: "rejected" })
       .eq("id", offerId);
     fetchData();
+  }
+
+  async function handleReopen() {
+    Alert.alert(t("reopenJob"), t("reopenJobConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("reopenJob"),
+        onPress: async () => {
+          await supabase
+            .from("requests")
+            .update({ status: "active" })
+            .eq("id", id);
+          fetchData();
+        },
+      },
+    ]);
   }
 
   async function handleClose() {
@@ -316,6 +369,12 @@ export default function JobDetailScreen() {
           : null;
   const posterName = job.profiles?.username ?? null;
   const pendingCount = applicants.filter((a) => a.status === "pending").length;
+  // How many candidates are currently in "chatting" state (accepted but not yet hired/released)
+  const chattingCount = applicants.filter(
+    (a) => a.status === "accepted",
+  ).length;
+  const canAcceptMore =
+    chattingCount + (job.accepted_count ?? 0) < (job.workers_needed ?? 1);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -352,6 +411,11 @@ export default function JobDetailScreen() {
           {isOwner && job.status === "active" ? (
             <Pressable onPress={handleClose} style={styles.navBtn}>
               <Feather name="x-circle" size={20} color={colors.error} />
+            </Pressable>
+          ) : null}
+          {isOwner && job.status === "filled" ? (
+            <Pressable onPress={handleReopen} style={styles.navBtn}>
+              <Feather name="refresh-cw" size={20} color={colors.primary} />
             </Pressable>
           ) : null}
         </View>
@@ -651,10 +715,18 @@ export default function JobDetailScreen() {
                           </Text>
                         </Pressable>
                         <Pressable
-                          style={styles.acceptBtn}
-                          onPress={() => handleAccept(app.id)}
+                          style={[
+                            styles.acceptBtn,
+                            !canAcceptMore && { opacity: 0.4 },
+                          ]}
+                          onPress={() => canAcceptMore && handleAccept(app.id)}
+                          disabled={!canAcceptMore}
                         >
-                          <Feather name="check" size={14} color="#FFFFFF" />
+                          <Feather
+                            name="message-circle"
+                            size={14}
+                            color="#FFFFFF"
+                          />
                           <Text style={styles.acceptBtnText}>
                             {t("accept")}
                           </Text>
@@ -662,17 +734,39 @@ export default function JobDetailScreen() {
                       </View>
                     )}
                     {app.status === "accepted" && (
-                      <Pressable
-                        style={styles.chatBtn}
-                        onPress={() => router.push(`/request/${id}/chat`)}
-                      >
-                        <Feather
-                          name="message-circle"
-                          size={15}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.chatBtnText}>{t("openChat")}</Text>
-                      </Pressable>
+                      <View style={styles.decisionCol}>
+                        <Pressable
+                          style={styles.chatBtn}
+                          onPress={() => router.push(`/request/${id}/chat`)}
+                        >
+                          <Feather
+                            name="message-circle"
+                            size={15}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.chatBtnText}>
+                            {t("openChat")}
+                          </Text>
+                        </Pressable>
+                        <View style={styles.decisionRow}>
+                          <Pressable
+                            style={styles.hireBtn}
+                            onPress={() => handleHire(app.id)}
+                          >
+                            <Feather name="check" size={14} color="#FFFFFF" />
+                            <Text style={styles.hireBtnText}>{t("hire")}</Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.rejectBtn}
+                            onPress={() => handleRelease(app.id)}
+                          >
+                            <Feather name="x" size={14} color={colors.error} />
+                            <Text style={styles.rejectBtnText}>
+                              {t("release")}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
                     )}
                   </View>
                 );

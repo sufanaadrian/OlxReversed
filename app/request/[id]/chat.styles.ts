@@ -7,14 +7,17 @@ export function makeStyles(c: Colors) {
     flex: { flex: 1 },
 
     header: {
-      flexDirection: "row",
-      alignItems: "center",
       paddingHorizontal: 12,
       paddingTop: 8,
-      paddingBottom: 12,
+      paddingBottom: 10,
       borderBottomWidth: 1,
       borderColor: c.border,
       backgroundColor: c.surface,
+      gap: 8,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
       gap: 8,
     },
     backBtn: { padding: 8 },
@@ -24,8 +27,9 @@ export function makeStyles(c: Colors) {
     completeBtn: {
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       gap: 5,
-      paddingVertical: 6,
+      paddingVertical: 7,
       paddingHorizontal: 10,
       borderRadius: 10,
       backgroundColor: c.successLight,

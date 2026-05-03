@@ -27,7 +27,8 @@ function getAppStatusColors(
 ): Record<string, { bg: string; text: string }> {
   return {
     pending: { bg: c.warningLight, text: c.warning },
-    accepted: { bg: c.successLight, text: c.success },
+    accepted: { bg: c.primaryLight, text: c.primaryDark },
+    hired: { bg: c.successLight, text: c.success },
     rejected: { bg: c.errorLight, text: c.error },
     withdrawn: { bg: c.surfaceAlt, text: c.mutedText },
   };
@@ -69,7 +70,12 @@ type ReceivedApplication = {
   status: string;
   cover_letter: string | null;
   created_at: string;
-  requests: { id: string; title: string } | null;
+  requests: {
+    id: string;
+    title: string;
+    workers_needed: number;
+    accepted_count: number;
+  } | null;
   profiles: {
     id: string;
     username: string | null;
@@ -184,9 +190,9 @@ export default function ActivityScreen() {
         sentWithProfiles.push({
           ...app,
           requests: req ? { ...req, profiles: prof ?? null } : null,
-        } as Application);
+        } as unknown as Application);
       } else {
-        sentWithProfiles.push(app as Application);
+        sentWithProfiles.push(app as unknown as Application);
       }
     }
     setSentApps(sentWithProfiles);
@@ -201,12 +207,12 @@ export default function ActivityScreen() {
       const { data: received } = await supabase
         .from("offers")
         .select(
-          "id, status, cover_letter, created_at, requests!inner(id, title), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+          "id, status, cover_letter, created_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
         )
         .in("request_id", postIds)
         .neq("status", "withdrawn")
         .order("created_at", { ascending: false });
-      setReceivedApps((received as ReceivedApplication[]) ?? []);
+      setReceivedApps((received as unknown as ReceivedApplication[]) ?? []);
     } else {
       setReceivedApps([]);
     }
@@ -256,6 +262,67 @@ export default function ActivityScreen() {
             .from("offers")
             .update({ status: "withdrawn" })
             .eq("id", id);
+          fetchApplications();
+        },
+      },
+    ]);
+  }
+
+  // Slot-guarded accept: invite to chat without counting toward filled
+  async function handleAcceptReceived(item: ReceivedApplication) {
+    const req = item.requests;
+    if (!req) return;
+    const chattingCount = receivedApps.filter(
+      (a) => a.requests?.id === req.id && a.status === "accepted",
+    ).length;
+    const canAccept =
+      chattingCount + (req.accepted_count ?? 0) < (req.workers_needed ?? 1);
+    if (!canAccept) return;
+    await supabase
+      .from("offers")
+      .update({ status: "accepted" })
+      .eq("id", item.id);
+    fetchApplications();
+  }
+
+  async function handleHireReceived(item: ReceivedApplication) {
+    const req = item.requests;
+    if (!req) return;
+    Alert.alert(t("hire"), t("hireConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("hire"),
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "hired" })
+            .eq("id", item.id);
+          const newCount = (req.accepted_count ?? 0) + 1;
+          const nowFilled = newCount >= (req.workers_needed ?? 1);
+          await supabase
+            .from("requests")
+            .update({
+              accepted_count: newCount,
+              ...(nowFilled ? { status: "filled" } : {}),
+            })
+            .eq("id", req.id);
+          fetchApplications();
+        },
+      },
+    ]);
+  }
+
+  async function handleReleaseReceived(item: ReceivedApplication) {
+    Alert.alert(t("release"), t("releaseConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("release"),
+        style: "destructive",
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "rejected" })
+            .eq("id", item.id);
           fetchApplications();
         },
       },
@@ -334,75 +401,112 @@ export default function ActivityScreen() {
     const col = appStatusColors[item.status] ?? appStatusColors.pending;
     const req = item.requests;
     const canChat = item.status === "accepted" && req;
+    const isWithdrawn = item.status === "withdrawn";
+    const employerName = req?.profiles?.username ?? null;
+    const initials = (n: string | null) => {
+      if (!n) return "?";
+      return n
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    };
+
     return (
-      <View style={styles.card}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {req?.title ?? "—"}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: col.bg }]}>
-            <Text style={[styles.statusBadgeText, { color: col.text }]}>
-              {t(item.status)}
-            </Text>
+      <View style={[styles.appCard, isWithdrawn && styles.appCardDim]}>
+        <View style={[styles.appStatusBar, { backgroundColor: col.text }]} />
+        <View style={styles.appCardInner}>
+          {/* Top: avatar + title + status */}
+          <View style={styles.appCardTop}>
+            <View style={[styles.appAvatar, { backgroundColor: col.bg }]}>
+              <Text style={[styles.appAvatarText, { color: col.text }]}>
+                {initials(employerName)}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appJobTitle} numberOfLines={2}>
+                {req?.title ?? "—"}
+              </Text>
+              {employerName ? (
+                <Text style={styles.appEmployerName}>{employerName}</Text>
+              ) : null}
+            </View>
+            <View style={[styles.appStatusBadge, { backgroundColor: col.bg }]}>
+              <Text style={[styles.appStatusText, { color: col.text }]}>
+                {t(item.status)}
+              </Text>
+            </View>
           </View>
-        </View>
-        {req?.profiles?.username ? (
-          <Text style={styles.cardSub}>
-            {t("by")} {req.profiles.username}
+
+          <Text style={styles.appTimestamp}>
+            {t("appliedOn")} · {timeAgo(item.created_at)}
           </Text>
-        ) : null}
-        {item.cover_letter ? (
-          <Pressable
-            style={styles.coverLetterBox}
-            onPress={() => toggleLetter(item.id)}
-          >
-            <Text
-              style={styles.coverLetterText}
-              numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+
+          {/* Cover letter */}
+          {item.cover_letter ? (
+            <Pressable
+              style={styles.appCoverLetter}
+              onPress={() => toggleLetter(item.id)}
             >
-              {item.cover_letter}
-            </Text>
-            {item.cover_letter.split("\n").join(" ").length > 80 && (
-              <View style={styles.coverLetterChevron}>
+              <Feather
+                name="file-text"
+                size={12}
+                color={colors.mutedText}
+                style={{ marginTop: 1 }}
+              />
+              <Text
+                style={styles.appCoverLetterText}
+                numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+              >
+                {item.cover_letter}
+              </Text>
+              {item.cover_letter.length > 100 && (
                 <Feather
                   name={
                     expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
                   }
                   size={13}
-                  color={colors.primary}
+                  color={colors.mutedText}
                 />
-              </View>
-            )}
-          </Pressable>
-        ) : null}
-        <View style={styles.cardActions}>
-          {req && (
-            <Pressable
-              style={styles.actionBtn}
-              onPress={() => router.push(`/request/${req.id}` as any)}
-            >
-              <Feather name="eye" size={13} color={colors.primary} />
-              <Text style={styles.actionBtnText}>{t("viewPost")}</Text>
+              )}
             </Pressable>
-          )}
-          {canChat && (
-            <Pressable
-              style={styles.chatBtn}
-              onPress={() => router.push(`/request/${req.id}/chat` as any)}
-            >
-              <Feather name="message-circle" size={13} color="#fff" />
-              <Text style={styles.chatBtnText}>{t("openChat")}</Text>
-            </Pressable>
-          )}
-          {item.status === "pending" && (
-            <Pressable
-              style={[styles.actionBtn, styles.actionBtnDanger]}
-              onPress={() => withdrawApp(item.id)}
-            >
-              <Text style={[styles.actionBtnText, { color: colors.error }]}>
-                {t("withdraw")}
-              </Text>
-            </Pressable>
+          ) : null}
+
+          {/* Actions */}
+          {!isWithdrawn && (
+            <View style={styles.appActions}>
+              {req && (
+                <Pressable
+                  style={styles.appActionGhost}
+                  onPress={() => router.push(`/request/${req.id}` as any)}
+                >
+                  <Feather name="eye" size={13} color={colors.secondaryText} />
+                  <Text style={styles.appActionGhostText}>{t("viewPost")}</Text>
+                </Pressable>
+              )}
+              {canChat && (
+                <Pressable
+                  style={styles.appActionPrimary}
+                  onPress={() => router.push(`/request/${req.id}/chat` as any)}
+                >
+                  <Feather name="message-circle" size={13} color="#fff" />
+                  <Text style={styles.appActionPrimaryText}>
+                    {t("openChat")}
+                  </Text>
+                </Pressable>
+              )}
+              {item.status === "pending" && (
+                <Pressable
+                  style={styles.appActionDanger}
+                  onPress={() => withdrawApp(item.id)}
+                >
+                  <Text style={styles.appActionDangerText}>
+                    {t("withdraw")}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           )}
         </View>
       </View>
@@ -414,99 +518,185 @@ export default function ActivityScreen() {
     const col = appStatusColors[item.status] ?? appStatusColors.pending;
     const req = item.requests;
     const prof = item.profiles;
+    const isVerified = prof?.verified;
+    const initials = (n: string | null) => {
+      if (!n) return "?";
+      return n
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    };
+
     return (
-      <Pressable
-        style={styles.card}
-        onPress={() => req && router.push(`/request/${req.id}` as any)}
-      >
-        <View style={styles.cardTop}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {req?.title ?? "—"}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: col.bg }]}>
-            <Text style={[styles.statusBadgeText, { color: col.text }]}>
-              {t(item.status)}
-            </Text>
-          </View>
-        </View>
-        {prof?.username ? (
-          <Text style={styles.cardSub}>{prof.username}</Text>
-        ) : null}
-        {item.cover_letter ? (
-          <Pressable
-            style={styles.coverLetterBox}
-            onPress={() => toggleLetter(item.id)}
-          >
-            <Text
-              style={styles.coverLetterText}
-              numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+      <View style={styles.appCard}>
+        <View style={[styles.appStatusBar, { backgroundColor: col.text }]} />
+        <View style={styles.appCardInner}>
+          {/* Top: applicant avatar + name + status */}
+          <View style={styles.appCardTop}>
+            <Pressable
+              style={[
+                styles.appAvatar,
+                { backgroundColor: colors.primaryLight },
+              ]}
+              onPress={() => prof?.id && router.push(`/cv/${prof.id}` as any)}
             >
-              {item.cover_letter}
-            </Text>
-            {item.cover_letter.split("\n").join(" ").length > 80 && (
-              <View style={styles.coverLetterChevron}>
+              <Text style={[styles.appAvatarText, { color: colors.primary }]}>
+                {initials(prof?.username ?? null)}
+              </Text>
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+              >
+                <Text style={styles.appJobTitle} numberOfLines={1}>
+                  {prof?.username ?? t("anonymous")}
+                </Text>
+                {isVerified && (
+                  <Feather
+                    name="check-circle"
+                    size={13}
+                    color={colors.primary}
+                  />
+                )}
+              </View>
+              <Text style={styles.appEmployerName} numberOfLines={1}>
+                {req?.title ?? "—"}
+              </Text>
+            </View>
+            <View style={[styles.appStatusBadge, { backgroundColor: col.bg }]}>
+              <Text style={[styles.appStatusText, { color: col.text }]}>
+                {t(item.status)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Skills */}
+          {prof?.skills && prof.skills.length > 0 && (
+            <View style={styles.appSkillsRow}>
+              {prof.skills.slice(0, 4).map((s) => (
+                <View key={s} style={styles.appSkillChip}>
+                  <Text style={styles.appSkillText}>{s}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.appTimestamp}>{timeAgo(item.created_at)}</Text>
+
+          {/* Cover letter */}
+          {item.cover_letter ? (
+            <Pressable
+              style={styles.appCoverLetter}
+              onPress={() => toggleLetter(item.id)}
+            >
+              <Feather
+                name="file-text"
+                size={12}
+                color={colors.mutedText}
+                style={{ marginTop: 1 }}
+              />
+              <Text
+                style={styles.appCoverLetterText}
+                numberOfLines={expandedLetters.has(item.id) ? undefined : 2}
+              >
+                {item.cover_letter}
+              </Text>
+              {item.cover_letter.length > 100 && (
                 <Feather
                   name={
                     expandedLetters.has(item.id) ? "chevron-up" : "chevron-down"
                   }
                   size={13}
-                  color={colors.primary}
+                  color={colors.mutedText}
                 />
-              </View>
+              )}
+            </Pressable>
+          ) : null}
+
+          {/* Actions */}
+          <View style={styles.appActions}>
+            {prof?.id && (
+              <Pressable
+                style={styles.appActionGhost}
+                onPress={() => router.push(`/cv/${prof.id}` as any)}
+              >
+                <Feather name="user" size={13} color={colors.secondaryText} />
+                <Text style={styles.appActionGhostText}>{t("viewCV")}</Text>
+              </Pressable>
             )}
-          </Pressable>
-        ) : null}
-        <View style={styles.cardActions}>
-          {prof?.id && (
-            <Pressable
-              style={styles.actionBtn}
-              onPress={() => router.push(`/cv/${prof.id}` as any)}
-            >
-              <Feather name="user" size={13} color={colors.primary} />
-              <Text style={styles.actionBtnText}>{t("viewCV")}</Text>
-            </Pressable>
-          )}
-          {item.status === "accepted" && req && (
-            <Pressable
-              style={styles.chatBtn}
-              onPress={() => router.push(`/request/${req.id}/chat` as any)}
-            >
-              <Feather name="message-circle" size={13} color="#fff" />
-              <Text style={styles.chatBtnText}>{t("openChat")}</Text>
-            </Pressable>
-          )}
-          {item.status === "pending" && (
-            <>
-              <Pressable
-                style={styles.chatBtn}
-                onPress={async () => {
-                  await supabase
-                    .from("offers")
-                    .update({ status: "accepted" })
-                    .eq("id", item.id);
-                  fetchApplications();
-                }}
-              >
-                <Text style={styles.chatBtnText}>{t("accept")}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, styles.actionBtnDanger]}
-                onPress={async () => {
-                  await supabase
-                    .from("offers")
-                    .update({ status: "rejected" })
-                    .eq("id", item.id);
-                  fetchApplications();
-                }}
-              >
-                <Text style={[styles.actionBtnText, { color: colors.error }]}>
-                  {t("reject")}
-                </Text>
-              </Pressable>
-            </>
-          )}
+            {item.status === "accepted" && req && (
+              <>
+                <Pressable
+                  style={styles.appActionPrimary}
+                  onPress={() => router.push(`/request/${req.id}/chat` as any)}
+                >
+                  <Feather name="message-circle" size={13} color="#fff" />
+                  <Text style={styles.appActionPrimaryText}>
+                    {t("openChat")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.appActionPrimary}
+                  onPress={() => handleHireReceived(item)}
+                >
+                  <Feather name="check" size={13} color="#fff" />
+                  <Text style={styles.appActionPrimaryText}>{t("hire")}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.appActionDanger}
+                  onPress={() => handleReleaseReceived(item)}
+                >
+                  <Text style={styles.appActionDangerText}>{t("release")}</Text>
+                </Pressable>
+              </>
+            )}
+            {item.status === "pending" &&
+              (() => {
+                const req = item.requests;
+                const chattingCount = receivedApps.filter(
+                  (a) => a.requests?.id === req?.id && a.status === "accepted",
+                ).length;
+                const canAccept =
+                  !!req &&
+                  chattingCount + (req.accepted_count ?? 0) <
+                    (req.workers_needed ?? 1);
+                return (
+                  <>
+                    <Pressable
+                      style={[
+                        styles.appActionPrimary,
+                        !canAccept && { opacity: 0.4 },
+                      ]}
+                      onPress={() => canAccept && handleAcceptReceived(item)}
+                      disabled={!canAccept}
+                    >
+                      <Feather name="message-circle" size={13} color="#fff" />
+                      <Text style={styles.appActionPrimaryText}>
+                        {t("accept")}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.appActionDanger}
+                      onPress={async () => {
+                        await supabase
+                          .from("offers")
+                          .update({ status: "rejected" })
+                          .eq("id", item.id);
+                        fetchApplications();
+                      }}
+                    >
+                      <Text style={styles.appActionDangerText}>
+                        {t("reject")}
+                      </Text>
+                    </Pressable>
+                  </>
+                );
+              })()}
+          </View>
         </View>
-      </Pressable>
+      </View>
     );
   }
 
