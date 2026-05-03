@@ -30,6 +30,8 @@ export default function RootLayout() {
         SplashScreen.hideAsync();
         if (!profile?.onboarding_completed) {
           router.replace("/onboarding" as any);
+        } else {
+          router.replace("/(tabs)/marketplace" as any);
         }
       })
       .catch(() => {

@@ -3,81 +3,126 @@ import type { Colors } from "../src/theme/colors";
 
 const { width } = Dimensions.get("window");
 
+export const CARD_W = Math.min(260, width - 80);
+export const CARD_H = 160;
+export const CAP_AREA = 72;
+
 export function makeStyles(c: Colors) {
   return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: c.bg,
     },
-    slidesContainer: {
-      height: "58%",
-      position: "relative",
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 24,
+      paddingTop: 8,
+      paddingBottom: 4,
     },
-    flatList: {
-      flex: 1,
+    langToggle: {
+      flexDirection: "row",
+      backgroundColor: c.surfaceAlt,
+      borderRadius: 10,
+      padding: 3,
+      gap: 2,
     },
-    slide: {
-      width,
+    langBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 7,
+    },
+    langBtnActive: {
+      backgroundColor: c.primary,
+    },
+    langText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: c.secondaryText,
+    },
+    langTextActive: {
+      color: "#FFFFFF",
+    },
+    heroArea: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 32,
     },
-    slideCard: {
-      width: "100%",
-      borderRadius: 28,
-      paddingVertical: 48,
-      paddingHorizontal: 32,
+    cardStack: {
+      width: CARD_W,
+      height: CARD_H + CAP_AREA,
+      overflow: "visible",
+    },
+    capContainer: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
       alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.18,
+      zIndex: 20,
+    },
+    capEmoji: {
+      fontSize: 54,
+    },
+    card: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      width: CARD_W,
+      height: CARD_H,
+      borderRadius: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+    },
+    cardBackLeft: {
+      backgroundColor: "#7C3AED",
+      opacity: 0.82,
+      transform: [{ rotateZ: "-16deg" }, { scale: 0.92 }],
+    },
+    cardBackRight: {
+      backgroundColor: "#F97316",
+      opacity: 0.82,
+      transform: [{ rotateZ: "13deg" }, { scale: 0.92 }],
+    },
+    cardFront: {
+      backgroundColor: "#0D9488",
+      zIndex: 10,
+      shadowColor: "#0D9488",
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.5,
       shadowRadius: 20,
-      elevation: 10,
+      elevation: 14,
     },
-    slideEmoji: {
-      fontSize: 64,
-      marginBottom: 20,
+    cardEmoji: {
+      fontSize: 38,
+      marginBottom: 8,
     },
-    slideLabel: {
-      fontSize: 22,
+    cardBackLabel: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: "rgba(255,255,255,0.75)",
+      textAlign: "center",
+    },
+    cardFrontLabel: {
+      fontSize: 20,
       fontWeight: "900",
       color: "#FFFFFF",
       textAlign: "center",
       letterSpacing: -0.4,
-      marginBottom: 8,
+      marginBottom: 4,
     },
-    slideDesc: {
-      fontSize: 15,
+    cardFrontDesc: {
+      fontSize: 13,
       color: "rgba(255,255,255,0.82)",
       textAlign: "center",
-      lineHeight: 22,
-    },
-    dotsRow: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-      gap: 6,
-      paddingVertical: 16,
-    },
-    dot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: c.border,
-    },
-    dotActive: {
-      width: 22,
-      backgroundColor: c.primary,
     },
     bottom: {
-      flex: 1,
       paddingHorizontal: 28,
       paddingBottom: 32,
-      justifyContent: "flex-end",
     },
     appName: {
-      fontSize: 30,
+      fontSize: 32,
       fontWeight: "900",
       color: c.primaryText,
       letterSpacing: -1,
@@ -98,8 +143,8 @@ export function makeStyles(c: Colors) {
       marginBottom: 14,
       shadowColor: c.primary,
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.35,
-      shadowRadius: 10,
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
       elevation: 6,
     },
     createBtnText: {

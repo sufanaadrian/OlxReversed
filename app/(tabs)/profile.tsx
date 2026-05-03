@@ -2,15 +2,15 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Pressable,
-    ScrollView,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useCurrency } from "../../src/context/CurrencyContext";
 import { useLanguage, useTranslation } from "../../src/context/LanguageContext";
@@ -193,7 +193,7 @@ export default function ProfileScreen() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.replace("/sign-in");
+    router.replace("/welcome");
   }
 
   async function handleVerify() {

@@ -1,164 +1,113 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Pressable,
-    Text,
-    View,
-    ViewToken,
-} from "react-native";
+import { useEffect, useMemo } from "react";
+import { Pressable, Text, View } from "react-native";
+import Animated, {
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTranslation } from "../src/context/LanguageContext";
+import { useLanguage, useTranslation } from "../src/context/LanguageContext";
 import { useTheme } from "../src/context/ThemeContext";
 import { makeStyles } from "./welcome.styles";
-
-const { width } = Dimensions.get("window");
-
-type Slide = {
-  key: string;
-  emojiKey: string;
-  labelKey: string;
-  descKey: string;
-  cardColor: string;
-};
-
-const SLIDES: Slide[] = [
-  {
-    key: "events",
-    emojiKey: "🎉",
-    labelKey: "welcomeSlide1Label",
-    descKey: "welcomeSlide1Desc",
-    cardColor: "#7C3AED",
-  },
-  {
-    key: "it",
-    emojiKey: "💻",
-    labelKey: "welcomeSlide2Label",
-    descKey: "welcomeSlide2Desc",
-    cardColor: "#0D9488",
-  },
-  {
-    key: "hospitality",
-    emojiKey: "🍽️",
-    labelKey: "welcomeSlide3Label",
-    descKey: "welcomeSlide3Desc",
-    cardColor: "#F97316",
-  },
-  {
-    key: "tutoring",
-    emojiKey: "📚",
-    labelKey: "welcomeSlide4Label",
-    descKey: "welcomeSlide4Desc",
-    cardColor: "#0EA5E9",
-  },
-];
 
 export default function WelcomeScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
+  const { language, setLanguage } = useLanguage();
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const dotAnims = useRef(SLIDES.map(() => new Animated.Value(0))).current;
-
-  function animateDots(index: number) {
-    SLIDES.forEach((_, i) => {
-      Animated.spring(dotAnims[i], {
-        toValue: i === index ? 1 : 0,
-        useNativeDriver: false,
-        stiffness: 200,
-        damping: 20,
-      }).start();
-    });
-  }
+  // Front card floats up/down
+  const floatY = useSharedValue(0);
+  // Graduation cap floats at a different pace for natural feel
+  const capY = useSharedValue(0);
 
   useEffect(() => {
-    animateDots(0);
+    floatY.value = withRepeat(
+      withTiming(-14, { duration: 1900, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+    capY.value = withRepeat(
+      withTiming(-9, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
   }, []);
 
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setActiveIndex((prev) => {
-        const next = (prev + 1) % SLIDES.length;
-        flatListRef.current?.scrollToIndex({ index: next, animated: true });
-        animateDots(next);
-        return next;
-      });
-    }, 3200);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
+  const frontCardAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }, { rotateZ: "-2deg" }],
+  }));
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        const idx = viewableItems[0].index;
-        setActiveIndex(idx);
-        animateDots(idx);
-      }
-    },
-  ).current;
-
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-  }).current;
+  const capAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: capY.value }],
+  }));
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* Auto-sliding job category cards */}
-      <View style={styles.slidesContainer}>
-        <FlatList
-          ref={flatListRef}
-          data={SLIDES}
-          keyExtractor={(item) => item.key}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEnabled
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          style={styles.flatList}
-          renderItem={({ item }) => (
-            <View style={styles.slide}>
-              <View
-                style={[styles.slideCard, { backgroundColor: item.cardColor }]}
-              >
-                <Text style={styles.slideEmoji}>{item.emojiKey}</Text>
-                <Text style={styles.slideLabel}>{t(item.labelKey)}</Text>
-                <Text style={styles.slideDesc}>{t(item.descKey)}</Text>
-              </View>
-            </View>
-          )}
-        />
+      {/* Language toggle — top left */}
+      <View style={styles.header}>
+        <View style={styles.langToggle}>
+          <Pressable
+            onPress={() => setLanguage("ro")}
+            style={[styles.langBtn, language === "ro" && styles.langBtnActive]}
+          >
+            <Text
+              style={[
+                styles.langText,
+                language === "ro" && styles.langTextActive,
+              ]}
+            >
+              RO
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setLanguage("en")}
+            style={[styles.langBtn, language === "en" && styles.langBtnActive]}
+          >
+            <Text
+              style={[
+                styles.langText,
+                language === "en" && styles.langTextActive,
+              ]}
+            >
+              EN
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* Dot indicators */}
-      <View style={styles.dotsRow}>
-        {SLIDES.map((slide, i) => {
-          const dotWidth = dotAnims[i].interpolate({
-            inputRange: [0, 1],
-            outputRange: [7, 22],
-          });
-          const dotColor = dotAnims[i].interpolate({
-            inputRange: [0, 1],
-            outputRange: [colors.border, colors.primary],
-          });
-          return (
-            <Animated.View
-              key={slide.key}
-              style={[
-                styles.dot,
-                { width: dotWidth, backgroundColor: dotColor },
-              ]}
-            />
-          );
-        })}
+      {/* 3D card fan hero */}
+      <View style={styles.heroArea}>
+        <View style={styles.cardStack}>
+          {/* Floating graduation cap above the stack */}
+          <Animated.View style={[styles.capContainer, capAnimStyle]}>
+            <Text style={styles.capEmoji}>🎓</Text>
+          </Animated.View>
+
+          {/* Back-left card (Events) */}
+          <View style={[styles.card, styles.cardBackLeft]}>
+            <Text style={styles.cardEmoji}>🎉</Text>
+            <Text style={styles.cardBackLabel}>{t("welcomeSlide1Label")}</Text>
+          </View>
+
+          {/* Back-right card (Hospitality) */}
+          <View style={[styles.card, styles.cardBackRight]}>
+            <Text style={styles.cardEmoji}>🍽️</Text>
+            <Text style={styles.cardBackLabel}>{t("welcomeSlide3Label")}</Text>
+          </View>
+
+          {/* Front floating card (IT & Tech) */}
+          <Animated.View
+            style={[styles.card, styles.cardFront, frontCardAnimStyle]}
+          >
+            <Text style={styles.cardEmoji}>💻</Text>
+            <Text style={styles.cardFrontLabel}>{t("welcomeSlide2Label")}</Text>
+            <Text style={styles.cardFrontDesc}>{t("welcomeSlide2Desc")}</Text>
+          </Animated.View>
+        </View>
       </View>
 
       {/* Branding + CTAs */}
