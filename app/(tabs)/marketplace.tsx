@@ -2,40 +2,29 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
 import { useTheme } from "../../src/context/ThemeContext";
+import { JOB_TYPES } from "../../src/data/jobTypes";
 import { supabase } from "../../src/lib/supabase";
-import { makeStyles } from "./marketplace.styles";
-
-const CATEGORIES = [
-  "All",
-  "Hospitality",
-  "Retail",
-  "Tutoring",
-  "Events",
-  "Delivery",
-  "IT",
-  "Office",
-  "Marketing",
-  "Other",
-] as const;
+import { getCategoryColors, makeStyles } from "./marketplace.styles";
 
 const CATEGORY_KEYS: Record<string, string> = {
   All: "all",
@@ -50,11 +39,28 @@ const CATEGORY_KEYS: Record<string, string> = {
   Other: "other",
 };
 
+const BROWSE_CATEGORIES = [
+  { key: "All", emoji: "✨" },
+  { key: "Hospitality", emoji: "🍽️" },
+  { key: "Retail", emoji: "🛍️" },
+  { key: "Tutoring", emoji: "📚" },
+  { key: "Events", emoji: "🎉" },
+  { key: "Delivery", emoji: "🚴" },
+  { key: "IT", emoji: "💻" },
+  { key: "Office", emoji: "💼" },
+  { key: "Marketing", emoji: "📱" },
+  { key: "Other", emoji: "⭐" },
+] as const;
+
 type JobRequest = {
   id: string;
   title: string;
   description: string | null;
   category: string | null;
+  job_type: string | null;
+  schedule_type: string | null;
+  rate_type: string | null;
+  availability_tags: string[] | null;
   budget_min: number | null;
   budget_max: number | null;
   location: string | null;
@@ -101,11 +107,24 @@ function initials(name: string | null | undefined) {
     .slice(0, 2);
 }
 
-function formatWage(min: number | null, max: number | null) {
+const RATE_LABELS: Record<string, string> = {
+  hourly: "RON/h",
+  "per-session": "RON/ședință",
+  "per-project": "RON/proiect",
+  daily: "RON/zi",
+  negotiable: "negociabil",
+};
+
+function formatWage(
+  min: number | null,
+  max: number | null,
+  rateType?: string | null,
+) {
+  const suffix = RATE_LABELS[rateType ?? ""] ?? "RON/h";
   if (!min && !max) return null;
-  if (min && max) return `${min}–${max} RON/h`;
-  if (min) return `${min}+ RON/h`;
-  return `~${max} RON/h`;
+  if (min && max) return `${min}\u2013${max} ${suffix}`;
+  if (min) return `${min}+ ${suffix}`;
+  return `~${max} ${suffix}`;
 }
 
 export default function JobsScreen() {
@@ -129,99 +148,107 @@ export default function JobsScreen() {
   const [showBanner, setShowBanner] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [newJobsCount, setNewJobsCount] = useState(0);
+  const [showBrowse, setShowBrowse] = useState(false);
+  const [browseJobType, setBrowseJobType] = useState("");
+  const [filterMinWage, setFilterMinWage] = useState("");
+  const [filterMaxWage, setFilterMaxWage] = useState("");
+  const [browsePostingAs, setBrowsePostingAs] = useState<
+    "all" | "employer" | "student"
+  >("all");
+  const [filterScheduleType, setFilterScheduleType] = useState("");
+  const [filterAvailability, setFilterAvailability] = useState("");
+  const catColors = useMemo(
+    () => getCategoryColors(colors.isDark),
+    [colors.isDark],
+  );
   const isFirstLoad = useRef(true);
   // Ref so the stable realtime channel can always call the latest fetchJobs
   const fetchJobsRef = useRef<((quiet?: boolean) => Promise<void>) | null>(
     null,
   );
 
-  const fetchJobs = useCallback(
-    async (quiet = false) => {
-      if (!quiet) {
-        if (isFirstLoad.current) {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
+  const fetchJobs = useCallback(async (quiet = false) => {
+    if (!quiet) {
+      if (isFirstLoad.current) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUserId(user?.id ?? null);
+    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setUserId(user?.id ?? null);
 
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
-      let query = supabase
-        .from("requests")
-        .select(
-          "id,title,description,category,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
-        )
-        .eq("status", "active")
-        .gte("created_at", thirtyDaysAgo);
-      if (selectedCategory !== "All")
-        query = query.eq("category", selectedCategory);
-      const { data } = await query;
-      const rawJobs = (data as unknown as JobRequest[]) ?? [];
-      setJobs([...rawJobs].sort((a, b) => scoreJob(b) - scoreJob(a)));
-      isFirstLoad.current = false;
-      setNewJobsCount(0);
+    let query = supabase
+      .from("requests")
+      .select(
+        "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
+      )
+      .eq("status", "active")
+      .gte("created_at", thirtyDaysAgo);
+    const { data } = await query;
+    const rawJobs = (data as unknown as JobRequest[]) ?? [];
+    setJobs([...rawJobs].sort((a, b) => scoreJob(b) - scoreJob(a)));
+    isFirstLoad.current = false;
+    setNewJobsCount(0);
 
-      // Fetch interest counts for the loaded jobs
-      const jobIds = ((data ?? []) as { id: string }[]).map((j) => j.id);
-      if (jobIds.length) {
-        const { data: allInterests } = await supabase
-          .from("job_interests")
-          .select("request_id")
-          .in("request_id", jobIds);
-        const counts: Record<string, number> = {};
-        (allInterests ?? []).forEach((i: any) => {
-          counts[i.request_id] = (counts[i.request_id] ?? 0) + 1;
-        });
-        setInterestCounts(counts);
+    // Fetch interest counts for the loaded jobs
+    const jobIds = ((data ?? []) as { id: string }[]).map((j) => j.id);
+    if (jobIds.length) {
+      const { data: allInterests } = await supabase
+        .from("job_interests")
+        .select("request_id")
+        .in("request_id", jobIds);
+      const counts: Record<string, number> = {};
+      (allInterests ?? []).forEach((i: any) => {
+        counts[i.request_id] = (counts[i.request_id] ?? 0) + 1;
+      });
+      setInterestCounts(counts);
+    }
+
+    if (user) {
+      // Load saved jobs
+      const { data: saved } = await supabase
+        .from("saved_jobs")
+        .select("request_id")
+        .eq("user_id", user.id);
+      setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
+
+      // Load applied jobs (non-withdrawn)
+      const { data: applied } = await supabase
+        .from("offers")
+        .select("request_id")
+        .eq("seller_id", user.id)
+        .neq("status", "withdrawn");
+      setAppliedIds(new Set((applied ?? []).map((a: any) => a.request_id)));
+
+      // Load interested jobs
+      const { data: myInterests } = await supabase
+        .from("job_interests")
+        .select("request_id")
+        .eq("user_id", user.id);
+      setInterestedIds(
+        new Set((myInterests ?? []).map((i: any) => i.request_id)),
+      );
+
+      // Check profile completeness
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("bio, skills, university")
+        .eq("id", user.id)
+        .single();
+      if (prof) {
+        const incomplete =
+          !prof.bio || !prof.university || !prof.skills?.length;
+        setProfileIncomplete(incomplete);
       }
-
-      if (user) {
-        // Load saved jobs
-        const { data: saved } = await supabase
-          .from("saved_jobs")
-          .select("request_id")
-          .eq("user_id", user.id);
-        setSavedIds(new Set((saved ?? []).map((s: any) => s.request_id)));
-
-        // Load applied jobs (non-withdrawn)
-        const { data: applied } = await supabase
-          .from("offers")
-          .select("request_id")
-          .eq("seller_id", user.id)
-          .neq("status", "withdrawn");
-        setAppliedIds(new Set((applied ?? []).map((a: any) => a.request_id)));
-
-        // Load interested jobs
-        const { data: myInterests } = await supabase
-          .from("job_interests")
-          .select("request_id")
-          .eq("user_id", user.id);
-        setInterestedIds(
-          new Set((myInterests ?? []).map((i: any) => i.request_id)),
-        );
-
-        // Check profile completeness
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("bio, skills, university")
-          .eq("id", user.id)
-          .single();
-        if (prof) {
-          const incomplete =
-            !prof.bio || !prof.university || !prof.skills?.length;
-          setProfileIncomplete(incomplete);
-        }
-      }
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [selectedCategory],
-  );
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   // Keep ref pointing to latest fetchJobs so the stable channel can call it
   useEffect(() => {
@@ -317,20 +344,80 @@ export default function JobsScreen() {
   }
 
   const filtered = jobs.filter((j) => {
+    // Hide jobs the user has already applied to
+    if (appliedIds.has(j.id)) return false;
+    // Marketplace mode (global context)
     if (marketplaceMode !== "all" && j.posting_as !== marketplaceMode)
       return false;
+    // Posting type from browse panel
+    if (browsePostingAs !== "all" && j.posting_as !== browsePostingAs)
+      return false;
+    // Category filter (client-side)
+    if (selectedCategory !== "All" && j.category !== selectedCategory)
+      return false;
+    // Job-type filter:
+    // - For employer posts: match against their explicit job_type field
+    // - Student posts pass through (they offer availability, not a role)
+    if (browseJobType) {
+      if (j.posting_as === "employer") {
+        if (j.job_type !== browseJobType) return false;
+      }
+      // student posts are not filtered by job type
+    }
+    // Availability tag filter: for employer posts match against their availability_tags;
+    // for student posts match against their availability_tags (when available they can work)
+    if (filterAvailability) {
+      if (!(j.availability_tags ?? []).includes(filterAvailability))
+        return false;
+    }
+    // Schedule type filter (employer posts only; student posts pass through)
+    if (filterScheduleType) {
+      if (j.posting_as === "employer" && j.schedule_type !== filterScheduleType)
+        return false;
+    }
+    // Wage range filter
+    const minW = filterMinWage ? Number(filterMinWage) : null;
+    const maxW = filterMaxWage ? Number(filterMaxWage) : null;
+    if (minW !== null && !isNaN(minW)) {
+      const jobTop = j.budget_max ?? j.budget_min ?? 0;
+      if (jobTop < minW) return false;
+    }
+    if (maxW !== null && !isNaN(maxW)) {
+      const jobBot = j.budget_min ?? j.budget_max ?? Infinity;
+      if (jobBot > maxW) return false;
+    }
+    // Text search
     const q = search.toLowerCase();
     return (
       !q ||
       j.title.toLowerCase().includes(q) ||
-      j.description?.toLowerCase().includes(q) ||
-      j.location?.toLowerCase().includes(q)
+      (j.description ?? "").toLowerCase().includes(q) ||
+      (j.location ?? "").toLowerCase().includes(q)
     );
   });
 
+  const activeFilterCount = [
+    !!browseJobType,
+    !!filterMinWage,
+    !!filterMaxWage,
+    browsePostingAs !== "all",
+    !!filterScheduleType,
+    !!filterAvailability,
+  ].filter(Boolean).length;
+
+  function clearAllFilters() {
+    setSelectedCategory("All");
+    setBrowseJobType("");
+    setFilterMinWage("");
+    setFilterMaxWage("");
+    setBrowsePostingAs("all");
+    setFilterScheduleType("");
+    setFilterAvailability("");
+  }
+
   function renderItem({ item }: { item: JobRequest }) {
     const isEmployer = item.posting_as === "employer";
-    const wage = formatWage(item.budget_min, item.budget_max);
+    const wage = formatWage(item.budget_min, item.budget_max, item.rate_type);
     const posterName = item.profiles?.username ?? null;
     const isSaved = savedIds.has(item.id);
     const hasApplied = appliedIds.has(item.id);
@@ -436,6 +523,40 @@ export default function JobsScreen() {
                 </Text>
               </View>
             ) : null}
+            {item.job_type ? (
+              <View style={[styles.metaChip, styles.jobTypeChip]}>
+                <Feather name="briefcase" size={11} color={colors.primary} />
+                <Text
+                  style={[styles.metaChipText, styles.jobTypeChipText]}
+                  numberOfLines={1}
+                >
+                  {item.job_type}
+                </Text>
+              </View>
+            ) : null}
+            {item.schedule_type ? (
+              <View style={[styles.metaChip, styles.scheduleChip]}>
+                <Feather name="clock" size={11} color={colors.warning} />
+                <Text
+                  style={[styles.metaChipText, styles.scheduleChipText]}
+                  numberOfLines={1}
+                >
+                  {item.schedule_type}
+                </Text>
+              </View>
+            ) : null}
+            {!isEmployer &&
+              (item.availability_tags ?? []).slice(0, 3).map((tag) => (
+                <View key={tag} style={[styles.metaChip, styles.availChip]}>
+                  <Feather name="calendar" size={11} color={colors.success} />
+                  <Text
+                    style={[styles.metaChipText, styles.availChipText]}
+                    numberOfLines={1}
+                  >
+                    {tag}
+                  </Text>
+                </View>
+              ))}
           </View>
 
           {/* Footer */}
@@ -498,9 +619,383 @@ export default function JobsScreen() {
     );
   }
 
+  function renderBrowsePanel() {
+    return (
+      <Modal
+        visible={showBrowse}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowBrowse(false)}
+      >
+        <View style={[styles.browseModal, { backgroundColor: colors.bg }]}>
+          {/* Header */}
+          <View
+            style={[styles.browseHeader, { borderBottomColor: colors.border }]}
+          >
+            <Pressable onPress={clearAllFilters} hitSlop={8}>
+              <Text
+                style={[styles.browseClearText, { color: colors.mutedText }]}
+              >
+                {t("clearAllFilters")}
+              </Text>
+            </Pressable>
+            <Text
+              style={[styles.browseTitleText, { color: colors.primaryText }]}
+            >
+              {t("browsePanel")}
+            </Text>
+            <Pressable onPress={() => setShowBrowse(false)} hitSlop={8}>
+              <Feather name="x" size={20} color={colors.primaryText} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.browseContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Category grid */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("category")}
+            </Text>
+            <View style={styles.browseCatGrid}>
+              {BROWSE_CATEGORIES.map(({ key, emoji }) => {
+                const active = selectedCategory === key;
+                const bubbleColor = catColors[key]?.bg ?? colors.surfaceAlt;
+                return (
+                  <Pressable
+                    key={key}
+                    style={[
+                      styles.browseCatTile,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                      active && {
+                        backgroundColor: colors.primaryLight,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedCategory(
+                        active && key !== "All" ? "All" : key,
+                      );
+                      if (active) setBrowseJobType("");
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.browseCatEmojiWrap,
+                        { backgroundColor: bubbleColor },
+                      ]}
+                    >
+                      <Text style={styles.browseCatEmoji}>{emoji}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.browseCatLabel,
+                        {
+                          color: active ? colors.primary : colors.secondaryText,
+                        },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {key === "All"
+                        ? t("all")
+                        : t(CATEGORY_KEYS[key] ?? "other")}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Job type chips — only if a real category is selected */}
+            {selectedCategory !== "All" &&
+              (JOB_TYPES[selectedCategory]?.length ?? 0) > 0 && (
+                <>
+                  <Text
+                    style={[
+                      styles.browseSectionLabel,
+                      { color: colors.mutedText },
+                    ]}
+                  >
+                    {t("jobType")}
+                  </Text>
+                  <View style={styles.browseTypeWrap}>
+                    {JOB_TYPES[selectedCategory].map((type) => {
+                      const active = browseJobType === type;
+                      return (
+                        <Pressable
+                          key={type}
+                          style={[
+                            styles.browseTypeChip,
+                            {
+                              backgroundColor: colors.surfaceAlt,
+                              borderColor: colors.border,
+                            },
+                            active && {
+                              backgroundColor: colors.primary,
+                              borderColor: colors.primary,
+                            },
+                          ]}
+                          onPress={() => setBrowseJobType(active ? "" : type)}
+                        >
+                          <Text
+                            style={[
+                              styles.browseTypeText,
+                              { color: active ? "#fff" : colors.secondaryText },
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+            {/* Availability tags filter */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("availabilityFilter")}
+            </Text>
+            <View style={styles.browseTypeWrap}>
+              {(
+                [
+                  ["weekdays", t("availWeekdays")],
+                  ["mornings", t("availMorn")],
+                  ["afternoons", t("availAft")],
+                  ["evenings", t("availEve")],
+                  ["nights", t("availNights")],
+                  ["saturday", t("availSat")],
+                  ["sunday", t("availSun")],
+                  ["friday", t("availFri")],
+                  ["flexible", t("availFlexible")],
+                ] as [string, string][]
+              ).map(([value, label]) => {
+                const active = filterAvailability === value;
+                return (
+                  <Pressable
+                    key={value}
+                    style={[
+                      styles.browseTypeChip,
+                      {
+                        backgroundColor: colors.surfaceAlt,
+                        borderColor: colors.border,
+                      },
+                      active && {
+                        backgroundColor: colors.success,
+                        borderColor: colors.success,
+                      },
+                    ]}
+                    onPress={() => setFilterAvailability(active ? "" : value)}
+                  >
+                    <Text
+                      style={[
+                        styles.browseTypeText,
+                        { color: active ? "#fff" : colors.secondaryText },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Schedule type — relevant mainly for employer posts */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("scheduleTypeFilter")}
+            </Text>
+            <View style={styles.browseTypeWrap}>
+              {(
+                [
+                  ["part-time", t("schedulePartTime")],
+                  ["full-time", t("scheduleFullTime")],
+                  ["weekend", t("scheduleWeekend")],
+                  ["seasonal", t("scheduleSeasonal")],
+                  ["remote", t("scheduleRemote")],
+                  ["flexible", t("scheduleFlexible")],
+                ] as [string, string][]
+              ).map(([value, label]) => {
+                const active = filterScheduleType === value;
+                return (
+                  <Pressable
+                    key={value}
+                    style={[
+                      styles.browseTypeChip,
+                      {
+                        backgroundColor: colors.surfaceAlt,
+                        borderColor: colors.border,
+                      },
+                      active && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => setFilterScheduleType(active ? "" : value)}
+                  >
+                    <Text
+                      style={[
+                        styles.browseTypeText,
+                        { color: active ? "#fff" : colors.secondaryText },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Posting type */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("postingType")}
+            </Text>
+            <View style={styles.browseToggleRow}>
+              {(["all", "employer", "student"] as const).map((mode) => {
+                const labels: Record<string, string> = {
+                  all: t("all"),
+                  employer: t("employer"),
+                  student: t("student"),
+                };
+                const active = browsePostingAs === mode;
+                return (
+                  <Pressable
+                    key={mode}
+                    style={[
+                      styles.browseToggleBtn,
+                      {
+                        backgroundColor: colors.surfaceAlt,
+                        borderColor: colors.border,
+                      },
+                      active && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => setBrowsePostingAs(mode)}
+                  >
+                    <Text
+                      style={[
+                        styles.browseToggleText,
+                        { color: active ? "#fff" : colors.secondaryText },
+                      ]}
+                    >
+                      {labels[mode]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Wage range */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("wageFilter")}
+            </Text>
+            <View style={styles.browseWageRow}>
+              <View
+                style={[
+                  styles.browseWageBox,
+                  {
+                    backgroundColor: colors.surfaceAlt,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.browseWageLbl, { color: colors.mutedText }]}
+                >
+                  {t("budgetMin")}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.browseWageField,
+                    { color: colors.primaryText },
+                  ]}
+                  value={filterMinWage}
+                  onChangeText={setFilterMinWage}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.mutedText}
+                />
+              </View>
+              <Text
+                style={[styles.browseWageDash, { color: colors.mutedText }]}
+              >
+                —
+              </Text>
+              <View
+                style={[
+                  styles.browseWageBox,
+                  {
+                    backgroundColor: colors.surfaceAlt,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.browseWageLbl, { color: colors.mutedText }]}
+                >
+                  {t("budgetMax")}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.browseWageField,
+                    { color: colors.primaryText },
+                  ]}
+                  value={filterMaxWage}
+                  onChangeText={setFilterMaxWage}
+                  keyboardType="numeric"
+                  placeholder="∞"
+                  placeholderTextColor={colors.mutedText}
+                />
+              </View>
+            </View>
+
+            <View style={{ height: 20 }} />
+          </ScrollView>
+
+          {/* Footer */}
+          <View
+            style={[
+              styles.browseFooter,
+              {
+                borderTopColor: colors.border,
+                backgroundColor: colors.surface,
+              },
+            ]}
+          >
+            <Pressable
+              style={[
+                styles.browseApplyBtn,
+                { backgroundColor: colors.primary },
+              ]}
+              onPress={() => setShowBrowse(false)}
+            >
+              <Text style={styles.browseApplyText}>
+                {t("showResults")} ({filtered.length})
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <View style={styles.page}>
-      {/* Compact header: search row + recent searches */}
+      {/* Compact header: search + filter + bookmark */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.searchBox}>
@@ -520,6 +1015,28 @@ export default function JobsScreen() {
               </Pressable>
             )}
           </View>
+          {/* Filter button */}
+          <Pressable
+            style={[
+              styles.headerIconBtn,
+              activeFilterCount > 0 && styles.headerIconBtnActive,
+            ]}
+            onPress={() => setShowBrowse(true)}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            <Feather
+              name="sliders"
+              size={18}
+              color={
+                activeFilterCount > 0 ? colors.primary : colors.primaryDark
+              }
+            />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </Pressable>
           <Pressable
             style={styles.headerIconBtn}
             onPress={() => router.push("/saved-jobs" as any)}
@@ -586,20 +1103,23 @@ export default function JobsScreen() {
         </View>
       )}
 
-      {/* Category chips — ScrollView for reliable spacing */}
+      {/* Quick category chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.chipsScroll}
         contentContainerStyle={styles.chipsRow}
       >
-        {(CATEGORIES as unknown as string[]).map((cat) => {
+        {(Object.keys(CATEGORY_KEYS) as string[]).map((cat) => {
           const active = cat === selectedCategory;
           return (
             <Pressable
               key={cat}
               style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setSelectedCategory(cat)}
+              onPress={() => {
+                setSelectedCategory(active ? "All" : cat);
+                if (active) setBrowseJobType("");
+              }}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {cat === "All" ? t("all") : t(CATEGORY_KEYS[cat] ?? "other")}
@@ -609,38 +1129,76 @@ export default function JobsScreen() {
         })}
       </ScrollView>
 
-      {/* Mode indicator — only visible when a mode is active */}
-      {marketplaceMode !== "all" && (
-        <View style={styles.modePill}>
-          <Feather
-            name={marketplaceMode === "employer" ? "briefcase" : "user"}
-            size={11}
-            color={
-              marketplaceMode === "employer" ? colors.employer : colors.primary
-            }
-          />
-          <Text
-            style={[
-              styles.modePillText,
-              marketplaceMode === "employer"
-                ? styles.modePillTextEmployer
-                : styles.modePillTextStudent,
-            ]}
-          >
-            {marketplaceMode === "employer"
-              ? t("employerMode")
-              : t("studentMode")}
-          </Text>
-          <Pressable
-            hitSlop={8}
-            onPress={() => {
-              /* navigate to profile to change */
-              router.push("/(tabs)/profile" as any);
-            }}
-          >
-            <Feather name="settings" size={11} color={colors.mutedText} />
+      {/* Active filter chips row — shown only when browse panel filters are active */}
+      {activeFilterCount > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.activeChipsScroll}
+          contentContainerStyle={styles.activeChipsRow}
+        >
+          {browseJobType ? (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setBrowseJobType("")}
+            >
+              <Text style={styles.activeChipText}>{browseJobType}</Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          {browsePostingAs !== "all" && (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setBrowsePostingAs("all")}
+            >
+              <Text style={styles.activeChipText}>
+                {browsePostingAs === "employer" ? t("employer") : t("student")}
+              </Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          )}
+          {filterMinWage ? (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setFilterMinWage("")}
+            >
+              <Text style={styles.activeChipText}>≥{filterMinWage} RON</Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          {filterMaxWage ? (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setFilterMaxWage("")}
+            >
+              <Text style={styles.activeChipText}>≤{filterMaxWage} RON</Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          {filterScheduleType ? (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setFilterScheduleType("")}
+            >
+              <Text style={styles.activeChipText}>{filterScheduleType}</Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          {filterAvailability ? (
+            <Pressable
+              style={[styles.activeChip, styles.activeChipAvail]}
+              onPress={() => setFilterAvailability("")}
+            >
+              <Text style={[styles.activeChipText, styles.activeChipAvailText]}>
+                {filterAvailability}
+              </Text>
+              <Feather name="x" size={11} color={colors.success} />
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.clearChip} onPress={clearAllFilters}>
+            <Text style={styles.clearChipText}>{t("clearAllFilters")}</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       )}
 
       {/* Save search pill — visible when a filter or search is active */}
@@ -662,6 +1220,7 @@ export default function JobsScreen() {
           data={filtered}
           keyExtractor={(j) => j.id}
           renderItem={renderItem}
+          style={{ flex: 1 }}
           contentContainerStyle={[
             styles.list,
             filtered.length === 0 && { flex: 1 },
@@ -674,17 +1233,35 @@ export default function JobsScreen() {
               <View style={styles.emptyIcon}>
                 <Feather name="briefcase" size={32} color={colors.mutedText} />
               </View>
-              <Text style={styles.emptyTitle}>{t("noJobsFound")}</Text>
-              <Text style={styles.emptySubtitle}>
-                {t("tryAdjustingSearch")}
+              <Text style={styles.emptyTitle}>
+                {activeFilterCount > 0
+                  ? t("noJobsMatchFilters")
+                  : t("noJobsFound")}
               </Text>
-              <Pressable style={styles.refreshBtn} onPress={() => fetchJobs()}>
-                <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
-              </Pressable>
+              <Text style={styles.emptySubtitle}>
+                {activeFilterCount > 0
+                  ? t("adjustFilters")
+                  : t("tryAdjustingSearch")}
+              </Text>
+              {activeFilterCount > 0 ? (
+                <Pressable style={styles.refreshBtn} onPress={clearAllFilters}>
+                  <Text style={styles.refreshBtnText}>
+                    {t("clearAllFilters")}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.refreshBtn}
+                  onPress={() => fetchJobs()}
+                >
+                  <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
+                </Pressable>
+              )}
             </View>
           }
         />
       )}
+      {renderBrowsePanel()}
     </View>
   );
 }
