@@ -1216,50 +1216,59 @@ export default function JobsScreen() {
           color={colors.primary}
         />
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(j) => j.id}
-          renderItem={renderItem}
-          style={{ flex: 1 }}
-          contentContainerStyle={[
-            styles.list,
-            filtered.length === 0 && { flex: 1 },
-          ]}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          onRefresh={fetchJobs}
-          refreshing={refreshing}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <View style={styles.emptyIcon}>
-                <Feather name="briefcase" size={32} color={colors.mutedText} />
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={filtered}
+            keyExtractor={(j) => j.id}
+            renderItem={renderItem}
+            style={{ flex: 1 }}
+            contentContainerStyle={[
+              styles.list,
+              filtered.length === 0 && { flex: 1 },
+            ]}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            onRefresh={fetchJobs}
+            refreshing={refreshing}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <View style={styles.emptyIcon}>
+                  <Feather
+                    name="briefcase"
+                    size={32}
+                    color={colors.mutedText}
+                  />
+                </View>
+                <Text style={styles.emptyTitle}>
+                  {activeFilterCount > 0
+                    ? t("noJobsMatchFilters")
+                    : t("noJobsFound")}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {activeFilterCount > 0
+                    ? t("adjustFilters")
+                    : t("tryAdjustingSearch")}
+                </Text>
+                {activeFilterCount > 0 ? (
+                  <Pressable
+                    style={styles.refreshBtn}
+                    onPress={clearAllFilters}
+                  >
+                    <Text style={styles.refreshBtnText}>
+                      {t("clearAllFilters")}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.refreshBtn}
+                    onPress={() => fetchJobs()}
+                  >
+                    <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
+                  </Pressable>
+                )}
               </View>
-              <Text style={styles.emptyTitle}>
-                {activeFilterCount > 0
-                  ? t("noJobsMatchFilters")
-                  : t("noJobsFound")}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {activeFilterCount > 0
-                  ? t("adjustFilters")
-                  : t("tryAdjustingSearch")}
-              </Text>
-              {activeFilterCount > 0 ? (
-                <Pressable style={styles.refreshBtn} onPress={clearAllFilters}>
-                  <Text style={styles.refreshBtnText}>
-                    {t("clearAllFilters")}
-                  </Text>
-                </Pressable>
-              ) : (
-                <Pressable
-                  style={styles.refreshBtn}
-                  onPress={() => fetchJobs()}
-                >
-                  <Text style={styles.refreshBtnText}>{t("refresh")}</Text>
-                </Pressable>
-              )}
-            </View>
-          }
-        />
+            }
+          />
+        </View>
       )}
       {renderBrowsePanel()}
     </View>

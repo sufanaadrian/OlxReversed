@@ -218,6 +218,7 @@ export function makeStyles(c: Colors) {
     appStatusText: { fontSize: 11, fontWeight: "700" },
 
     decisionRow: { flexDirection: "row", gap: 8 },
+    decisionCol: { flexDirection: "column", gap: 6 },
     rejectBtn: {
       flex: 1,
       flexDirection: "row",
@@ -242,7 +243,19 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.primary,
     },
     acceptBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
+    hireBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+      paddingVertical: 9,
+      borderRadius: 10,
+      backgroundColor: c.success,
+    },
+    hireBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
     chatBtn: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
@@ -250,7 +263,6 @@ export function makeStyles(c: Colors) {
       paddingVertical: 9,
       borderRadius: 10,
       backgroundColor: c.primary,
-      marginTop: 4,
     },
     chatBtnText: { fontWeight: "700", color: "#FFFFFF", fontSize: 13 },
 

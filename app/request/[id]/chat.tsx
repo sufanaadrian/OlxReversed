@@ -115,7 +115,7 @@ export default function ChatScreen() {
       if (!req) return;
       const owner = req.user_id === user.id;
       setIsOwner(owner);
-      setJobClosed(req.status === "closed" || req.status === "filled");
+      setJobClosed(req.status === "closed");
       setRequestInfo({
         title: (req as any).title,
         category: (req as any).category ?? null,
@@ -124,14 +124,14 @@ export default function ChatScreen() {
         location: (req as any).location ?? null,
       });
       if (owner) {
-        // I'm the owner, find the accepted applicant
+        // I'm the owner, find the accepted or hired applicant
         const { data: offer } = await supabase
           .from("offers")
           .select(
             "seller_id, price, profiles!seller_id(id, username, phone_number)",
           )
           .eq("request_id", id)
-          .eq("status", "accepted")
+          .in("status", ["accepted", "hired"])
           .maybeSingle();
         if (offer) {
           const prof = (offer as any).profiles as Profile & {
@@ -153,13 +153,13 @@ export default function ChatScreen() {
           .single();
         setOtherUser(prof);
         setOtherPhone((empProf as any)?.phone_number ?? null);
-        // Fetch my accepted offer price
+        // Fetch my accepted/hired offer price
         const { data: myOffer } = await supabase
           .from("offers")
           .select("price")
           .eq("request_id", id)
           .eq("seller_id", user.id)
-          .eq("status", "accepted")
+          .in("status", ["accepted", "hired"])
           .maybeSingle();
         if (myOffer) setOfferInfo({ price: (myOffer as any).price });
       }
@@ -353,44 +353,46 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={colors.primaryText} />
-        </Pressable>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>
-            {otherUser?.username ?? t("chat")}
-          </Text>
-          {jobClosed && (
-            <Text style={styles.headerSub}>{t("statusClosed")}</Text>
-          )}
-        </View>
-        <View style={styles.headerActions}>
-          {otherUser?.id && (
-            <Pressable
-              style={styles.headerIconBtn}
-              onPress={() => router.push(`/cv/${otherUser.id}` as any)}
-            >
-              <Feather name="user" size={18} color={colors.primaryText} />
-            </Pressable>
-          )}
-          {otherUser && (
-            <Pressable
-              style={[
-                styles.headerIconBtn,
-                styles.headerCallBtn,
-                !otherPhone && styles.headerCallBtnDisabled,
-              ]}
-              onPress={() => {
-                if (otherPhone) {
-                  Linking.openURL(`tel:${otherPhone}`);
-                } else {
-                  Alert.alert(t("noPhoneTitle"), t("noPhoneDesc"));
-                }
-              }}
-            >
-              <Feather name="phone" size={18} color="#FFFFFF" />
-            </Pressable>
-          )}
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Feather name="arrow-left" size={22} color={colors.primaryText} />
+          </Pressable>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName}>
+              {otherUser?.username ?? t("chat")}
+            </Text>
+            {jobClosed && (
+              <Text style={styles.headerSub}>{t("statusClosed")}</Text>
+            )}
+          </View>
+          <View style={styles.headerActions}>
+            {otherUser?.id && (
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={() => router.push(`/cv/${otherUser.id}` as any)}
+              >
+                <Feather name="user" size={18} color={colors.primaryText} />
+              </Pressable>
+            )}
+            {otherUser && (
+              <Pressable
+                style={[
+                  styles.headerIconBtn,
+                  styles.headerCallBtn,
+                  !otherPhone && styles.headerCallBtnDisabled,
+                ]}
+                onPress={() => {
+                  if (otherPhone) {
+                    Linking.openURL(`tel:${otherPhone}`);
+                  } else {
+                    Alert.alert(t("noPhoneTitle"), t("noPhoneDesc"));
+                  }
+                }}
+              >
+                <Feather name="phone" size={18} color="#FFFFFF" />
+              </Pressable>
+            )}
+          </View>
         </View>
         {isOwner && !jobClosed && (
           <Pressable onPress={handleComplete} style={styles.completeBtn}>

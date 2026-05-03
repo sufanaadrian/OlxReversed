@@ -367,12 +367,13 @@ export function makeStyles(c: Colors) {
     bannerLink: { fontSize: 12, fontWeight: "800", color: c.primary },
     bannerDismiss: { padding: 2 },
 
-    chipsScroll: { flexShrink: 0 },
+    chipsScroll: { flexGrow: 0, flexShrink: 0 },
     chipsRow: {
       paddingVertical: 8,
       paddingHorizontal: 14,
       gap: 6,
       flexDirection: "row",
+      alignItems: "center",
     },
     chip: {
       paddingVertical: 5,

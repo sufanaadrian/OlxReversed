@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
@@ -27,7 +27,8 @@ function getAppStatusColors(
 ): Record<string, { bg: string; text: string }> {
   return {
     pending: { bg: c.warningLight, text: c.warning },
-    accepted: { bg: c.successLight, text: c.success },
+    accepted: { bg: c.primaryLight, text: c.primaryDark },
+    hired: { bg: c.successLight, text: c.success },
     rejected: { bg: c.errorLight, text: c.error },
     withdrawn: { bg: c.surfaceAlt, text: c.mutedText },
   };
@@ -69,7 +70,12 @@ type ReceivedApplication = {
   status: string;
   cover_letter: string | null;
   created_at: string;
-  requests: { id: string; title: string } | null;
+  requests: {
+    id: string;
+    title: string;
+    workers_needed: number;
+    accepted_count: number;
+  } | null;
   profiles: {
     id: string;
     username: string | null;
@@ -184,9 +190,9 @@ export default function ActivityScreen() {
         sentWithProfiles.push({
           ...app,
           requests: req ? { ...req, profiles: prof ?? null } : null,
-        } as Application);
+        } as unknown as Application);
       } else {
-        sentWithProfiles.push(app as Application);
+        sentWithProfiles.push(app as unknown as Application);
       }
     }
     setSentApps(sentWithProfiles);
@@ -201,12 +207,12 @@ export default function ActivityScreen() {
       const { data: received } = await supabase
         .from("offers")
         .select(
-          "id, status, cover_letter, created_at, requests!inner(id, title), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+          "id, status, cover_letter, created_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
         )
         .in("request_id", postIds)
         .neq("status", "withdrawn")
         .order("created_at", { ascending: false });
-      setReceivedApps((received as ReceivedApplication[]) ?? []);
+      setReceivedApps((received as unknown as ReceivedApplication[]) ?? []);
     } else {
       setReceivedApps([]);
     }
@@ -256,6 +262,67 @@ export default function ActivityScreen() {
             .from("offers")
             .update({ status: "withdrawn" })
             .eq("id", id);
+          fetchApplications();
+        },
+      },
+    ]);
+  }
+
+  // Slot-guarded accept: invite to chat without counting toward filled
+  async function handleAcceptReceived(item: ReceivedApplication) {
+    const req = item.requests;
+    if (!req) return;
+    const chattingCount = receivedApps.filter(
+      (a) => a.requests?.id === req.id && a.status === "accepted",
+    ).length;
+    const canAccept =
+      chattingCount + (req.accepted_count ?? 0) < (req.workers_needed ?? 1);
+    if (!canAccept) return;
+    await supabase
+      .from("offers")
+      .update({ status: "accepted" })
+      .eq("id", item.id);
+    fetchApplications();
+  }
+
+  async function handleHireReceived(item: ReceivedApplication) {
+    const req = item.requests;
+    if (!req) return;
+    Alert.alert(t("hire"), t("hireConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("hire"),
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "hired" })
+            .eq("id", item.id);
+          const newCount = (req.accepted_count ?? 0) + 1;
+          const nowFilled = newCount >= (req.workers_needed ?? 1);
+          await supabase
+            .from("requests")
+            .update({
+              accepted_count: newCount,
+              ...(nowFilled ? { status: "filled" } : {}),
+            })
+            .eq("id", req.id);
+          fetchApplications();
+        },
+      },
+    ]);
+  }
+
+  async function handleReleaseReceived(item: ReceivedApplication) {
+    Alert.alert(t("release"), t("releaseConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("release"),
+        style: "destructive",
+        onPress: async () => {
+          await supabase
+            .from("offers")
+            .update({ status: "rejected" })
+            .eq("id", item.id);
           fetchApplications();
         },
       },
@@ -560,43 +627,73 @@ export default function ActivityScreen() {
               </Pressable>
             )}
             {item.status === "accepted" && req && (
-              <Pressable
-                style={styles.appActionPrimary}
-                onPress={() => router.push(`/request/${req.id}/chat` as any)}
-              >
-                <Feather name="message-circle" size={13} color="#fff" />
-                <Text style={styles.appActionPrimaryText}>{t("openChat")}</Text>
-              </Pressable>
-            )}
-            {item.status === "pending" && (
               <>
                 <Pressable
                   style={styles.appActionPrimary}
-                  onPress={async () => {
-                    await supabase
-                      .from("offers")
-                      .update({ status: "accepted" })
-                      .eq("id", item.id);
-                    fetchApplications();
-                  }}
+                  onPress={() => router.push(`/request/${req.id}/chat` as any)}
+                >
+                  <Feather name="message-circle" size={13} color="#fff" />
+                  <Text style={styles.appActionPrimaryText}>
+                    {t("openChat")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.appActionPrimary}
+                  onPress={() => handleHireReceived(item)}
                 >
                   <Feather name="check" size={13} color="#fff" />
-                  <Text style={styles.appActionPrimaryText}>{t("accept")}</Text>
+                  <Text style={styles.appActionPrimaryText}>{t("hire")}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.appActionDanger}
-                  onPress={async () => {
-                    await supabase
-                      .from("offers")
-                      .update({ status: "rejected" })
-                      .eq("id", item.id);
-                    fetchApplications();
-                  }}
+                  onPress={() => handleReleaseReceived(item)}
                 >
-                  <Text style={styles.appActionDangerText}>{t("reject")}</Text>
+                  <Text style={styles.appActionDangerText}>{t("release")}</Text>
                 </Pressable>
               </>
             )}
+            {item.status === "pending" &&
+              (() => {
+                const req = item.requests;
+                const chattingCount = receivedApps.filter(
+                  (a) => a.requests?.id === req?.id && a.status === "accepted",
+                ).length;
+                const canAccept =
+                  !!req &&
+                  chattingCount + (req.accepted_count ?? 0) <
+                    (req.workers_needed ?? 1);
+                return (
+                  <>
+                    <Pressable
+                      style={[
+                        styles.appActionPrimary,
+                        !canAccept && { opacity: 0.4 },
+                      ]}
+                      onPress={() => canAccept && handleAcceptReceived(item)}
+                      disabled={!canAccept}
+                    >
+                      <Feather name="message-circle" size={13} color="#fff" />
+                      <Text style={styles.appActionPrimaryText}>
+                        {t("accept")}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.appActionDanger}
+                      onPress={async () => {
+                        await supabase
+                          .from("offers")
+                          .update({ status: "rejected" })
+                          .eq("id", item.id);
+                        fetchApplications();
+                      }}
+                    >
+                      <Text style={styles.appActionDangerText}>
+                        {t("reject")}
+                      </Text>
+                    </Pressable>
+                  </>
+                );
+              })()}
           </View>
         </View>
       </View>
