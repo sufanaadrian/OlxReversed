@@ -601,6 +601,21 @@ export const translations = {
     appliedAgo: "Applied",
     atEmployer: "at",
     candidatureFor: "Application for",
+    // Welcome screen
+    welcomeTagline: "Find student jobs.\nGet hired fast.",
+    welcomeSubtitle:
+      "Part-time, freelance & seasonal jobs from local employers.",
+    welcomeCreateAccount: "Create Account",
+    welcomeHaveAccount: "Already have an account?",
+    welcomeSignInLink: "Sign in",
+    welcomeSlide1Label: "Events & Promo",
+    welcomeSlide1Desc: "Weekend gigs & festival staff",
+    welcomeSlide2Label: "IT & Tech",
+    welcomeSlide2Desc: "Remote work, great pay",
+    welcomeSlide3Label: "Hospitality",
+    welcomeSlide3Desc: "Shifts with tips included",
+    welcomeSlide4Label: "Tutoring",
+    welcomeSlide4Desc: "Teach what you know",
   },
   ro: {
     home: "Joburi",
@@ -1212,5 +1227,20 @@ export const translations = {
     appliedAgo: "Aplicat",
     atEmployer: "la",
     candidatureFor: "Candidatură pentru",
+    // Welcome screen
+    welcomeTagline: "Joburi pentru studenți.\nAngajează-te rapid.",
+    welcomeSubtitle:
+      "Joburi part-time, freelance & sezoniere de la angajatori locali.",
+    welcomeCreateAccount: "Creează cont",
+    welcomeHaveAccount: "Ai deja un cont?",
+    welcomeSignInLink: "Autentifică-te",
+    welcomeSlide1Label: "Evenimente & Promo",
+    welcomeSlide1Desc: "Gig-uri de weekend & staff festival",
+    welcomeSlide2Label: "IT & Tech",
+    welcomeSlide2Desc: "Lucru remote, plată excelentă",
+    welcomeSlide3Label: "Ospitalitate",
+    welcomeSlide3Desc: "Ture cu bacșiș inclus",
+    welcomeSlide4Label: "Meditații",
+    welcomeSlide4Desc: "Predă ce știi",
   },
 };
