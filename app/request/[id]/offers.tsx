@@ -1,7 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo} from "react";
-import { View, ActivityIndicator } from "react-native";
-import { useTheme } from "../../../src/context/ThemeContext";
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 export default function OffersRedirect() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -9,5 +8,9 @@ export default function OffersRedirect() {
     // Applicants are shown on the job detail page
     router.replace(`/request/${id}`);
   }, [id]);
-  return <View style={{ flex: 1 }}><ActivityIndicator style={{ flex: 1 }} /></View>;
+  return (
+    <View style={{ flex: 1 }}>
+      <ActivityIndicator style={{ flex: 1 }} />
+    </View>
+  );
 }

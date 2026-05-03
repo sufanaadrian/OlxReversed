@@ -59,7 +59,6 @@ export default function SavedJobsScreen() {
   const t = useTranslation();
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
 
   const catColors = colors.isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS;
 
@@ -72,7 +71,6 @@ export default function SavedJobsScreen() {
       setLoading(false);
       return;
     }
-    setUserId(user.id);
 
     const { data } = await supabase
       .from("saved_jobs")

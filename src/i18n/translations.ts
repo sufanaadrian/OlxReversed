@@ -602,7 +602,7 @@ export const translations = {
     atEmployer: "at",
     candidatureFor: "Application for",
     // Welcome screen
-    welcomeTagline: "Find student jobs.\nGet hired fast.",
+    welcomeTagline: "Find student jobs. Get hired fast.",
     welcomeSubtitle:
       "Part-time, freelance & seasonal jobs from local employers.",
     welcomeCreateAccount: "Create Account",
@@ -611,8 +611,8 @@ export const translations = {
     welcomeSlide1Label: "Events & Promo",
     welcomeSlide1Desc: "Weekend gigs & festival staff",
     welcomeSlide2Label: "IT & Tech",
-    welcomeSlide2Desc: "Remote work, great pay",
-    welcomeSlide3Label: "Hospitality",
+    welcomeSlide2Desc: "Remote work, On-site support, and more",
+    welcomeSlide3Label: "HoReCa",
     welcomeSlide3Desc: "Shifts with tips included",
     welcomeSlide4Label: "Tutoring",
     welcomeSlide4Desc: "Teach what you know",
@@ -1228,7 +1228,7 @@ export const translations = {
     atEmployer: "la",
     candidatureFor: "Candidatură pentru",
     // Welcome screen
-    welcomeTagline: "Joburi pentru studenți.\nAngajează-te rapid.",
+    welcomeTagline: "Joburi pentru studenți. Angajează-te rapid.",
     welcomeSubtitle:
       "Joburi part-time, freelance & sezoniere de la angajatori locali.",
     welcomeCreateAccount: "Creează cont",
@@ -1237,8 +1237,8 @@ export const translations = {
     welcomeSlide1Label: "Evenimente & Promo",
     welcomeSlide1Desc: "Gig-uri de weekend & staff festival",
     welcomeSlide2Label: "IT & Tech",
-    welcomeSlide2Desc: "Lucru remote, plată excelentă",
-    welcomeSlide3Label: "Ospitalitate",
+    welcomeSlide2Desc: "Lucrează remote, sau fizic.",
+    welcomeSlide3Label: "HoReCa",
     welcomeSlide3Desc: "Ture cu bacșiș inclus",
     welcomeSlide4Label: "Meditații",
     welcomeSlide4Desc: "Predă ce știi",

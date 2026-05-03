@@ -1,5 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import i18n from "../i18n";
 
 type Language = "en" | "ro";
@@ -15,6 +22,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("ro");
+
+  i18n.locale = language;
 
   // Load saved language preference on mount
   useEffect(() => {
@@ -33,18 +42,23 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     loadLanguage();
   }, []);
 
-  const setLanguage = async (lang: Language) => {
+  const setLanguage = useCallback(async (lang: Language) => {
     try {
-      (i18n as any).locale = lang;
+      i18n.locale = lang;
       setLanguageState(lang);
       await AsyncStorage.setItem("app_language", lang);
     } catch (e) {
       console.log("Error saving language preference:", e);
     }
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({ language, setLanguage }),
+    [language, setLanguage],
+  );
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
@@ -59,8 +73,10 @@ export function useLanguage() {
 }
 
 export function useTranslation() {
-  const { language } = useLanguage(); // Make hook reactive to language changes
-  return (key: string): string => {
-    return (i18n as any).t(key);
-  };
+  const { language } = useLanguage();
+
+  return useMemo(() => {
+    i18n.locale = language;
+    return (key: string): string => i18n.t(key);
+  }, [language]);
 }
