@@ -125,7 +125,7 @@ export function makeStyles(c: Colors) {
       width: 236,
       height: 164,
       borderRadius: 30,
-      backgroundColor: "#7C3AED",
+      backgroundColor: c.employer,
       opacity: 0.22,
       transform: [
         { translateX: -34 },
@@ -138,7 +138,7 @@ export function makeStyles(c: Colors) {
       width: 232,
       height: 156,
       borderRadius: 30,
-      backgroundColor: "#F97316",
+      backgroundColor: c.accent,
       opacity: 0.18,
       transform: [{ translateX: 34 }, { translateY: 0 }, { rotateZ: "14deg" }],
     },
@@ -205,7 +205,7 @@ export function makeStyles(c: Colors) {
       width: 74,
       height: 46,
       borderRadius: 28,
-      backgroundColor: "#0F172A",
+      backgroundColor: c.primaryText,
     },
     avatarHead: {
       position: "absolute",
@@ -213,7 +213,7 @@ export function makeStyles(c: Colors) {
       width: 58,
       height: 58,
       borderRadius: 29,
-      backgroundColor: "#F4C7A1",
+      backgroundColor: c.accentLight,
       zIndex: 2,
     },
     avatarBody: {
@@ -233,9 +233,9 @@ export function makeStyles(c: Colors) {
       width: 136,
       height: 72,
       borderRadius: 16,
-      backgroundColor: "#1E293B",
+      backgroundColor: c.primaryText,
       borderWidth: 6,
-      borderColor: "#E2E8F0",
+      borderColor: c.border,
       zIndex: 3,
     },
     laptopBase: {
@@ -244,7 +244,7 @@ export function makeStyles(c: Colors) {
       width: 160,
       height: 14,
       borderRadius: 8,
-      backgroundColor: "#CBD5E1",
+      backgroundColor: c.borderStrong,
       zIndex: 1,
     },
     metricRow: {

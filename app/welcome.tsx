@@ -159,19 +159,19 @@ export default function WelcomeScreen() {
           >
             <Defs>
               <LinearGradient id="orb" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#C4B5FD" stopOpacity="0.9" />
-                <Stop offset="100%" stopColor="#5EEAD4" stopOpacity="0.2" />
+                <Stop offset="0%" stopColor={colors.employerLight} stopOpacity="0.9" />
+                <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.2" />
               </LinearGradient>
               <LinearGradient id="desk" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#0D9488" stopOpacity="0.22" />
-                <Stop offset="100%" stopColor="#F97316" stopOpacity="0.08" />
+                <Stop offset="0%" stopColor={colors.primary} stopOpacity="0.22" />
+                <Stop offset="100%" stopColor={colors.accent} stopOpacity="0.08" />
               </LinearGradient>
             </Defs>
             <Circle cx="86" cy="84" r="58" fill="url(#orb)" />
-            <Circle cx="286" cy="92" r="34" fill="#FDBA74" fillOpacity="0.28" />
+            <Circle cx="286" cy="92" r="34" fill={colors.accent} fillOpacity="0.28" />
             <Path
               d="M92 64 C148 24, 236 24, 290 92"
-              stroke="#CBD5E1"
+              stroke={colors.borderStrong}
               strokeOpacity="0.7"
               strokeWidth="2"
               strokeDasharray="8 10"

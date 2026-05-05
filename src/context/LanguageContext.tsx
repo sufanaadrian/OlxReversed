@@ -23,7 +23,10 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("ro");
 
-  i18n.locale = language;
+  // Sync i18n locale whenever language state changes
+  useEffect(() => {
+    i18n.locale = language;
+  }, [language]);
 
   // Load saved language preference on mount
   useEffect(() => {
@@ -32,7 +35,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         const saved = await AsyncStorage.getItem("app_language");
         if (saved === "en" || saved === "ro") {
           setLanguageState(saved);
-          (i18n as any).locale = saved;
         }
       } catch (e) {
         console.log("Error loading language preference:", e);
@@ -75,8 +77,5 @@ export function useLanguage() {
 export function useTranslation() {
   const { language } = useLanguage();
 
-  return useMemo(() => {
-    i18n.locale = language;
-    return (key: string): string => i18n.t(key);
-  }, [language]);
+  return useMemo(() => (key: string): string => i18n.t(key, language), [language]);
 }

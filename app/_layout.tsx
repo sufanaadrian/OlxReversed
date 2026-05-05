@@ -10,7 +10,7 @@ import { MarketplaceModeProvider } from "../src/context/MarketplaceModeContext";
 import { ThemeProvider } from "../src/context/ThemeContext";
 import { supabase } from "../src/lib/supabase";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function RootLayout() {
       .then(async ({ data: { session } }) => {
         if (!session?.user) {
           router.replace("/welcome" as any);
-          SplashScreen.hideAsync();
+          void SplashScreen.hideAsync();
           return;
         }
         const { data: profile } = await supabase
@@ -27,7 +27,7 @@ export default function RootLayout() {
           .select("onboarding_completed")
           .eq("id", session.user.id)
           .single();
-        SplashScreen.hideAsync();
+        void SplashScreen.hideAsync();
         if (!profile?.onboarding_completed) {
           router.replace("/onboarding" as any);
         } else {
@@ -36,7 +36,7 @@ export default function RootLayout() {
       })
       .catch(() => {
         router.replace("/welcome" as any);
-        SplashScreen.hideAsync();
+        void SplashScreen.hideAsync();
       });
   }, []);
 
