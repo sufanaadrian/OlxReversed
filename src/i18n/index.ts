@@ -5,10 +5,10 @@ class I18n {
   locale: string = "ro";
   translations = translations;
 
-  t(key: string): string {
+  t(key: string, locale?: string): string {
     const keys = key.split(".");
     let value: any =
-      this.translations[this.locale as keyof typeof translations];
+      this.translations[(locale ?? this.locale) as keyof typeof translations];
 
     for (const k of keys) {
       value = value?.[k];

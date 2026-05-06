@@ -3,6 +3,13 @@ import type { Colors } from "../../../src/theme/colors";
 
 export function makeStyles(c: Colors) {
   return StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loader: {
+    flex: 1,
+  },
+
   page: {
     flex: 1,
     backgroundColor: c.bg,
