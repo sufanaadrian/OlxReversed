@@ -636,6 +636,15 @@ export const translations = {
     reportOutcomeOther: "Other issue",
     reportOutcomeSent: "Report submitted. We'll review it.",
     reportOutcomeAlready: "You already reported this job.",
+    // Discovery features
+    forYouSection: "For You",
+    forYouHint: "Based on your skills",
+    trendingSection: "Trending This Week",
+    trendingHint: "Most viewed jobs",
+    similarJobs: "Similar Jobs",
+    newSinceLastVisit: "{{count}} new jobs since your last visit",
+    browseByEmployer: "By Employer",
+    employerSearchPlaceholder: "Search by employer name…",
   },
   ro: {
     home: "Joburi",
@@ -1282,5 +1291,14 @@ export const translations = {
     reportOutcomeOther: "Altă problemă",
     reportOutcomeSent: "Raport trimis. Îl vom analiza.",
     reportOutcomeAlready: "Ai raportat deja această angajare.",
+    // Discovery features
+    forYouSection: "Pentru tine",
+    forYouHint: "Bazat pe abiltățile tale",
+    trendingSection: "Populare săptămâna aceasta",
+    trendingHint: "Cele mai vizualizate joburi",
+    similarJobs: "Joburi similare",
+    newSinceLastVisit: "{{count}} joburi noi de la ultima ta vizită",
+    browseByEmployer: "După angajator",
+    employerSearchPlaceholder: "Caută după numele angajatorului…",
   },
 };

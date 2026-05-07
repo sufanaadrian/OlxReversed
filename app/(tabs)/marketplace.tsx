@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, {
@@ -97,6 +98,28 @@ function scoreJob(job: JobRequest): number {
   );
 }
 
+// "For you" bonus: +200 if any of the user's skills match job category keywords
+const CATEGORY_SKILL_MAP: Record<string, string[]> = {
+  IT: ["javascript", "react", "python", "java", "typescript", "node", "sql", "web", "dev", "code", "software", "android", "ios", "flutter", "php"],
+  Tutoring: ["teaching", "math", "physics", "chemistry", "english", "tutoring", "education", "mentor"],
+  Marketing: ["marketing", "social media", "seo", "content", "copywriting", "photoshop", "illustrator", "canva", "branding"],
+  Events: ["events", "bartending", "waiter", "hostess", "promoter", "staff"],
+  Hospitality: ["hospitality", "hotel", "restaurant", "barista", "chef", "cook", "waiter"],
+  Delivery: ["delivery", "courier", "driver", "transport", "logistics"],
+  Office: ["excel", "word", "admin", "secretary", "office", "data entry", "accounting"],
+  Retail: ["sales", "retail", "cashier", "customer service", "shop"],
+};
+
+function forYouScore(job: JobRequest, userSkills: string[]): number {
+  if (!userSkills.length || !job.category) return 0;
+  const keywords = CATEGORY_SKILL_MAP[job.category] ?? [];
+  const lowerSkills = userSkills.map((s) => s.toLowerCase());
+  const matches = keywords.some((kw) =>
+    lowerSkills.some((sk) => sk.includes(kw) || kw.includes(sk)),
+  );
+  return matches ? 200 : 0;
+}
+
 function initials(name: string | null | undefined) {
   if (!name) return "?";
   return name
@@ -157,6 +180,11 @@ export default function JobsScreen() {
   >("all");
   const [filterScheduleType, setFilterScheduleType] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("");
+  const [filterEmployerName, setFilterEmployerName] = useState("");
+  const [userSkills, setUserSkills] = useState<string[]>([]);
+  const [trendingJobs, setTrendingJobs] = useState<JobRequest[]>([]);
+  const [newSinceLastVisitCount, setNewSinceLastVisitCount] = useState(0);
+  const [showNewSinceBanner, setShowNewSinceBanner] = useState(false);
   const catColors = useMemo(
     () => getCategoryColors(colors.isDark),
     [colors.isDark],
@@ -191,6 +219,23 @@ export default function JobsScreen() {
       .gte("created_at", thirtyDaysAgo);
     const { data } = await query;
     const rawJobs = (data as unknown as JobRequest[]) ?? [];
+
+    // "New since last visit" count
+    const LAST_VISIT_KEY = "marketplace_last_visit_at";
+    const lastVisitRaw = await AsyncStorage.getItem(LAST_VISIT_KEY);
+    if (lastVisitRaw) {
+      const lastVisitTs = Number(lastVisitRaw);
+      const newCount = rawJobs.filter(
+        (j) => new Date(j.created_at).getTime() > lastVisitTs,
+      ).length;
+      if (newCount > 0) {
+        setNewSinceLastVisitCount(newCount);
+        setShowNewSinceBanner(true);
+      }
+    }
+    // Record current visit time for next comparison
+    await AsyncStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
+
     setJobs([...rawJobs].sort((a, b) => scoreJob(b) - scoreJob(a)));
     isFirstLoad.current = false;
     setNewJobsCount(0);
@@ -234,7 +279,7 @@ export default function JobsScreen() {
         new Set((myInterests ?? []).map((i: any) => i.request_id)),
       );
 
-      // Check profile completeness
+      // Check profile completeness + load skills
       const { data: prof } = await supabase
         .from("profiles")
         .select("bio, skills, university")
@@ -244,8 +289,45 @@ export default function JobsScreen() {
         const incomplete =
           !prof.bio || !prof.university || !prof.skills?.length;
         setProfileIncomplete(incomplete);
+        setUserSkills(prof.skills ?? []);
       }
     }
+
+    // Trending: top 5 jobs by views in the last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data: trendingViews } = await supabase
+      .from("job_views")
+      .select("request_id")
+      .gte("viewed_at", sevenDaysAgo);
+    if (trendingViews && trendingViews.length) {
+      const viewCountMap: Record<string, number> = {};
+      trendingViews.forEach((v: any) => {
+        viewCountMap[v.request_id] = (viewCountMap[v.request_id] ?? 0) + 1;
+      });
+      const topIds = Object.entries(viewCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([id]) => id);
+      const { data: trendData } = await supabase
+        .from("requests")
+        .select(
+          "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
+        )
+        .in("id", topIds)
+        .eq("status", "active");
+      if (trendData) {
+        setTrendingJobs(
+          topIds
+            .map((tid) =>
+              (trendData as unknown as JobRequest[]).find((j) => j.id === tid),
+            )
+            .filter((j): j is JobRequest => !!j),
+        );
+      }
+    } else {
+      setTrendingJobs([]);
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -388,6 +470,12 @@ export default function JobsScreen() {
     }
     // Text search
     const q = search.toLowerCase();
+    // Employer name filter
+    if (filterEmployerName.trim()) {
+      const emp = filterEmployerName.trim().toLowerCase();
+      if (!(j.profiles?.username ?? "").toLowerCase().includes(emp))
+        return false;
+    }
     return (
       !q ||
       j.title.toLowerCase().includes(q) ||
@@ -396,6 +484,29 @@ export default function JobsScreen() {
     );
   });
 
+  // Sort filtered by combined score (base score + for-you bonus)
+  const sortedFiltered = [...filtered].sort(
+    (a, b) =>
+      scoreJob(b) +
+      forYouScore(b, userSkills) -
+      (scoreJob(a) + forYouScore(a, userSkills)),
+  );
+
+  // "For you" jobs — shown as a separate highlighted section when user has skills
+  const forYouJobs = useMemo(
+    () =>
+      userSkills.length
+        ? jobs
+            .filter(
+              (j) =>
+                !appliedIds.has(j.id) &&
+                forYouScore(j, userSkills) > 0,
+            )
+            .slice(0, 5)
+        : [],
+    [jobs, userSkills, appliedIds],
+  );
+
   const activeFilterCount = [
     !!browseJobType,
     !!filterMinWage,
@@ -403,6 +514,7 @@ export default function JobsScreen() {
     browsePostingAs !== "all",
     !!filterScheduleType,
     !!filterAvailability,
+    !!filterEmployerName.trim(),
   ].filter(Boolean).length;
 
   function clearAllFilters() {
@@ -413,6 +525,7 @@ export default function JobsScreen() {
     setBrowsePostingAs("all");
     setFilterScheduleType("");
     setFilterAvailability("");
+    setFilterEmployerName("");
   }
 
   function renderItem({ item }: { item: JobRequest }) {
@@ -423,6 +536,7 @@ export default function JobsScreen() {
     const hasApplied = appliedIds.has(item.id);
     const isInterested = interestedIds.has(item.id);
     const iCount = interestCounts[item.id] ?? 0;
+    const isForYou = forYouScore(item, userSkills) > 0;
     const isBoostedActive =
       item.is_boosted &&
       (!item.boosted_until ||
@@ -457,6 +571,11 @@ export default function JobsScreen() {
             {isBoostedActive && (
               <View style={styles.boostedBadge}>
                 <Text style={styles.boostedBadgeText}>{t("boostedBadge")}</Text>
+              </View>
+            )}
+            {isForYou && (
+              <View style={styles.forYouBadge}>
+                <Text style={styles.forYouBadgeText}>✨ {t("forYouSection")}</Text>
               </View>
             )}
           </View>
@@ -963,6 +1082,32 @@ export default function JobsScreen() {
               </View>
             </View>
 
+            {/* Employer name filter */}
+            <Text
+              style={[styles.browseSectionLabel, { color: colors.mutedText }]}
+            >
+              {t("browseByEmployer")}
+            </Text>
+            <View
+              style={[
+                styles.browseWageBox,
+                {
+                  backgroundColor: colors.surfaceAlt,
+                  borderColor: colors.border,
+                  width: "100%",
+                },
+              ]}
+            >
+              <TextInput
+                style={[styles.browseWageField, { color: colors.primaryText }]}
+                value={filterEmployerName}
+                onChangeText={setFilterEmployerName}
+                placeholder={t("employerSearchPlaceholder")}
+                placeholderTextColor={colors.mutedText}
+                autoCapitalize="none"
+              />
+            </View>
+
             <View style={{ height: 20 }} />
           </ScrollView>
 
@@ -1195,6 +1340,15 @@ export default function JobsScreen() {
               <Feather name="x" size={11} color={colors.success} />
             </Pressable>
           ) : null}
+          {filterEmployerName.trim() ? (
+            <Pressable
+              style={styles.activeChip}
+              onPress={() => setFilterEmployerName("")}
+            >
+              <Text style={styles.activeChipText}>@{filterEmployerName.trim()}</Text>
+              <Feather name="x" size={11} color={colors.primary} />
+            </Pressable>
+          ) : null}
           <Pressable style={styles.clearChip} onPress={clearAllFilters}>
             <Text style={styles.clearChipText}>{t("clearAllFilters")}</Text>
           </Pressable>
@@ -1209,6 +1363,25 @@ export default function JobsScreen() {
         </Pressable>
       )}
 
+      {/* New since last visit banner */}
+      {showNewSinceBanner && newSinceLastVisitCount > 0 && (
+        <Pressable
+          style={styles.newSinceBanner}
+          onPress={() => setShowNewSinceBanner(false)}
+        >
+          <Feather name="star" size={14} color={colors.success} />
+          <Text style={styles.newSinceBannerText}>
+            {t("newSinceLastVisit").replace(
+              "{{count}}",
+              String(newSinceLastVisitCount),
+            )}
+          </Text>
+          <Pressable onPress={() => setShowNewSinceBanner(false)} hitSlop={8}>
+            <Feather name="x" size={14} color={colors.success} />
+          </Pressable>
+        </Pressable>
+      )}
+
       {loading ? (
         <ActivityIndicator
           style={{ flex: 1 }}
@@ -1218,17 +1391,125 @@ export default function JobsScreen() {
       ) : (
         <View style={{ flex: 1 }}>
           <FlatList
-            data={filtered}
+            data={sortedFiltered}
             keyExtractor={(j) => j.id}
             renderItem={renderItem}
             style={{ flex: 1 }}
             contentContainerStyle={[
               styles.list,
-              filtered.length === 0 && { flex: 1 },
+              sortedFiltered.length === 0 && { flex: 1 },
             ]}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             onRefresh={fetchJobs}
             refreshing={refreshing}
+            ListHeaderComponent={
+              <>
+                {/* Trending this week */}
+                {trendingJobs.length > 0 &&
+                  !search &&
+                  selectedCategory === "All" && (
+                    <View style={styles.discoverSection}>
+                      <View style={styles.discoverHeader}>
+                        <Text style={styles.discoverTitle}>
+                          🔥 {t("trendingSection")}
+                        </Text>
+                        <Text style={styles.discoverHint}>
+                          {t("trendingHint")}
+                        </Text>
+                      </View>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.discoverScroll}
+                      >
+                        {trendingJobs.map((job) => (
+                          <Pressable
+                            key={job.id}
+                            style={styles.miniCard}
+                            onPress={() => router.push(`/request/${job.id}`)}
+                          >
+                            <Text
+                              style={styles.miniCardCategory}
+                              numberOfLines={1}
+                            >
+                              {t(
+                                CATEGORY_KEYS[job.category ?? "Other"] ??
+                                  "other",
+                              )}
+                            </Text>
+                            <Text
+                              style={styles.miniCardTitle}
+                              numberOfLines={2}
+                            >
+                              {job.title}
+                            </Text>
+                            <Text
+                              style={styles.miniCardPoster}
+                              numberOfLines={1}
+                            >
+                              {job.profiles?.username ?? t("anonymous")}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                {/* For you section */}
+                {forYouJobs.length > 0 &&
+                  !search &&
+                  selectedCategory === "All" && (
+                    <View style={styles.discoverSection}>
+                      <View style={styles.discoverHeader}>
+                        <Text style={styles.discoverTitle}>
+                          ✨ {t("forYouSection")}
+                        </Text>
+                        <Text style={styles.discoverHint}>
+                          {t("forYouHint")}
+                        </Text>
+                      </View>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.discoverScroll}
+                      >
+                        {forYouJobs.map((job) => (
+                          <Pressable
+                            key={job.id}
+                            style={[
+                              styles.miniCard,
+                              styles.miniCardForYou,
+                            ]}
+                            onPress={() => router.push(`/request/${job.id}`)}
+                          >
+                            <Text
+                              style={styles.miniCardCategory}
+                              numberOfLines={1}
+                            >
+                              {t(
+                                CATEGORY_KEYS[job.category ?? "Other"] ??
+                                  "other",
+                              )}
+                            </Text>
+                            <Text
+                              style={styles.miniCardTitle}
+                              numberOfLines={2}
+                            >
+                              {job.title}
+                            </Text>
+                            <Text
+                              style={styles.miniCardPoster}
+                              numberOfLines={1}
+                            >
+                              {job.profiles?.username ?? t("anonymous")}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+              </>
+            }
             ListEmptyComponent={
               <View style={styles.emptyWrap}>
                 <View style={styles.emptyIcon}>

@@ -386,5 +386,41 @@ export function makeStyles(c: Colors) {
     posterVerifiedText: { fontSize: 11, fontWeight: "700", color: "#0F766E" },
 
     // Report modal overlay handled via Alert; just need flag btn style
+
+    // Similar jobs section
+    similarSection: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+    similarScroll: {
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    similarCard: {
+      width: 160,
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 12,
+    },
+    similarCardCategory: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: c.mutedText,
+      textTransform: "uppercase",
+      marginBottom: 4,
+    },
+    similarCardTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: c.primaryText,
+      lineHeight: 18,
+      marginBottom: 6,
+    },
+    similarCardPoster: {
+      fontSize: 11,
+      color: c.secondaryText,
+    },
   });
 }

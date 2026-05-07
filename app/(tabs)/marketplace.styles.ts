@@ -602,5 +602,90 @@ export function makeStyles(c: Colors) {
       alignItems: "center",
     },
     browseApplyText: { fontSize: 16, fontWeight: "900", color: "#fff" },
+
+    // Discovery features
+    newSinceBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginHorizontal: 14,
+      marginTop: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: c.successLight,
+      borderWidth: 1,
+      borderColor: c.success,
+    },
+    newSinceBannerText: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: "700",
+      color: c.success,
+    },
+
+    discoverSection: {
+      marginBottom: 6,
+    },
+    discoverHeader: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 8,
+      paddingHorizontal: 14,
+      marginBottom: 8,
+      marginTop: 12,
+    },
+    discoverTitle: {
+      fontSize: 15,
+      fontWeight: "900",
+      color: c.primaryText,
+    },
+    discoverHint: {
+      fontSize: 12,
+      color: c.mutedText,
+      fontWeight: "500",
+    },
+    discoverScroll: {
+      paddingHorizontal: 14,
+      gap: 10,
+    },
+    miniCard: {
+      width: 160,
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 12,
+    },
+    miniCardForYou: {
+      borderColor: c.primary,
+      backgroundColor: c.primaryLight,
+    },
+    miniCardCategory: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: c.mutedText,
+      textTransform: "uppercase",
+      marginBottom: 4,
+    },
+    miniCardTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: c.primaryText,
+      lineHeight: 18,
+      marginBottom: 6,
+    },
+    miniCardPoster: {
+      fontSize: 11,
+      color: c.secondaryText,
+    },
+
+    forYouBadge: {
+      paddingVertical: 2,
+      paddingHorizontal: 7,
+      borderRadius: 5,
+      backgroundColor: c.primaryLight,
+    },
+    forYouBadgeText: { fontSize: 10, fontWeight: "800", color: c.primary },
   });
 }

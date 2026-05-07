@@ -101,6 +101,9 @@ export default function JobDetailScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [viewCount, setViewCount] = useState(0);
   const [alreadyReported, setAlreadyReported] = useState(false);
+  const [similarJobs, setSimilarJobs] = useState<
+    { id: string; title: string; category: string | null; posting_as: string | null; profiles: { username: string | null } | null }[]
+  >([]);
   const viewCounted = React.useRef(false);
 
   async function handleShare() {
@@ -194,6 +197,22 @@ export default function JobDetailScreen() {
         .maybeSingle();
       setAlreadyReported(!!reportRow);
     }
+
+    // Load similar jobs (same category + posting_as, active, not this job)
+    if (jobData?.category) {
+      const { data: similar } = await supabase
+        .from("requests")
+        .select("id,title,category,posting_as,profiles(username)")
+        .eq("category", jobData.category)
+        .eq("posting_as", jobData.posting_as ?? "employer")
+        .eq("status", "active")
+        .neq("id", id)
+        .limit(5);
+      setSimilarJobs((similar as any[]) ?? []);
+    } else {
+      setSimilarJobs([]);
+    }
+
     setLoading(false);
   }, [id]);
 
@@ -776,6 +795,41 @@ export default function JobDetailScreen() {
         )}
 
         <View style={{ height: isOwner ? 16 : 100 }} />
+
+        {/* Similar jobs */}
+        {similarJobs.length > 0 && (
+          <View style={styles.similarSection}>
+            <View style={styles.sectionHeader}>
+              <Feather name="layers" size={16} color={colors.primary} />
+              <Text style={styles.sectionTitle}>{t("similarJobs")}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.similarScroll}
+            >
+              {similarJobs.map((sj) => (
+                <Pressable
+                  key={sj.id}
+                  style={styles.similarCard}
+                  onPress={() => router.push(`/request/${sj.id}`)}
+                >
+                  <Text style={styles.similarCardCategory} numberOfLines={1}>
+                    {t(CATEGORY_KEYS[sj.category ?? "Other"] ?? "other")}
+                  </Text>
+                  <Text style={styles.similarCardTitle} numberOfLines={2}>
+                    {sj.title}
+                  </Text>
+                  <Text style={styles.similarCardPoster} numberOfLines={1}>
+                    {sj.profiles?.username ?? t("anonymous")}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
 
       {/* Sticky apply button (non-owner only) */}
