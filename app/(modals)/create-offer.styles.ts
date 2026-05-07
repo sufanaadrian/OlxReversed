@@ -37,7 +37,8 @@ export function makeStyles(c: Colors) {
   },
   jobTitle: { fontSize: 15, fontWeight: "800", color: c.primaryText },
 
-  body: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  body: { paddingHorizontal: 16, paddingTop: 16 },
+  bodyContent: { paddingBottom: 32 },
 
   label: {
     fontSize: 13,
@@ -77,8 +78,90 @@ export function makeStyles(c: Colors) {
     color: c.mutedText,
     textAlign: "right",
     marginTop: 4,
+  },
+  coverLetterFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
     marginBottom: 16,
   },
+  saveTplBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.primary,
+  },
+  saveTplBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: c.primary,
+  },
+
+  quickApplyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: c.primary,
+    marginBottom: 8,
+  },
+  quickApplyBtnText: { fontSize: 15, fontWeight: "800", color: "#FFFFFF" },
+  quickApplyHint: {
+    fontSize: 12,
+    color: c.mutedText,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  orDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  orLine: { flex: 1, height: 1, backgroundColor: c.border },
+  orText: { fontSize: 12, color: c.mutedText, fontWeight: "600" },
+
+  templateChipSaved: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: c.primaryLight,
+    borderColor: c.primary,
+  },
+
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  priceInput: {
+    flex: 1,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: c.primaryText,
+  },
+  priceUnit: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  priceUnitText: { fontSize: 13, fontWeight: "700", color: c.secondaryText },
 
   submitBtn: {
     paddingVertical: 14,

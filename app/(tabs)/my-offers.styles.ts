@@ -210,6 +210,54 @@ export const styles = StyleSheet.create({
   },
   disputeBtnText: { fontSize: 11, fontWeight: "700", color: theme.error },
 
+  // ── Application timeline ─────────────────────────────────────────
+  timeline: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  timelineStep: {
+    alignItems: "center",
+    gap: 4,
+  },
+  timelineDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timelineConnector: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: theme.border,
+    marginBottom: 16,
+  },
+  timelineLabel: {
+    fontSize: 9,
+    color: theme.mutedText,
+    fontWeight: "600",
+    textAlign: "center",
+    maxWidth: 60,
+  },
+
+  priceChip: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    marginBottom: 2,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  priceChipText: { fontSize: 11, fontWeight: "700", color: theme.primaryDark },
+
   // ── Candidate profile card (received tab) ────────────────────────
   candidateSection: {
     borderTopWidth: 1,

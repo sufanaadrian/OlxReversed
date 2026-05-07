@@ -19,6 +19,7 @@ type Application = {
   id: string;
   status: string;
   cover_letter: string | null;
+  price: number | null;
   created_at: string;
   viewed_at: string | null;
   requests: {
@@ -119,7 +120,7 @@ export default function ApplicationsScreen() {
         supabase
           .from("offers")
           .select(
-            "id, status, cover_letter, created_at, viewed_at, requests(id, title, user_id, status, posting_as, profiles(username))",
+            "id, status, cover_letter, price, created_at, viewed_at, requests(id, title, user_id, status, posting_as, profiles(username))",
           )
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false }),
@@ -243,6 +244,68 @@ export default function ApplicationsScreen() {
     fetchData();
   }
 
+  function renderTimeline(item: Application) {
+    const steps = [
+      { key: "timelineApplied", done: true, color: theme.success },
+      { key: "timelineSeen", done: !!item.viewed_at, color: theme.success },
+      {
+        key: "timelineShortlisted",
+        done: item.status === "accepted" || item.status === "hired",
+        color: theme.success,
+      },
+      {
+        key: "timelineDecision",
+        done: item.status === "hired" || item.status === "rejected" || item.status === "withdrawn",
+        color:
+          item.status === "rejected"
+            ? theme.error
+            : item.status === "withdrawn"
+            ? theme.mutedText
+            : theme.success,
+      },
+    ];
+    return (
+      <View style={styles.timeline}>
+        {steps.map((step, i) => (
+          <React.Fragment key={step.key}>
+            <View style={styles.timelineStep}>
+              <View
+                style={[
+                  styles.timelineDot,
+                  step.done && { backgroundColor: step.color, borderColor: step.color },
+                ]}
+              >
+                {step.done && (
+                  <Feather
+                    name={item.status === "rejected" && i === 3 ? "x" : "check"}
+                    size={8}
+                    color="#FFFFFF"
+                  />
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.timelineLabel,
+                  step.done && { color: step.color, fontWeight: "700" },
+                ]}
+              >
+                {t(step.key as any)}
+              </Text>
+            </View>
+            {i < steps.length - 1 && (
+              <View
+                style={[
+                  styles.timelineConnector,
+                  steps[i + 1].done && { backgroundColor: theme.success },
+                ]}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+    );
+  }
+
   function renderSentItem({ item }: { item: Application }) {
     const c = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
     const job = item.requests;
@@ -278,6 +341,16 @@ export default function ApplicationsScreen() {
               <Text style={styles.applicationText}>{item.cover_letter}</Text>
             </View>
           ) : null}
+
+          {renderTimeline(item)}
+
+          {item.price != null && (
+            <View style={styles.priceChip}>
+              <Text style={styles.priceChipText}>
+                {t("proposedRateLabel")}: {item.price} {t("rateUnit")}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.cardFooter}>
             <View style={{ gap: 4 }}>
