@@ -31,6 +31,8 @@ type ProfileData = {
   linkedin_url: string | null;
   verified: boolean | null;
   phone_number: string | null;
+  company_name: string | null;
+  company_description: string | null;
 };
 
 export default function ProfileScreen() {
@@ -48,6 +50,8 @@ export default function ProfileScreen() {
   const [editSkillsRaw, setEditSkillsRaw] = useState("");
   const [editLinkedinUrl, setEditLinkedinUrl] = useState("");
   const [editPhoneNumber, setEditPhoneNumber] = useState("");
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editCompanyDescription, setEditCompanyDescription] = useState("");
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState(0);
   const [workHistory, setWorkHistory] = useState<
@@ -80,7 +84,7 @@ export default function ProfileScreen() {
         supabase
           .from("profiles")
           .select(
-            "username, university, study_year, bio, skills, user_type, created_at, cv_url, linkedin_url, verified, phone_number",
+            "username, university, study_year, bio, skills, user_type, created_at, cv_url, linkedin_url, verified, phone_number, company_name, company_description",
           )
           .eq("id", user.id)
           .single(),
@@ -142,6 +146,8 @@ export default function ProfileScreen() {
     setEditSkillsRaw((profile.skills ?? []).join(", "));
     setEditLinkedinUrl(profile.linkedin_url ?? "");
     setEditPhoneNumber(profile.phone_number ?? "");
+    setEditCompanyName(profile.company_name ?? "");
+    setEditCompanyDescription(profile.company_description ?? "");
     setEditing(true);
   }
 
@@ -170,6 +176,8 @@ export default function ProfileScreen() {
         skills: skills.length ? skills : null,
         linkedin_url: editLinkedinUrl.trim() || null,
         phone_number: editPhoneNumber.trim() || null,
+        company_name: editCompanyName.trim() || null,
+        company_description: editCompanyDescription.trim() || null,
       })
       .eq("id", user.id);
 
@@ -387,6 +395,32 @@ export default function ProfileScreen() {
             autoCapitalize="none"
           />
 
+          {(profile?.user_type === "employer" ||
+            profile?.user_type === "both") && (
+            <>
+              <Text style={styles.fieldLabel}>{t("companyName")}</Text>
+              <TextInput
+                style={styles.fieldInput}
+                value={editCompanyName}
+                onChangeText={setEditCompanyName}
+                placeholder={t("companyNamePlaceholder")}
+                placeholderTextColor={colors.mutedText}
+              />
+
+              <Text style={styles.fieldLabel}>{t("companyDescription")}</Text>
+              <TextInput
+                style={[styles.fieldInput, styles.fieldTextarea]}
+                value={editCompanyDescription}
+                onChangeText={setEditCompanyDescription}
+                placeholder={t("companyDescriptionPlaceholder")}
+                placeholderTextColor={colors.mutedText}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </>
+          )}
+
           <View style={styles.editActions}>
             <Pressable
               style={styles.cancelBtn}
@@ -529,6 +563,35 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
+
+          {/* Company (employer/both only) */}
+          {(profile?.user_type === "employer" ||
+            profile?.user_type === "both") &&
+            (profile?.company_name || profile?.company_description) ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Feather name="briefcase" size={14} color={colors.employer} />
+                <Text style={styles.sectionTitle}>{t("companySection")}</Text>
+              </View>
+              {profile.company_name ? (
+                <Text
+                  style={[
+                    styles.infoText,
+                    { color: colors.primaryText, fontWeight: "700" },
+                  ]}
+                >
+                  {profile.company_name}
+                </Text>
+              ) : null}
+              {profile.company_description ? (
+                <Text
+                  style={[styles.bioText, { marginTop: profile.company_name ? 4 : 0 }]}
+                >
+                  {profile.company_description}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </>
       )}
 

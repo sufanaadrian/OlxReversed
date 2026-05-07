@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Linking,
     Pressable,
     ScrollView,
@@ -27,6 +28,14 @@ type CVProfile = {
   linkedin_url: string | null;
   created_at: string | null;
   phone_number: string | null;
+  company_name: string | null;
+  company_description: string | null;
+};
+
+type Endorsement = {
+  skill: string;
+  count: number;
+  endorsedByMe: boolean;
 };
 
 function initials(name: string | null | undefined) {
@@ -46,21 +55,113 @@ export default function CVScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const [profile, setProfile] = useState<CVProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
+  const [canEndorse, setCanEndorse] = useState(false);
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase
         .from("profiles")
         .select(
-          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at, phone_number",
+          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at, phone_number, company_name, company_description",
         )
         .eq("id", userId)
         .single();
       setProfile(data as CVProfile | null);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const me = user?.id ?? null;
+      setCurrentUserId(me);
+
+      if (me && me !== userId) {
+        await loadEndorsements(me);
+        await checkCanEndorse(me);
+      }
+
       setLoading(false);
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  async function loadEndorsements(me: string) {
+    const { data } = await supabase
+      .from("skill_endorsements")
+      .select("skill, endorser_id")
+      .eq("endorsee_id", userId);
+    if (!data) return;
+    const map: Record<string, { count: number; endorsedByMe: boolean }> = {};
+    for (const row of data) {
+      if (!map[row.skill]) map[row.skill] = { count: 0, endorsedByMe: false };
+      map[row.skill].count++;
+      if (row.endorser_id === me) map[row.skill].endorsedByMe = true;
+    }
+    setEndorsements(
+      Object.entries(map).map(([skill, v]) => ({ skill, ...v })),
+    );
+  }
+
+  async function checkCanEndorse(me: string) {
+    // Can endorse if there is any hired offer connecting the two users
+    const [{ data: myReqs }, { data: theirReqs }] = await Promise.all([
+      supabase.from("requests").select("id").eq("user_id", me),
+      supabase.from("requests").select("id").eq("user_id", userId),
+    ]);
+    const myReqIds = (myReqs ?? []).map((r: any) => r.id);
+    const theirReqIds = (theirReqs ?? []).map((r: any) => r.id);
+
+    const queries: Promise<any>[] = [];
+    if (myReqIds.length) {
+      queries.push(
+        supabase
+          .from("offers")
+          .select("id")
+          .eq("seller_id", userId)
+          .in("request_id", myReqIds)
+          .eq("status", "hired")
+          .limit(1),
+      );
+    }
+    if (theirReqIds.length) {
+      queries.push(
+        supabase
+          .from("offers")
+          .select("id")
+          .eq("seller_id", me)
+          .in("request_id", theirReqIds)
+          .eq("status", "hired")
+          .limit(1),
+      );
+    }
+    if (!queries.length) return;
+    const results = await Promise.all(queries);
+    const found = results.some((r) => (r.data ?? []).length > 0);
+    setCanEndorse(found);
+  }
+
+  async function handleEndorse(skill: string) {
+    if (!currentUserId) return;
+    Alert.alert(t("endorseConfirm"), skill, [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("endorseSkill"),
+        onPress: async () => {
+          const { error } = await supabase.from("skill_endorsements").insert({
+            endorser_id: currentUserId,
+            endorsee_id: userId,
+            skill,
+          });
+          if (!error) {
+            Alert.alert(t("endorseSent"));
+            await loadEndorsements(currentUserId);
+          }
+        },
+      },
+    ]);
+  }
 
   if (loading) {
     return (
@@ -189,12 +290,70 @@ export default function CVScreen() {
               <Text style={styles.sectionTitle}>{t("skills")}</Text>
             </View>
             <View style={styles.skillsRow}>
-              {profile.skills.map((s, i) => (
-                <View key={i} style={styles.skillChip}>
-                  <Text style={styles.skillChipText}>{s}</Text>
-                </View>
-              ))}
+              {profile.skills.map((s, i) => {
+                const endorsement = endorsements.find((e) => e.skill === s);
+                const endorsedByMe = endorsement?.endorsedByMe ?? false;
+                const count = endorsement?.count ?? 0;
+                return (
+                  <View key={i} style={styles.skillChipWrap}>
+                    <View style={styles.skillChip}>
+                      <Text style={styles.skillChipText}>{s}</Text>
+                      {count > 0 && (
+                        <View style={styles.endorseBadge}>
+                          <Text style={styles.endorseBadgeText}>{count}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {canEndorse && !endorsedByMe && (
+                      <Pressable
+                        style={styles.endorseBtn}
+                        onPress={() => handleEndorse(s)}
+                      >
+                        <Feather
+                          name="thumbs-up"
+                          size={11}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.endorseBtnText}>
+                          {t("endorseSkill")}
+                        </Text>
+                      </Pressable>
+                    )}
+                    {endorsedByMe && (
+                      <View style={styles.endorsedByMeTag}>
+                        <Feather
+                          name="check"
+                          size={10}
+                          color={colors.success}
+                        />
+                        <Text style={styles.endorsedByMeText}>
+                          {t("endorsedByYou")}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
+          </View>
+        ) : null}
+
+        {/* Company (employer/both only) */}
+        {(profile.user_type === "employer" || profile.user_type === "both") &&
+        (profile.company_name || profile.company_description) ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="briefcase" size={15} color={colors.employer} />
+              <Text style={styles.sectionTitle}>{t("companySection")}</Text>
+            </View>
+            {profile.company_name ? (
+              <Text style={styles.infoText}>{profile.company_name}</Text>
+            ) : null}
+            {profile.company_description ? (
+              <Text style={[styles.bioText, { marginTop: profile.company_name ? 4 : 0 }]}>
+                {profile.company_description}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 

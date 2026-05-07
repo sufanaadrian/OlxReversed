@@ -196,6 +196,19 @@ export const styles = StyleSheet.create({
     lineHeight: 19,
   },
   dateText: { fontSize: 11, color: theme.mutedText },
+  seenText: { fontSize: 11, color: theme.success, fontWeight: "600" },
+  disputeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.error,
+    backgroundColor: theme.errorLight,
+  },
+  disputeBtnText: { fontSize: 11, fontWeight: "700", color: theme.error },
 
   // ── Candidate profile card (received tab) ────────────────────────
   candidateSection: {

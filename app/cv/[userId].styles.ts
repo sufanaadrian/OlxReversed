@@ -128,15 +128,49 @@ export function makeStyles(c: Colors) {
 
     // Skills
     skillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    skillChipWrap: { flexDirection: "column", alignItems: "flex-start", gap: 3 },
     skillChip: {
+      flexDirection: "row",
+      alignItems: "center",
       paddingVertical: 5,
       paddingHorizontal: 12,
       borderRadius: 999,
       backgroundColor: c.primaryLight,
       borderWidth: 1,
       borderColor: c.primary,
+      gap: 5,
     },
     skillChipText: { fontSize: 12, fontWeight: "700", color: c.primaryDark },
+    endorseBadge: {
+      backgroundColor: c.primary,
+      borderRadius: 99,
+      minWidth: 18,
+      height: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 4,
+    },
+    endorseBadgeText: { fontSize: 10, fontWeight: "800", color: "#FFFFFF" },
+    endorseBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      paddingVertical: 2,
+      paddingHorizontal: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: c.primary,
+      backgroundColor: c.primaryLight,
+    },
+    endorseBtnText: { fontSize: 10, fontWeight: "700", color: c.primary },
+    endorsedByMeTag: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+    },
+    endorsedByMeText: { fontSize: 10, color: c.success, fontWeight: "600" },
 
     // LinkedIn button
     linkedinBtn: {

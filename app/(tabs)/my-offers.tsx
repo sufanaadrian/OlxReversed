@@ -20,6 +20,7 @@ type Application = {
   status: string;
   cover_letter: string | null;
   created_at: string;
+  viewed_at: string | null;
   requests: {
     id: string;
     title: string;
@@ -35,6 +36,7 @@ type ReceivedApplication = {
   status: string;
   cover_letter: string | null;
   created_at: string;
+  viewed_at: string | null;
   requests: {
     id: string;
     title: string;
@@ -117,7 +119,7 @@ export default function ApplicationsScreen() {
         supabase
           .from("offers")
           .select(
-            "id, status, cover_letter, created_at, requests(id, title, user_id, status, posting_as, profiles(username))",
+            "id, status, cover_letter, created_at, viewed_at, requests(id, title, user_id, status, posting_as, profiles(username))",
           )
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false }),
@@ -130,7 +132,7 @@ export default function ApplicationsScreen() {
       ? await supabase
           .from("offers")
           .select(
-            "id, status, cover_letter, created_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+            "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
           )
           .in("request_id", myRequestIds)
           .order("created_at", { ascending: false })
@@ -162,6 +164,52 @@ export default function ApplicationsScreen() {
       supabase.removeChannel(channel);
     };
   }, [fetchData]);
+
+  async function markReceivedAsViewed(offerIds: string[]) {
+    if (!offerIds.length) return;
+    await supabase
+      .from("offers")
+      .update({ viewed_at: new Date().toISOString() })
+      .in("id", offerIds)
+      .is("viewed_at", null);
+  }
+
+  async function handleDispute(
+    offerId: string,
+    reportedUserId: string,
+    requestId: string,
+  ) {
+    if (!userId) return;
+    const reasons = [
+      t("reportOutcomeNotPaid"),
+      t("reportOutcomeNoShow"),
+      t("reportOutcomeUnsafe"),
+      t("reportOutcomeOther"),
+    ];
+    const reasonKeys = [
+      "not_paid",
+      "no_show",
+      "unsafe_conditions",
+      "other",
+    ];
+    Alert.alert(
+      t("reportOutcome"),
+      t("reportOutcomeTitle"),
+      reasons.map((label, i) => ({
+        text: label,
+        onPress: async () => {
+          const { error } = await supabase.from("disputes").insert({
+            reporter_id: userId,
+            reported_user_id: reportedUserId,
+            offer_id: offerId,
+            request_id: requestId,
+            reason: reasonKeys[i],
+          });
+          if (!error) Alert.alert(t("reportOutcomeSent"));
+        },
+      })),
+    );
+  }
 
   async function handleWithdraw(offerId: string) {
     Alert.alert(t("withdrawApplication"), t("withdrawConfirm"), [
@@ -237,14 +285,19 @@ export default function ApplicationsScreen() {
           ) : null}
 
           <View style={styles.cardFooter}>
-            <Text style={styles.dateText}>
-              {new Date(item.created_at).toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
+            <View style={{ gap: 4 }}>
+              <Text style={styles.dateText}>
+                {new Date(item.created_at).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+              {item.viewed_at ? (
+                <Text style={styles.seenText}>{t("applicationSeen")}</Text>
+              ) : null}
+            </View>
             <View style={styles.footerActions}>
               {item.status === "accepted" && job && (
                 <Pressable
@@ -268,6 +321,19 @@ export default function ApplicationsScreen() {
                     </Text>
                   </Pressable>
                 )}
+              {item.status === "hired" && job && (
+                <Pressable
+                  style={styles.disputeBtn}
+                  onPress={() =>
+                    handleDispute(item.id, job.user_id, job.id)
+                  }
+                >
+                  <Feather name="alert-triangle" size={12} color={theme.error} />
+                  <Text style={styles.disputeBtnText}>
+                    {t("reportOutcome")}
+                  </Text>
+                </Pressable>
+              )}
               {item.status === "pending" && (
                 <Pressable
                   style={styles.withdrawBtn}
@@ -411,7 +477,10 @@ export default function ApplicationsScreen() {
     (a) => a.status === "pending" || a.status === "accepted",
   );
   const pastSent = sent.filter(
-    (a) => a.status === "rejected" || a.status === "withdrawn",
+    (a) =>
+      a.status === "rejected" ||
+      a.status === "withdrawn" ||
+      a.status === "hired",
   );
 
   return (
@@ -426,7 +495,15 @@ export default function ApplicationsScreen() {
           <Pressable
             key={tab}
             style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-            onPress={() => setActiveTab(tab)}
+            onPress={() => {
+              setActiveTab(tab);
+              if (tab === "received") {
+                const unviewedIds = received
+                  .filter((r) => !r.viewed_at)
+                  .map((r) => r.id);
+                markReceivedAsViewed(unviewedIds);
+              }
+            }}
           >
             <Text
               style={[
