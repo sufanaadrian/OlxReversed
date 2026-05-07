@@ -102,7 +102,13 @@ export default function JobDetailScreen() {
   const [viewCount, setViewCount] = useState(0);
   const [alreadyReported, setAlreadyReported] = useState(false);
   const [similarJobs, setSimilarJobs] = useState<
-    { id: string; title: string; category: string | null; posting_as: string | null; profiles: { username: string | null } | null }[]
+    {
+      id: string;
+      title: string;
+      category: string | null;
+      posting_as: string | null;
+      profiles: { username: string | null } | null;
+    }[]
   >([]);
   const viewCounted = React.useRef(false);
 

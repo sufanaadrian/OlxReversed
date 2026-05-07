@@ -100,13 +100,64 @@ function scoreJob(job: JobRequest): number {
 
 // "For you" bonus: +200 if any of the user's skills match job category keywords
 const CATEGORY_SKILL_MAP: Record<string, string[]> = {
-  IT: ["javascript", "react", "python", "java", "typescript", "node", "sql", "web", "dev", "code", "software", "android", "ios", "flutter", "php"],
-  Tutoring: ["teaching", "math", "physics", "chemistry", "english", "tutoring", "education", "mentor"],
-  Marketing: ["marketing", "social media", "seo", "content", "copywriting", "photoshop", "illustrator", "canva", "branding"],
+  IT: [
+    "javascript",
+    "react",
+    "python",
+    "java",
+    "typescript",
+    "node",
+    "sql",
+    "web",
+    "dev",
+    "code",
+    "software",
+    "android",
+    "ios",
+    "flutter",
+    "php",
+  ],
+  Tutoring: [
+    "teaching",
+    "math",
+    "physics",
+    "chemistry",
+    "english",
+    "tutoring",
+    "education",
+    "mentor",
+  ],
+  Marketing: [
+    "marketing",
+    "social media",
+    "seo",
+    "content",
+    "copywriting",
+    "photoshop",
+    "illustrator",
+    "canva",
+    "branding",
+  ],
   Events: ["events", "bartending", "waiter", "hostess", "promoter", "staff"],
-  Hospitality: ["hospitality", "hotel", "restaurant", "barista", "chef", "cook", "waiter"],
+  Hospitality: [
+    "hospitality",
+    "hotel",
+    "restaurant",
+    "barista",
+    "chef",
+    "cook",
+    "waiter",
+  ],
   Delivery: ["delivery", "courier", "driver", "transport", "logistics"],
-  Office: ["excel", "word", "admin", "secretary", "office", "data entry", "accounting"],
+  Office: [
+    "excel",
+    "word",
+    "admin",
+    "secretary",
+    "office",
+    "data entry",
+    "accounting",
+  ],
   Retail: ["sales", "retail", "cashier", "customer service", "shop"],
 };
 
@@ -498,9 +549,7 @@ export default function JobsScreen() {
       userSkills.length
         ? jobs
             .filter(
-              (j) =>
-                !appliedIds.has(j.id) &&
-                forYouScore(j, userSkills) > 0,
+              (j) => !appliedIds.has(j.id) && forYouScore(j, userSkills) > 0,
             )
             .slice(0, 5)
         : [],
@@ -575,7 +624,9 @@ export default function JobsScreen() {
             )}
             {isForYou && (
               <View style={styles.forYouBadge}>
-                <Text style={styles.forYouBadgeText}>✨ {t("forYouSection")}</Text>
+                <Text style={styles.forYouBadgeText}>
+                  {t("forYouSection")}
+                </Text>
               </View>
             )}
           </View>
@@ -1345,7 +1396,9 @@ export default function JobsScreen() {
               style={styles.activeChip}
               onPress={() => setFilterEmployerName("")}
             >
-              <Text style={styles.activeChipText}>@{filterEmployerName.trim()}</Text>
+              <Text style={styles.activeChipText}>
+                @{filterEmployerName.trim()}
+              </Text>
               <Feather name="x" size={11} color={colors.primary} />
             </Pressable>
           ) : null}
@@ -1411,7 +1464,7 @@ export default function JobsScreen() {
                     <View style={styles.discoverSection}>
                       <View style={styles.discoverHeader}>
                         <Text style={styles.discoverTitle}>
-                          🔥 {t("trendingSection")}
+                          {t("trendingSection")}
                         </Text>
                         <Text style={styles.discoverHint}>
                           {t("trendingHint")}
@@ -1462,7 +1515,7 @@ export default function JobsScreen() {
                     <View style={styles.discoverSection}>
                       <View style={styles.discoverHeader}>
                         <Text style={styles.discoverTitle}>
-                          ✨ {t("forYouSection")}
+                          {t("forYouSection")}
                         </Text>
                         <Text style={styles.discoverHint}>
                           {t("forYouHint")}
@@ -1476,10 +1529,7 @@ export default function JobsScreen() {
                         {forYouJobs.map((job) => (
                           <Pressable
                             key={job.id}
-                            style={[
-                              styles.miniCard,
-                              styles.miniCardForYou,
-                            ]}
+                            style={[styles.miniCard, styles.miniCardForYou]}
                             onPress={() => router.push(`/request/${job.id}`)}
                           >
                             <Text

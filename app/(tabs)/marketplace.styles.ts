@@ -625,6 +625,7 @@ export function makeStyles(c: Colors) {
     },
 
     discoverSection: {
+      marginHorizontal: -14,
       marginBottom: 6,
     },
     discoverHeader: {
@@ -636,8 +637,8 @@ export function makeStyles(c: Colors) {
       marginTop: 12,
     },
     discoverTitle: {
-      fontSize: 15,
-      fontWeight: "900",
+      fontSize: 14,
+      fontWeight: "800",
       color: c.primaryText,
     },
     discoverHint: {
@@ -647,6 +648,7 @@ export function makeStyles(c: Colors) {
     },
     discoverScroll: {
       paddingHorizontal: 14,
+      paddingBottom: 4,
       gap: 10,
     },
     miniCard: {
