@@ -182,5 +182,26 @@ export function makeStyles(c: Colors) {
       gap: 4,
     },
     deleteActionText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
+
+    swipeActions: { flexDirection: "row" },
+    archiveAction: {
+      backgroundColor: c.warning,
+      justifyContent: "center",
+      alignItems: "center",
+      width: 80,
+      gap: 4,
+    },
+    archiveActionText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
+
+    archivedToggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    archivedToggleText: { fontSize: 13, fontWeight: "600", color: c.mutedText },
   });
 }

@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -51,6 +52,32 @@ export default function MessagesScreen() {
   const t = useTranslation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Load archived IDs from storage
+  useEffect(() => {
+    AsyncStorage.getItem("archived_chats").then((raw) => {
+      if (raw) setArchivedIds(new Set(JSON.parse(raw) as string[]));
+    });
+  }, []);
+
+  async function archiveConversation(requestId: string) {
+    const next = new Set(archivedIds);
+    const isCurrentlyArchived = next.has(requestId);
+    if (isCurrentlyArchived) {
+      next.delete(requestId);
+      // Switch back to main view so the restored chat is visible
+      setShowArchived(false);
+    } else {
+      next.add(requestId);
+    }
+    setArchivedIds(next);
+    await AsyncStorage.setItem(
+      "archived_chats",
+      JSON.stringify(Array.from(next)),
+    );
+  }
 
   async function deleteConversation(requestId: string) {
     Alert.alert(t("deleteConversation"), t("deleteConversationConfirm"), [
@@ -187,6 +214,7 @@ export default function MessagesScreen() {
   );
 
   function renderItem({ item }: { item: Conversation }) {
+    const isArchived = archivedIds.has(item.requestId);
     const initials = (item.otherUsername ?? "?")
       .split(" ")
       .map((w) => w[0])
@@ -201,16 +229,30 @@ export default function MessagesScreen() {
     return (
       <ReanimatedSwipeable
         renderRightActions={(_, __, swipeable) => (
-          <Pressable
-            style={styles.deleteAction}
-            onPress={() => {
-              swipeable.close();
-              deleteConversation(item.requestId);
-            }}
-          >
-            <Feather name="trash-2" size={20} color="#FFFFFF" />
-            <Text style={styles.deleteActionText}>{t("delete")}</Text>
-          </Pressable>
+          <View style={styles.swipeActions}>
+            <Pressable
+              style={styles.archiveAction}
+              onPress={() => {
+                swipeable.close();
+                archiveConversation(item.requestId);
+              }}
+            >
+              <Feather name="archive" size={20} color="#FFFFFF" />
+              <Text style={styles.archiveActionText}>
+                {isArchived ? t("unarchive") : t("archiveChat")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.deleteAction}
+              onPress={() => {
+                swipeable.close();
+                deleteConversation(item.requestId);
+              }}
+            >
+              <Feather name="trash-2" size={20} color="#FFFFFF" />
+              <Text style={styles.deleteActionText}>{t("delete")}</Text>
+            </Pressable>
+          </View>
         )}
       >
         <Pressable
@@ -322,13 +364,21 @@ export default function MessagesScreen() {
         />
       ) : (
         <FlatList
-          data={conversations}
+          data={conversations.filter((c) =>
+            showArchived
+              ? archivedIds.has(c.requestId)
+              : !archivedIds.has(c.requestId),
+          )}
           keyExtractor={(c) => c.requestId + c.otherUserId}
           renderItem={renderItem}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={[
             styles.listContent,
-            conversations.length === 0 && { flex: 1 },
+            conversations.filter((c) =>
+              showArchived
+                ? archivedIds.has(c.requestId)
+                : !archivedIds.has(c.requestId),
+            ).length === 0 && { flex: 1 },
           ]}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -348,6 +398,25 @@ export default function MessagesScreen() {
                 <Text style={styles.emptyBtnText}>{t("marketplace")}</Text>
               </Pressable>
             </View>
+          }
+          ListFooterComponent={
+            archivedIds.size > 0 ? (
+              <Pressable
+                style={styles.archivedToggleRow}
+                onPress={() => setShowArchived((v) => !v)}
+              >
+                <Feather
+                  name={showArchived ? "inbox" : "archive"}
+                  size={14}
+                  color={colors.mutedText}
+                />
+                <Text style={styles.archivedToggleText}>
+                  {showArchived
+                    ? t("hideArchivedChats")
+                    : `${t("showArchivedChats")} (${archivedIds.size})`}
+                </Text>
+              </Pressable>
+            ) : null
           }
         />
       )}

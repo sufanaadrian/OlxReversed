@@ -227,5 +227,40 @@ export function makeStyles(c: Colors) {
       justifyContent: "center",
     },
     sendBtnDisabled: { opacity: 0.4 },
+
+    dateProposalChip: {
+      paddingVertical: 5,
+      paddingHorizontal: 11,
+      borderRadius: 14,
+      backgroundColor: c.primaryLight,
+      borderWidth: 1,
+      borderColor: c.primary,
+    },
+    dateProposalChipText: {
+      fontSize: 12,
+      color: c.primary,
+      fontWeight: "700",
+    },
+
+    datePickerBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.4)",
+    },
+    datePickerContainer: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingBottom: 32,
+    },
+    datePickerHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+    },
+    datePickerTitle: { fontSize: 15, fontWeight: "700" },
+    datePickerCancel: { fontSize: 14, fontWeight: "500" },
+    datePickerConfirm: { fontSize: 14, fontWeight: "700" },
   });
 }

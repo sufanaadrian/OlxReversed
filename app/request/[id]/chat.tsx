@@ -1,28 +1,26 @@
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker, {
+    type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Linking,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useTranslation } from "../../../src/context/LanguageContext";
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -70,7 +68,9 @@ export default function ChatScreen() {
   const [jobClosed, setJobClosed] = useState(false);
   const [requestInfo, setRequestInfo] = useState<RequestInfo | null>(null);
   const [offerInfo, setOfferInfo] = useState<OfferInfo | null>(null);
-  const flatRef = useRef<FlatList>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
+  const [pickerStep, setPickerStep] = useState<"date" | "time">("date");
 
   const fetchMessages = useCallback(async () => {
     const {
@@ -200,6 +200,42 @@ export default function ChatScreen() {
       sender_id: userId,
       content: trimmed,
     });
+  }
+
+  function openDateProposal() {
+    setPickerDate(new Date());
+    setPickerStep("date");
+    setShowDatePicker(true);
+  }
+
+  function sendDateProposal(date: Date) {
+    const formatted = date.toLocaleString(undefined, {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    setText(`${t("proposedStartDate")}: ${formatted}`);
+  }
+
+  function handleAndroidDateChange(
+    event: DateTimePickerEvent,
+    selected?: Date,
+  ) {
+    if (event.type === "dismissed") {
+      setShowDatePicker(false);
+      return;
+    }
+    const chosen = selected ?? pickerDate;
+    if (pickerStep === "date") {
+      setPickerDate(chosen);
+      setPickerStep("time");
+    } else {
+      setShowDatePicker(false);
+      sendDateProposal(chosen);
+    }
   }
 
   function promptRating() {
@@ -408,14 +444,12 @@ export default function ChatScreen() {
         keyboardVerticalOffset={0}
       >
         <FlatList
-          ref={flatRef}
-          data={messages}
+          data={[...messages].reverse()}
           keyExtractor={(m) => m.id}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={() =>
-            flatRef.current?.scrollToEnd({ animated: false })
-          }
-          ListHeaderComponent={<ContextCard />}
+          inverted
+          ListFooterComponent={<ContextCard />}
           renderItem={({ item }) => {
             const isMe = item.sender_id === userId;
             return (
@@ -481,11 +515,20 @@ export default function ChatScreen() {
             contentContainerStyle={styles.templateRowContent}
             keyboardShouldPersistTaps="handled"
           >
+            <Pressable
+              style={styles.dateProposalChip}
+              onPress={openDateProposal}
+            >
+              <Text style={styles.dateProposalChipText}>
+                {t("tplProposeDate")}
+              </Text>
+            </Pressable>
             {[
               t("tplAvailable"),
               t("tplWhenStart"),
               t("tplSoundsGood"),
               t("tplConfirm"),
+              t("tplLate"),
             ].map((tpl) => (
               <Pressable
                 key={tpl}
@@ -525,6 +568,77 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Date proposal picker — Android native dialog */}
+      {Platform.OS === "android" && showDatePicker && (
+        <DateTimePicker
+          value={pickerDate}
+          mode={pickerStep}
+          display="default"
+          onChange={handleAndroidDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Date proposal picker — iOS modal */}
+      {Platform.OS === "ios" && (
+        <Modal
+          transparent
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <Pressable
+            style={styles.datePickerBackdrop}
+            onPress={() => setShowDatePicker(false)}
+          />
+          <View
+            style={[
+              styles.datePickerContainer,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <View
+              style={[styles.datePickerHeader, { borderColor: colors.border }]}
+            >
+              <Pressable onPress={() => setShowDatePicker(false)}>
+                <Text
+                  style={[styles.datePickerCancel, { color: colors.mutedText }]}
+                >
+                  {t("cancel")}
+                </Text>
+              </Pressable>
+              <Text
+                style={[styles.datePickerTitle, { color: colors.primaryText }]}
+              >
+                {t("datePickerTitle")}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setShowDatePicker(false);
+                  sendDateProposal(pickerDate);
+                }}
+              >
+                <Text
+                  style={[styles.datePickerConfirm, { color: colors.primary }]}
+                >
+                  {t("confirm")}
+                </Text>
+              </Pressable>
+            </View>
+            <DateTimePicker
+              value={pickerDate}
+              mode="datetime"
+              display="spinner"
+              onChange={(_, d) => {
+                if (d) setPickerDate(d);
+              }}
+              minimumDate={new Date()}
+              textColor={colors.primaryText}
+            />
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
