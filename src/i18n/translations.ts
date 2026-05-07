@@ -618,7 +618,8 @@ export const translations = {
     welcomeSlide4Desc: "Teach what you know",
     // Trust features
     companyDescription: "About the Company",
-    companyDescriptionPlaceholder: "Tell students about your team, what you do, and what makes you a great employer…",
+    companyDescriptionPlaceholder:
+      "Tell students about your team, what you do, and what makes you a great employer…",
     companySection: "Company",
     applicationSeen: "Seen",
     applicationNotSeen: "Not yet seen",
@@ -1263,7 +1264,8 @@ export const translations = {
     welcomeSlide4Desc: "Predă ce știi",
     // Trust features
     companyDescription: "Despre companie",
-    companyDescriptionPlaceholder: "Spune-le studenților despre echipa ta, ce faci și ce te face un angajator bun…",
+    companyDescriptionPlaceholder:
+      "Spune-le studenților despre echipa ta, ce faci și ce te face un angajator bun…",
     companySection: "Companie",
     applicationSeen: "Văzut",
     applicationNotSeen: "Nevăzut încă",

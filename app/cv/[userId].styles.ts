@@ -128,7 +128,11 @@ export function makeStyles(c: Colors) {
 
     // Skills
     skillsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    skillChipWrap: { flexDirection: "column", alignItems: "flex-start", gap: 3 },
+    skillChipWrap: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+      gap: 3,
+    },
     skillChip: {
       flexDirection: "row",
       alignItems: "center",

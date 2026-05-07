@@ -99,9 +99,7 @@ export default function CVScreen() {
       map[row.skill].count++;
       if (row.endorser_id === me) map[row.skill].endorsedByMe = true;
     }
-    setEndorsements(
-      Object.entries(map).map(([skill, v]) => ({ skill, ...v })),
-    );
+    setEndorsements(Object.entries(map).map(([skill, v]) => ({ skill, ...v })));
   }
 
   async function checkCanEndorse(me: string) {
@@ -350,7 +348,12 @@ export default function CVScreen() {
               <Text style={styles.infoText}>{profile.company_name}</Text>
             ) : null}
             {profile.company_description ? (
-              <Text style={[styles.bioText, { marginTop: profile.company_name ? 4 : 0 }]}>
+              <Text
+                style={[
+                  styles.bioText,
+                  { marginTop: profile.company_name ? 4 : 0 },
+                ]}
+              >
                 {profile.company_description}
               </Text>
             ) : null}

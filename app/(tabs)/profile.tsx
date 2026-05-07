@@ -567,7 +567,7 @@ export default function ProfileScreen() {
           {/* Company (employer/both only) */}
           {(profile?.user_type === "employer" ||
             profile?.user_type === "both") &&
-            (profile?.company_name || profile?.company_description) ? (
+          (profile?.company_name || profile?.company_description) ? (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <Feather name="briefcase" size={14} color={colors.employer} />
@@ -585,7 +585,10 @@ export default function ProfileScreen() {
               ) : null}
               {profile.company_description ? (
                 <Text
-                  style={[styles.bioText, { marginTop: profile.company_name ? 4 : 0 }]}
+                  style={[
+                    styles.bioText,
+                    { marginTop: profile.company_name ? 4 : 0 },
+                  ]}
                 >
                   {profile.company_description}
                 </Text>

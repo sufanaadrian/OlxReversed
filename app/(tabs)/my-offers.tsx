@@ -186,12 +186,7 @@ export default function ApplicationsScreen() {
       t("reportOutcomeUnsafe"),
       t("reportOutcomeOther"),
     ];
-    const reasonKeys = [
-      "not_paid",
-      "no_show",
-      "unsafe_conditions",
-      "other",
-    ];
+    const reasonKeys = ["not_paid", "no_show", "unsafe_conditions", "other"];
     Alert.alert(
       t("reportOutcome"),
       t("reportOutcomeTitle"),
@@ -324,11 +319,13 @@ export default function ApplicationsScreen() {
               {item.status === "hired" && job && (
                 <Pressable
                   style={styles.disputeBtn}
-                  onPress={() =>
-                    handleDispute(item.id, job.user_id, job.id)
-                  }
+                  onPress={() => handleDispute(item.id, job.user_id, job.id)}
                 >
-                  <Feather name="alert-triangle" size={12} color={theme.error} />
+                  <Feather
+                    name="alert-triangle"
+                    size={12}
+                    color={theme.error}
+                  />
                   <Text style={styles.disputeBtnText}>
                     {t("reportOutcome")}
                   </Text>
