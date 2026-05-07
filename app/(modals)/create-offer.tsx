@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Alert,
     KeyboardAvoidingView,
@@ -14,10 +14,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
+import { useTheme } from "../../src/context/ThemeContext";
 import { requireAuth } from "../../src/lib/authGuard";
 import { supabase } from "../../src/lib/supabase";
 import { makeStyles } from "./create-offer.styles";
-import { useTheme } from "../../src/context/ThemeContext";
 
 export default function ApplyModal() {
   const { colors } = useTheme();
@@ -141,7 +141,11 @@ export default function ApplyModal() {
           </View>
         ) : null}
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          keyboardShouldPersistTaps="handled"
+        >
           {alreadyApplied ? (
             <View style={styles.alreadyApplied}>
               <Feather name="check-circle" size={20} color={colors.primary} />
@@ -160,9 +164,13 @@ export default function ApplyModal() {
                     disabled={saving}
                   >
                     <Feather name="zap" size={16} color="#FFFFFF" />
-                    <Text style={styles.quickApplyBtnText}>{t("quickApply")}</Text>
+                    <Text style={styles.quickApplyBtnText}>
+                      {t("quickApply")}
+                    </Text>
                   </Pressable>
-                  <Text style={styles.quickApplyHint}>{t("quickApplyHint")}</Text>
+                  <Text style={styles.quickApplyHint}>
+                    {t("quickApplyHint")}
+                  </Text>
                   <View style={styles.orDivider}>
                     <View style={styles.orLine} />
                     <Text style={styles.orText}>or</Text>
@@ -185,7 +193,13 @@ export default function ApplyModal() {
                     onPress={() => setCoverLetter(savedTemplate)}
                   >
                     <Feather name="bookmark" size={11} color={colors.primary} />
-                    <Text style={[styles.templateChipText, { color: colors.primary }]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.templateChipText,
+                        { color: colors.primary },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {t("useTemplate")}
                     </Text>
                   </Pressable>
@@ -230,7 +244,9 @@ export default function ApplyModal() {
 
               {/* Cover letter */}
               <Text style={styles.label}>
-                {screeningNote ? `${t("coverLetter")} *` : t("coverLetterOptional")}
+                {screeningNote
+                  ? `${t("coverLetter")} *`
+                  : t("coverLetterOptional")}
               </Text>
               <TextInput
                 style={styles.coverInput}
@@ -248,7 +264,9 @@ export default function ApplyModal() {
                 {coverLetter.trim().length > 20 && category && (
                   <Pressable style={styles.saveTplBtn} onPress={saveTemplate}>
                     <Feather name="bookmark" size={12} color={colors.primary} />
-                    <Text style={styles.saveTplBtnText}>{t("saveAsTemplate")}</Text>
+                    <Text style={styles.saveTplBtnText}>
+                      {t("saveAsTemplate")}
+                    </Text>
                   </Pressable>
                 )}
               </View>

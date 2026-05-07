@@ -255,53 +255,69 @@ export default function ApplicationsScreen() {
       },
       {
         key: "timelineDecision",
-        done: item.status === "hired" || item.status === "rejected" || item.status === "withdrawn",
+        done:
+          item.status === "hired" ||
+          item.status === "rejected" ||
+          item.status === "withdrawn",
         color:
           item.status === "rejected"
             ? theme.error
             : item.status === "withdrawn"
-            ? theme.mutedText
-            : theme.success,
+              ? theme.mutedText
+              : theme.success,
       },
     ];
     return (
       <View style={styles.timeline}>
-        {steps.map((step, i) => (
-          <React.Fragment key={step.key}>
-            <View style={styles.timelineStep}>
+        <Text style={styles.timelineSectionLabel}>
+          {t("applicationStatus")}
+        </Text>
+        {/* Dot + connector row */}
+        <View style={styles.timelineDotsRow}>
+          {steps.map((step, i) => (
+            <React.Fragment key={step.key}>
               <View
                 style={[
                   styles.timelineDot,
-                  step.done && { backgroundColor: step.color, borderColor: step.color },
+                  step.done && {
+                    backgroundColor: step.color,
+                    borderColor: step.color,
+                  },
                 ]}
               >
                 {step.done && (
                   <Feather
                     name={item.status === "rejected" && i === 3 ? "x" : "check"}
-                    size={8}
+                    size={9}
                     color="#FFFFFF"
                   />
                 )}
               </View>
-              <Text
-                style={[
-                  styles.timelineLabel,
-                  step.done && { color: step.color, fontWeight: "700" },
-                ]}
-              >
-                {t(step.key as any)}
-              </Text>
-            </View>
-            {i < steps.length - 1 && (
-              <View
-                style={[
-                  styles.timelineConnector,
-                  steps[i + 1].done && { backgroundColor: theme.success },
-                ]}
-              />
-            )}
-          </React.Fragment>
-        ))}
+              {i < steps.length - 1 && (
+                <View
+                  style={[
+                    styles.timelineConnector,
+                    steps[i + 1].done && { backgroundColor: theme.success },
+                  ]}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </View>
+        {/* Label row */}
+        <View style={styles.timelineLabelsRow}>
+          {steps.map((step) => (
+            <Text
+              key={step.key}
+              style={[
+                styles.timelineLabel,
+                step.done && { color: step.color, fontWeight: "700" },
+              ]}
+            >
+              {t(step.key as any)}
+            </Text>
+          ))}
+        </View>
       </View>
     );
   }

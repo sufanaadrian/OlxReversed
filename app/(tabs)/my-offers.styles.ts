@@ -212,37 +212,54 @@ export const styles = StyleSheet.create({
 
   // ── Application timeline ─────────────────────────────────────────
   timeline: {
+    marginTop: 12,
+    marginBottom: 6,
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  timelineSectionLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: theme.mutedText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  timelineDotsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
-    marginBottom: 4,
+  },
+  timelineLabelsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   timelineStep: {
     alignItems: "center",
     gap: 4,
   },
   timelineDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
     borderColor: theme.border,
-    backgroundColor: theme.surfaceAlt,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   timelineConnector: {
     flex: 1,
-    height: 1.5,
+    height: 2.5,
     backgroundColor: theme.border,
-    marginBottom: 16,
   },
   timelineLabel: {
-    fontSize: 9,
+    fontSize: 11,
     color: theme.mutedText,
     fontWeight: "600",
     textAlign: "center",
-    maxWidth: 60,
+    flex: 1,
   },
 
   priceChip: {

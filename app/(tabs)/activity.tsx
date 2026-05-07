@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../src/context/LanguageContext";
@@ -54,7 +54,9 @@ type Application = {
   id: string;
   status: string;
   cover_letter: string | null;
+  price: number | null;
   created_at: string;
+  viewed_at: string | null;
   requests: {
     id: string;
     title: string;
@@ -70,6 +72,7 @@ type ReceivedApplication = {
   status: string;
   cover_letter: string | null;
   created_at: string;
+  viewed_at: string | null;
   requests: {
     id: string;
     title: string;
@@ -172,7 +175,7 @@ export default function ActivityScreen() {
     const { data: sent } = await supabase
       .from("offers")
       .select(
-        "id, status, cover_letter, created_at, requests!inner(id, title, user_id, status, posting_as)",
+        "id, status, cover_letter, price, created_at, viewed_at, requests!inner(id, title, user_id, status, posting_as)",
       )
       .eq("seller_id", user.id)
       .order("created_at", { ascending: false });
@@ -207,7 +210,7 @@ export default function ActivityScreen() {
       const { data: received } = await supabase
         .from("offers")
         .select(
-          "id, status, cover_letter, created_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+          "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
         )
         .in("request_id", postIds)
         .neq("status", "withdrawn")
@@ -312,6 +315,15 @@ export default function ActivityScreen() {
     ]);
   }
 
+  async function markReceivedAsViewed(offerIds: string[]) {
+    if (!offerIds.length) return;
+    await supabase
+      .from("offers")
+      .update({ viewed_at: new Date().toISOString() })
+      .in("id", offerIds)
+      .is("viewed_at", null);
+  }
+
   async function handleReleaseReceived(item: ReceivedApplication) {
     Alert.alert(t("release"), t("releaseConfirm"), [
       { text: t("cancel"), style: "cancel" },
@@ -396,11 +408,88 @@ export default function ActivityScreen() {
     );
   }
 
+  function renderTimeline(item: Application) {
+    const steps = [
+      { key: "timelineApplied", done: true, color: colors.success },
+      { key: "timelineSeen", done: !!item.viewed_at, color: colors.success },
+      {
+        key: "timelineShortlisted",
+        done: item.status === "accepted" || item.status === "hired",
+        color: colors.success,
+      },
+      {
+        key: "timelineDecision",
+        done:
+          item.status === "hired" ||
+          item.status === "rejected" ||
+          item.status === "withdrawn",
+        color:
+          item.status === "rejected"
+            ? colors.error
+            : item.status === "withdrawn"
+              ? colors.mutedText
+              : colors.success,
+      },
+    ];
+    return (
+      <View style={styles.timeline}>
+        <Text style={styles.timelineSectionLabel}>
+          {t("applicationStatus")}
+        </Text>
+        <View style={styles.timelineDotsRow}>
+          {steps.map((step, i) => (
+            <React.Fragment key={step.key}>
+              <View
+                style={[
+                  styles.timelineDot,
+                  step.done && {
+                    backgroundColor: step.color,
+                    borderColor: step.color,
+                  },
+                ]}
+              >
+                {step.done && (
+                  <Feather
+                    name={item.status === "rejected" && i === 3 ? "x" : "check"}
+                    size={9}
+                    color="#FFFFFF"
+                  />
+                )}
+              </View>
+              {i < steps.length - 1 && (
+                <View
+                  style={[
+                    styles.timelineConnector,
+                    steps[i + 1].done && { backgroundColor: colors.success },
+                  ]}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </View>
+        <View style={styles.timelineLabelsRow}>
+          {steps.map((step) => (
+            <Text
+              key={step.key}
+              style={[
+                styles.timelineLabel,
+                step.done && { color: step.color, fontWeight: "700" },
+              ]}
+            >
+              {t(step.key as any)}
+            </Text>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   function renderSentApp({ item }: { item: Application }) {
     const appStatusColors = getAppStatusColors(colors);
     const col = appStatusColors[item.status] ?? appStatusColors.pending;
     const req = item.requests;
-    const canChat = item.status === "accepted" && req;
+    const canChat =
+      (item.status === "accepted" || item.status === "hired") && req;
     const isWithdrawn = item.status === "withdrawn";
     const employerName = req?.profiles?.username ?? null;
     const initials = (n: string | null) => {
@@ -472,6 +561,8 @@ export default function ActivityScreen() {
               )}
             </Pressable>
           ) : null}
+
+          {renderTimeline(item)}
 
           {/* Actions */}
           {!isWithdrawn && (
@@ -626,7 +717,7 @@ export default function ActivityScreen() {
                 <Text style={styles.appActionGhostText}>{t("viewCV")}</Text>
               </Pressable>
             )}
-            {item.status === "accepted" && req && (
+            {(item.status === "accepted" || item.status === "hired") && req && (
               <>
                 <Pressable
                   style={styles.appActionPrimary}
@@ -669,8 +760,13 @@ export default function ActivityScreen() {
                         styles.appActionPrimary,
                         !canAccept && { opacity: 0.4 },
                       ]}
-                      onPress={() => canAccept && handleAcceptReceived(item)}
-                      disabled={!canAccept}
+                      onPress={() => {
+                        if (!canAccept) {
+                          Alert.alert(t("slotsFull"), t("slotsFullHint"));
+                          return;
+                        }
+                        handleAcceptReceived(item);
+                      }}
                     >
                       <Feather name="message-circle" size={13} color="#fff" />
                       <Text style={styles.appActionPrimaryText}>
@@ -788,7 +884,13 @@ export default function ActivityScreen() {
               styles.subTabBtn,
               appTab === "received" && styles.subTabBtnActive,
             ]}
-            onPress={() => setAppTab("received")}
+            onPress={() => {
+              setAppTab("received");
+              const unviewedIds = receivedApps
+                .filter((r) => !r.viewed_at)
+                .map((r) => r.id);
+              markReceivedAsViewed(unviewedIds);
+            }}
           >
             <Text
               style={[

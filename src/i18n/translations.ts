@@ -187,6 +187,9 @@ export const translations = {
     applicationAcceptedBadge: "Accepted",
     applicationRejectedBadge: "Rejected",
     applicationWithdrawnBadge: "Withdrawn",
+    slotsFull: "All slots filled",
+    slotsFullHint:
+      "You've already invited enough candidates for this job. Hire or release one before accepting more.",
     goToChat: "Open Chat",
     chat: "Chat",
     messages: "Messages",
@@ -398,6 +401,10 @@ export const translations = {
     timelineShortlisted: "Shortlisted",
     timelineDecision: "Decision",
     proposedRateLabel: "Rate proposed",
+    applicationStatus: "Application Status",
+    slotsFull: "All slots filled",
+    slotsFullHint:
+      "You've already invited enough candidates for this job. Hire or release one before accepting more.",
     rateExperience: "Rate this experience",
     rateSubmit: "Submit rating",
     ratingThanks: "Thanks for your feedback!",
@@ -1085,6 +1092,10 @@ export const translations = {
     timelineShortlisted: "Selectat",
     timelineDecision: "Decizie",
     proposedRateLabel: "Tarif propus",
+    applicationStatus: "Statusul candidațurii",
+    slotsFull: "Toate locurile sunt ocupate",
+    slotsFullHint:
+      "Ai invitat deja suficienți candidați pentru acest job. Angajează sau eliberează unul înainte de a accepta mai mulți.",
     rateExperience: "Evaluează experiența",
     rateSubmit: "Trimite evaluarea",
     ratingThanks: "Mulțumim pentru feedback!",

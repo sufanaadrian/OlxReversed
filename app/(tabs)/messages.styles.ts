@@ -97,6 +97,17 @@ export function makeStyles(c: Colors) {
     roleBadgeText: { fontSize: 10, fontWeight: "800", color: c.primary },
     roleBadgeTextBuyer: { color: c.employer },
 
+    hiredBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: c.success,
+    },
+    hiredBadgeText: { fontSize: 10, fontWeight: "800", color: "#fff" },
+
     time: { fontSize: 11, color: c.mutedText, flexShrink: 0 },
 
     jobRow: {

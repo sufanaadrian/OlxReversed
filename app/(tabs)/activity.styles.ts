@@ -304,5 +304,53 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.primaryLight,
     },
     appSkillText: { fontSize: 11, fontWeight: "600", color: c.primary },
+
+    // ── Application timeline ─────────────────────────────────────────
+    timeline: {
+      marginTop: 10,
+      marginBottom: 10,
+      backgroundColor: c.surfaceAlt,
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+    },
+    timelineSectionLabel: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: c.mutedText,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 2,
+    },
+    timelineDotsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    timelineLabelsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    timelineDot: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timelineConnector: {
+      flex: 1,
+      height: 2.5,
+      backgroundColor: c.border,
+    },
+    timelineLabel: {
+      fontSize: 11,
+      color: c.mutedText,
+      fontWeight: "600",
+      textAlign: "center",
+      flex: 1,
+    },
   });
 }

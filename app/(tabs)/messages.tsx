@@ -3,12 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Pressable,
+    Text,
+    View,
 } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -27,6 +27,7 @@ type Conversation = {
   lastMessageIsMe: boolean;
   unreadCount: number;
   iAmOwner: boolean;
+  isHired: boolean;
 };
 
 function timeAgo(iso: string) {
@@ -83,7 +84,7 @@ export default function MessagesScreen() {
         "id, request_id, requests!inner(id, title, user_id, status, profiles(id, username))",
       )
       .eq("seller_id", user.id)
-      .eq("status", "accepted");
+      .in("status", ["accepted", "hired"]);
 
     for (const offer of myAccepted ?? []) {
       const req = (offer as any).requests;
@@ -112,6 +113,7 @@ export default function MessagesScreen() {
         lastMessageIsMe: last?.sender_id === user.id,
         unreadCount: unread ?? 0,
         iAmOwner: false,
+        isHired: (offer as any).status === "hired",
       });
     }
 
@@ -129,7 +131,7 @@ export default function MessagesScreen() {
           "id, request_id, seller_id, requests!inner(id, title), profiles!seller_id(id, username)",
         )
         .in("request_id", postIds)
-        .eq("status", "accepted");
+        .in("status", ["accepted", "hired"]);
 
       for (const offer of acceptedOnMyPosts ?? []) {
         const req = (offer as any).requests;
@@ -158,6 +160,7 @@ export default function MessagesScreen() {
           lastMessageIsMe: last?.sender_id === user.id,
           unreadCount: unread ?? 0,
           iAmOwner: true,
+          isHired: (offer as any).status === "hired",
         });
       }
     }
@@ -193,6 +196,7 @@ export default function MessagesScreen() {
 
     const isBuyer = item.iAmOwner;
     const hasUnread = item.unreadCount > 0;
+    const isHired = item.isHired;
 
     return (
       <ReanimatedSwipeable
@@ -248,6 +252,12 @@ export default function MessagesScreen() {
                     {isBuyer ? t("chatRoleBuyer") : t("chatRoleSeller")}
                   </Text>
                 </View>
+                {isHired && (
+                  <View style={styles.hiredBadge}>
+                    <Feather name="check-circle" size={10} color="#fff" />
+                    <Text style={styles.hiredBadgeText}>{t("offerHired")}</Text>
+                  </View>
+                )}
               </View>
               {item.lastMessageAt && (
                 <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
