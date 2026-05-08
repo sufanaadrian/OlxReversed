@@ -91,21 +91,14 @@ export default function ChatScreen() {
   const hasLoaded = useRef(false);
   const messagesRef = useRef<Message[]>([]);
 
-  const fetchMessages = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data } = await supabase
-      .from("messages")
-      .select("id, sender_id, content, created_at, read_at")
-      .eq("request_id", id)
-      .order("created_at", { ascending: true });
-    setMessages((data as Message[]) ?? []);
-    setLoading(false);
-
-    // Mark incoming messages as read — awaited so the DB write completes
-    // reliably even if the user navigates away (JS promises run to completion)
-    if (user) {
+  // Mark all incoming messages as read immediately on mount — runs before
+  // fetchMessages so the DB write starts as early as possible.
+  useEffect(() => {
+    async function markAsRead() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
       await supabase
         .from("messages")
         .update({ read_at: new Date().toISOString() })
@@ -113,6 +106,17 @@ export default function ChatScreen() {
         .neq("sender_id", user.id)
         .is("read_at", null);
     }
+    markAsRead();
+  }, [id]);
+
+  const fetchMessages = useCallback(async () => {
+    const { data } = await supabase
+      .from("messages")
+      .select("id, sender_id, content, created_at, read_at")
+      .eq("request_id", id)
+      .order("created_at", { ascending: true });
+    setMessages((data as Message[]) ?? []);
+    setLoading(false);
   }, [id]);
 
   // Keep ref in sync so catchUpMessages can access latest without stale closure
