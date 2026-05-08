@@ -15,6 +15,7 @@ import {
     FlatList,
     Image,
     Pressable,
+    RefreshControl,
     Text,
     View,
 } from "react-native";
@@ -60,6 +61,7 @@ export default function MessagesScreen() {
   const t = useTranslation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
   const hasLoaded = useRef(false);
@@ -218,6 +220,25 @@ export default function MessagesScreen() {
     setLoading(false);
   }, []);
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchConversations();
+    setRefreshing(false);
+  }
+
+  function previewLastMessage(content: string | null, isMe: boolean): string {
+    if (!content) return t("noMessages");
+    const prefix = isMe ? `${t("youTyped")}: ` : "";
+    if (content.startsWith('{"_t":')) {
+      try {
+        const obj = JSON.parse(content);
+        if (obj._t === "img") return prefix + "📷 " + t("photo");
+        if (obj._t === "doc") return prefix + "📎 " + (obj.name ?? t("file"));
+      } catch {}
+    }
+    return prefix + content;
+  }
+
   useFocusEffect(
     useCallback(() => {
       if (!hasLoaded.current) {
@@ -357,10 +378,7 @@ export default function MessagesScreen() {
               ]}
               numberOfLines={1}
             >
-              {item.lastMessage
-                ? (item.lastMessageIsMe ? `${t("youTyped")}: ` : "") +
-                  item.lastMessage
-                : t("noMessages")}
+              {previewLastMessage(item.lastMessage, item.lastMessageIsMe)}
             </Text>
           </View>
 
@@ -408,6 +426,14 @@ export default function MessagesScreen() {
           )}
           keyExtractor={(c) => c.requestId + c.otherUserId}
           renderItem={renderItem}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           contentContainerStyle={[
             styles.listContent,
