@@ -72,7 +72,7 @@ type JobRequest = {
   is_urgent: boolean;
   is_boosted: boolean;
   boosted_until: string | null;
-  profiles: { username: string | null; avatar_url: string | null } | null;
+  profiles: { username: string | null; avatar_url: string | null; avg_response_hours: number | null } | null;
 };
 
 function timeAgo(dateStr: string, t: (key: string) => string) {
@@ -255,7 +255,7 @@ export default function JobsScreen() {
     let query = supabase
       .from("requests")
       .select(
-        "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url)",
+        "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url,avg_response_hours)",
       )
       .eq("status", "active")
       .gte("created_at", thirtyDaysAgo);
@@ -353,7 +353,7 @@ export default function JobsScreen() {
       const { data: trendData } = await supabase
         .from("requests")
         .select(
-          "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url)",
+          "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url,avg_response_hours)",
         )
         .in("id", topIds)
         .eq("status", "active");
@@ -734,6 +734,20 @@ export default function JobsScreen() {
                 <Text style={styles.timeAgo}>
                   {timeAgo(item.created_at, t)}
                 </Text>
+                {isEmployer &&
+                  (item.profiles as any)?.avg_response_hours != null &&
+                  (item.profiles as any).avg_response_hours <= 48 && (
+                    <View style={styles.responseRateBadge}>
+                      <Feather name="zap" size={10} color={colors.success} />
+                      <Text style={styles.responseRateText}>
+                        {t("respondsWithin")}{" "}
+                        {Math.round(
+                          (item.profiles as any).avg_response_hours,
+                        )}
+                        {t("h")}
+                      </Text>
+                    </View>
+                  )}
               </View>
             </View>
             {hasApplied ? (

@@ -291,6 +291,18 @@ export function makeStyles(c: Colors) {
     },
     appliedBadgeText: { fontSize: 11, fontWeight: "700", color: c.primary },
 
+    responseRateBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      marginTop: 2,
+    },
+    responseRateText: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: c.success,
+    },
+
     saveSearchBtn: {
       flexDirection: "row",
       alignItems: "center",

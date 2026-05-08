@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,7 @@ export default function MyPostsScreen() {
   const t = useTranslation();
   const [posts, setPosts] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoaded = useRef(false);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -79,7 +80,10 @@ export default function MyPostsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchPosts();
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+        fetchPosts();
+      }
     }, [fetchPosts]),
   );
 
@@ -112,6 +116,88 @@ export default function MyPostsScreen() {
         },
       },
     ]);
+  }
+
+  async function handleRepost(id: string) {
+    const { data: job } = await supabase
+      .from("requests")
+      .select(
+        "title,description,category,location,budget_min,budget_max,posting_as,job_type,schedule_type,availability_tags,screening_note,is_urgent,workers_needed",
+      )
+      .eq("id", id)
+      .single();
+    if (!job) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: newJob, error } = await supabase
+      .from("requests")
+      .insert({
+        user_id: user.id,
+        title: job.title,
+        description: job.description,
+        category: job.category,
+        location: job.location,
+        budget_min: job.budget_min,
+        budget_max: job.budget_max,
+        posting_as: job.posting_as,
+        job_type: job.job_type,
+        schedule_type: job.schedule_type,
+        availability_tags: job.availability_tags,
+        screening_note: job.screening_note,
+        is_urgent: job.is_urgent,
+        workers_needed: job.workers_needed,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (error) {
+      Alert.alert(t("error"));
+      return;
+    }
+    hasLoaded.current = false;
+    fetchPosts();
+    Alert.alert(t("repostDone"), t("repostDoneDesc"), [
+      { text: t("view"), onPress: () => router.push(`/request/${newJob.id}`) },
+      { text: t("ok") },
+    ]);
+  }
+
+  async function handleSaveAsTemplate(id: string) {
+    const { data: job } = await supabase
+      .from("requests")
+      .select(
+        "title,description,category,location,budget_min,budget_max,posting_as,job_type,schedule_type,availability_tags,screening_note,is_urgent,workers_needed",
+      )
+      .eq("id", id)
+      .single();
+    if (!job) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from("job_templates").insert({
+      user_id: user.id,
+      title: job.title,
+      description: job.description,
+      category: job.category,
+      location: job.location,
+      budget_min: job.budget_min,
+      budget_max: job.budget_max,
+      posting_as: job.posting_as,
+      job_type: job.job_type,
+      schedule_type: job.schedule_type,
+      availability_tags: job.availability_tags,
+      screening_note: job.screening_note,
+      is_urgent: job.is_urgent,
+      workers_needed: job.workers_needed,
+    });
+    if (error) {
+      Alert.alert(t("error"));
+      return;
+    }
+    Alert.alert(t("templateSavedTitle"), t("templateSavedDesc"));
   }
 
   async function handleBump(id: string) {
@@ -281,6 +367,18 @@ export default function MyPostsScreen() {
                 }
               >
                 <Feather name="edit-2" size={16} color={theme.secondaryText} />
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, styles.repostBtn]}
+                onPress={() => handleRepost(item.id)}
+              >
+                <Feather name="copy" size={15} color={theme.primary} />
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, styles.templateBtn]}
+                onPress={() => handleSaveAsTemplate(item.id)}
+              >
+                <Feather name="bookmark" size={15} color="#7C3AED" />
               </Pressable>
               <Pressable
                 style={[styles.actionBtn, styles.deleteBtn]}

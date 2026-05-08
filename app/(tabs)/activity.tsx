@@ -93,7 +93,21 @@ type ReceivedApplication = {
 };
 
 type MainTab = "posts" | "applications";
-type AppTab = "sent" | "received";
+type AppTab = "sent" | "received" | "invitations";
+
+type Invitation = {
+  id: string;
+  status: string;
+  message: string | null;
+  created_at: string;
+  requests: {
+    id: string;
+    title: string;
+    category: string | null;
+    location: string | null;
+    profiles: { username: string | null; avatar_url: string | null } | null;
+  } | null;
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -111,6 +125,7 @@ export default function ActivityScreen() {
   // Applications state
   const [sentApps, setSentApps] = useState<Application[]>([]);
   const [receivedApps, setReceivedApps] = useState<ReceivedApplication[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [appsLoading, setAppsLoading] = useState(true);
   const [expandedLetters, setExpandedLetters] = useState<Set<string>>(
     new Set(),
@@ -222,6 +237,17 @@ export default function ActivityScreen() {
     } else {
       setReceivedApps([]);
     }
+
+    // Invitations (sent to me as a student)
+    const { data: invites } = await supabase
+      .from("invitations")
+      .select(
+        "id, status, message, created_at, requests!inner(id, title, category, location, profiles!user_id(username, avatar_url))",
+      )
+      .eq("student_id", user.id)
+      .order("created_at", { ascending: false });
+    setInvitations((invites as unknown as Invitation[]) ?? []);
+
     setAppsLoading(false);
   }, []);
 
@@ -482,6 +508,146 @@ export default function ActivityScreen() {
               {t(step.key as any)}
             </Text>
           ))}
+        </View>
+      </View>
+    );
+  }
+
+  function renderInvitation({ item }: { item: Invitation }) {
+    const req = item.requests;
+    const isPending = item.status === "pending";
+    const isAccepted = item.status === "accepted";
+    const isDeclined = item.status === "declined";
+    const posterName = req?.profiles?.username ?? null;
+
+    return (
+      <View
+        style={[
+          styles.appCard,
+          isDeclined && styles.appCardDim,
+        ]}
+      >
+        <View
+          style={[
+            styles.appStatusBar,
+            {
+              backgroundColor: isPending
+                ? colors.warning
+                : isAccepted
+                  ? colors.primary
+                  : colors.mutedText,
+            },
+          ]}
+        />
+        <View style={styles.appCardInner}>
+          <View style={styles.appCardTop}>
+            <View
+              style={[
+                styles.appAvatar,
+                { backgroundColor: colors.employerLight },
+              ]}
+            >
+              {req?.profiles?.avatar_url ? (
+                <Image
+                  source={{ uri: req.profiles.avatar_url }}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Feather name="briefcase" size={18} color={colors.employer} />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appJobTitle} numberOfLines={2}>
+                {req?.title ?? "—"}
+              </Text>
+              {posterName ? (
+                <Text style={styles.appEmployerName}>{posterName}</Text>
+              ) : null}
+            </View>
+            <View
+              style={[
+                styles.appStatusBadge,
+                {
+                  backgroundColor: isPending
+                    ? colors.warningLight
+                    : isAccepted
+                      ? colors.primaryLight
+                      : colors.surfaceAlt,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.appStatusText,
+                  {
+                    color: isPending
+                      ? colors.warning
+                      : isAccepted
+                        ? colors.primaryDark
+                        : colors.mutedText,
+                  },
+                ]}
+              >
+                {t(
+                  isPending
+                    ? "invitePending"
+                    : isAccepted
+                      ? "inviteAccepted"
+                      : "inviteDeclined",
+                )}
+              </Text>
+            </View>
+          </View>
+
+          {item.message ? (
+            <Text style={styles.appCoverLetterText}>{item.message}</Text>
+          ) : null}
+
+          <Text style={styles.appTimestamp}>{timeAgo(item.created_at)}</Text>
+
+          {isPending && req ? (
+            <View style={styles.appActions}>
+              <Pressable
+                style={styles.appActionGhost}
+                onPress={() => router.push(`/request/${req.id}` as any)}
+              >
+                <Feather name="eye" size={13} color={colors.secondaryText} />
+                <Text style={styles.appActionGhostText}>{t("viewPost")}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.appActionPrimary}
+                onPress={async () => {
+                  await supabase
+                    .from("invitations")
+                    .update({ status: "accepted" })
+                    .eq("id", item.id);
+                  fetchApplications();
+                  router.push({
+                    pathname: "/(modals)/create-offer",
+                    params: { requestId: req.id, title: req.title },
+                  } as any);
+                }}
+              >
+                <Feather name="check" size={13} color="#fff" />
+                <Text style={styles.appActionPrimaryText}>
+                  {t("acceptAndApply")}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.appActionDanger}
+                onPress={async () => {
+                  await supabase
+                    .from("invitations")
+                    .update({ status: "declined" })
+                    .eq("id", item.id);
+                  fetchApplications();
+                }}
+              >
+                <Text style={styles.appActionDangerText}>{t("decline")}</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       </View>
     );
@@ -860,6 +1026,13 @@ export default function ActivityScreen() {
               </Text>
             </View>
           )}
+          {invitations.filter((i) => i.status === "pending").length > 0 && (
+            <View style={[styles.mainTabBadge, { backgroundColor: colors.warningLight }]}>
+              <Text style={[styles.mainTabBadgeText, { color: colors.warning }]}>
+                {invitations.filter((i) => i.status === "pending").length}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
@@ -905,6 +1078,27 @@ export default function ActivityScreen() {
               {receivedApps.length > 0 ? `(${receivedApps.length})` : ""}
             </Text>
           </Pressable>
+          {invitations.length > 0 && (
+            <Pressable
+              style={[
+                styles.subTabBtn,
+                appTab === "invitations" && styles.subTabBtnActive,
+              ]}
+              onPress={() => setAppTab("invitations")}
+            >
+              <Text
+                style={[
+                  styles.subTabText,
+                  appTab === "invitations" && styles.subTabTextActive,
+                ]}
+              >
+                {t("invitations")}{" "}
+                {invitations.filter((i) => i.status === "pending").length > 0
+                  ? `(${invitations.filter((i) => i.status === "pending").length})`
+                  : ""}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -937,6 +1131,19 @@ export default function ActivityScreen() {
             <View style={styles.empty}>
               <Feather name="inbox" size={40} color={colors.border} />
               <Text style={styles.emptyText}>{t("noApplicationsYet")}</Text>
+            </View>
+          }
+        />
+      ) : appTab === "invitations" ? (
+        <FlatList
+          data={invitations}
+          keyExtractor={(a) => a.id}
+          renderItem={renderInvitation}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Feather name="mail" size={40} color={colors.border} />
+              <Text style={styles.emptyText}>{t("noInvitations")}</Text>
             </View>
           }
         />

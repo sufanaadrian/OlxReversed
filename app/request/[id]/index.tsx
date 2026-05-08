@@ -101,6 +101,7 @@ export default function JobDetailScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [viewCount, setViewCount] = useState(0);
   const [alreadyReported, setAlreadyReported] = useState(false);
+  const [applicantFilter, setApplicantFilter] = useState<string>("all");
   const [similarJobs, setSimilarJobs] = useState<
     {
       id: string;
@@ -401,6 +402,12 @@ export default function JobDetailScreen() {
   const canAcceptMore =
     chattingCount + (job.accepted_count ?? 0) < (job.workers_needed ?? 1);
 
+  const FILTER_OPTIONS = ["all", "pending", "accepted", "hired", "rejected"] as const;
+  const filteredApplicants =
+    applicantFilter === "all"
+      ? applicants
+      : applicants.filter((a) => a.status === applicantFilter);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       {/* Nav bar */}
@@ -627,7 +634,36 @@ export default function JobDetailScreen() {
               )}
             </View>
 
-            {applicants.length === 0 ? (
+            {/* Filter chips */}
+            {applicants.length > 0 && (
+              <View style={styles.filterRow}>
+                {FILTER_OPTIONS.map((f) => {
+                  const cnt = f === "all" ? applicants.length : applicants.filter((a) => a.status === f).length;
+                  if (f !== "all" && cnt === 0) return null;
+                  return (
+                    <Pressable
+                      key={f}
+                      style={[
+                        styles.filterChip,
+                        applicantFilter === f && styles.filterChipActive,
+                      ]}
+                      onPress={() => setApplicantFilter(f)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          applicantFilter === f && styles.filterChipTextActive,
+                        ]}
+                      >
+                        {t(f === "all" ? "all" : (`offer${f.charAt(0).toUpperCase() + f.slice(1)}` as any))}{" "}{cnt > 0 ? `(${cnt})` : ""}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {filteredApplicants.length === 0 ? (
               <View style={styles.emptyApplicants}>
                 <Feather name="inbox" size={28} color={colors.mutedText} />
                 <Text style={styles.emptyApplicantsText}>
@@ -635,7 +671,7 @@ export default function JobDetailScreen() {
                 </Text>
               </View>
             ) : (
-              applicants.map((app) => {
+              filteredApplicants.map((app) => {
                 const offerStatus = getOfferStatus(colors);
                 const s = offerStatus[app.status] ?? offerStatus.pending;
                 const prof = (app as any).profiles;

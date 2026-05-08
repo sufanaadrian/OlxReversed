@@ -169,6 +169,28 @@ export function makeStyles(c: Colors) {
     },
     pendingBadgeText: { fontSize: 11, fontWeight: "800", color: "#FFFFFF" },
 
+    filterRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 8,
+      marginTop: 4,
+    },
+    filterChip: {
+      paddingVertical: 4,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      backgroundColor: c.surfaceAlt,
+      borderWidth: 1.5,
+      borderColor: c.border,
+    },
+    filterChipActive: {
+      backgroundColor: c.primaryLight,
+      borderColor: c.primary,
+    },
+    filterChipText: { fontSize: 12, fontWeight: "600", color: c.mutedText },
+    filterChipTextActive: { color: c.primaryDark, fontWeight: "700" },
+
     emptyApplicants: { alignItems: "center", paddingVertical: 24, gap: 8 },
     emptyApplicantsText: { color: c.mutedText, fontSize: 14 },
 

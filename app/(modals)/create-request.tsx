@@ -66,14 +66,58 @@ export default function CreateJobScreen() {
   const [screeningNote, setScreeningNote] = useState("");
   const [workersNeeded, setWorkersNeeded] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [templates, setTemplates] = useState<
+    { id: string; title: string; category: string | null }[]
+  >([]);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     requireAuth();
     if (isEdit && params.id) {
       loadExisting(params.id);
     }
+    loadTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadTemplates() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("job_templates")
+      .select("id, title, category")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setTemplates(data ?? []);
+  }
+
+  async function applyTemplate(id: string) {
+    const { data } = await supabase
+      .from("job_templates")
+      .select(
+        "title, description, category, location, budget_min, budget_max, posting_as, job_type, schedule_type, availability_tags, screening_note, is_urgent, workers_needed",
+      )
+      .eq("id", id)
+      .single();
+    if (!data) return;
+    setTitle(data.title ?? "");
+    setDescription(data.description ?? "");
+    setCategory(data.category ?? "Other");
+    setLocation(data.location ?? "");
+    setBudgetMin(data.budget_min != null ? String(data.budget_min) : "");
+    setBudgetMax(data.budget_max != null ? String(data.budget_max) : "");
+    setPostingAs((data.posting_as as PostingAs) ?? "employer");
+    setJobType(data.job_type ?? "");
+    setScheduleType(data.schedule_type ?? "part-time");
+    setAvailabilityTags(data.availability_tags ?? []);
+    setIsUrgent(data.is_urgent ?? false);
+    setScreeningNote(data.screening_note ?? "");
+    setWorkersNeeded(data.workers_needed ?? 1);
+    setShowTemplates(false);
+  }
 
   async function loadExisting(id: string) {
     const { data } = await supabase
@@ -167,6 +211,44 @@ export default function CreateJobScreen() {
             </Text>
             <View style={{ width: 38 }} />
           </View>
+
+          {/* Template bar — only in new post mode with saved templates */}
+          {!isEdit && templates.length > 0 && (
+            <View style={styles.templateBar}>
+              <Pressable
+                style={styles.templateBarHeader}
+                onPress={() => setShowTemplates((v) => !v)}
+              >
+                <Feather name="bookmark" size={15} color={colors.primary} />
+                <Text style={styles.templateBarTitle}>
+                  {t("useTemplate")}
+                </Text>
+                <Feather
+                  name={showTemplates ? "chevron-up" : "chevron-down"}
+                  size={15}
+                  color={colors.mutedText}
+                />
+              </Pressable>
+              {showTemplates && (
+                <View style={styles.templateList}>
+                  {templates.map((tpl) => (
+                    <Pressable
+                      key={tpl.id}
+                      style={styles.templateChip}
+                      onPress={() => applyTemplate(tpl.id)}
+                    >
+                      <Text style={styles.templateChipText}>{tpl.title}</Text>
+                      {tpl.category ? (
+                        <Text style={styles.templateChipCat}>
+                          {tpl.category}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Posting as toggle */}
           <View style={styles.section}>

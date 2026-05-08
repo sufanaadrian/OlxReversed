@@ -349,5 +349,53 @@ export function makeStyles(c: Colors) {
     rangeSep: { fontSize: 18, color: c.mutedText },
 
     inputMultiline: { height: 110, textAlignVertical: "top", paddingTop: 10 },
+
+    // ── Template bar ─────────────────────────────────────────────────
+    templateBar: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: c.primary,
+      padding: 14,
+      marginBottom: 12,
+      marginTop: 4,
+    },
+    templateBarHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    templateBarTitle: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "700",
+      color: c.primary,
+    },
+    templateList: {
+      marginTop: 10,
+      gap: 6,
+    },
+    templateChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: c.primaryLight,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    templateChipText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: c.primaryDark,
+      flex: 1,
+    },
+    templateChipCat: {
+      fontSize: 12,
+      color: c.mutedText,
+      fontWeight: "600",
+    },
   });
 }

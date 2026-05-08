@@ -207,5 +207,51 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.primary,
     },
     backBtnText: { color: "#FFFFFF", fontWeight: "700" },
+
+    // Employer action bar (save candidate + invite to apply)
+    employerBar: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      paddingBottom: 24,
+      backgroundColor: c.surface,
+      borderTopWidth: 1,
+      borderColor: c.border,
+    },
+    employerBarBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      backgroundColor: c.surfaceAlt,
+    },
+    employerBarBtnSaved: {
+      borderColor: c.primary,
+      backgroundColor: c.primaryLight,
+    },
+    employerBarBtnInvite: {
+      backgroundColor: c.primary,
+      borderColor: c.primary,
+    },
+    employerBarBtnText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: c.mutedText,
+    },
+    employerBarBtnTextWhite: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: "#FFFFFF",
+    },
   });
 }

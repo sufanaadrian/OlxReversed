@@ -60,6 +60,8 @@ export default function CVScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [endorsements, setEndorsements] = useState<Endorsement[]>([]);
   const [canEndorse, setCanEndorse] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -81,6 +83,13 @@ export default function CVScreen() {
       if (me && me !== userId) {
         await loadEndorsements(me);
         await checkCanEndorse(me);
+        const { data: savedRow } = await supabase
+          .from("saved_candidates")
+          .select("student_id")
+          .eq("employer_id", me)
+          .eq("student_id", userId)
+          .maybeSingle();
+        setIsSaved(!!savedRow);
       }
 
       setLoading(false);
@@ -142,6 +151,68 @@ export default function CVScreen() {
     setCanEndorse(found);
   }
 
+  async function handleToggleSave() {
+    if (!currentUserId) return;
+    if (isSaved) {
+      await supabase
+        .from("saved_candidates")
+        .delete()
+        .eq("employer_id", currentUserId)
+        .eq("student_id", userId);
+      setIsSaved(false);
+    } else {
+      await supabase
+        .from("saved_candidates")
+        .insert({ employer_id: currentUserId, student_id: userId });
+      setIsSaved(true);
+    }
+  }
+
+  async function handleInviteToApply() {
+    if (!currentUserId) return;
+    setSendingInvite(true);
+    const { data: jobs } = await supabase
+      .from("requests")
+      .select("id, title")
+      .eq("user_id", currentUserId)
+      .eq("status", "active")
+      .eq("posting_as", "employer")
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setSendingInvite(false);
+    if (!jobs || jobs.length === 0) {
+      Alert.alert(t("noActiveJobsForInvite"), t("noActiveJobsForInviteHint"));
+      return;
+    }
+    const jobButtons = jobs.map((j: { id: string; title: string }) => ({
+      text: j.title,
+      onPress: async () => {
+        const { data: existing } = await supabase
+          .from("invitations")
+          .select("id")
+          .eq("employer_id", currentUserId)
+          .eq("student_id", userId)
+          .eq("request_id", j.id)
+          .maybeSingle();
+        if (existing) {
+          Alert.alert(t("inviteAlreadySent"));
+          return;
+        }
+        await supabase.from("invitations").insert({
+          employer_id: currentUserId,
+          student_id: userId,
+          request_id: j.id,
+          status: "pending",
+        });
+        Alert.alert(t("inviteSent"), t("inviteSentDesc"));
+      },
+    }));
+    Alert.alert(t("inviteToApply"), t("invitePickJob"), [
+      ...jobButtons,
+      { text: t("cancel"), style: "cancel" as const },
+    ]);
+  }
+
   async function handleEndorse(skill: string) {
     if (!currentUserId) return;
     Alert.alert(t("endorseConfirm"), skill, [
@@ -189,6 +260,8 @@ export default function CVScreen() {
   }
 
   const isStudent = profile.user_type !== "employer";
+  const isViewingOtherStudent =
+    currentUserId && currentUserId !== userId && isStudent;
   const memberSince = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString(undefined, {
         year: "numeric",
@@ -208,7 +281,7 @@ export default function CVScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, isViewingOtherStudent && { paddingBottom: 96 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header card */}
@@ -415,6 +488,43 @@ export default function CVScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* Employer action bar */}
+      {isViewingOtherStudent ? (
+        <View style={styles.employerBar}>
+          <Pressable
+            style={[
+              styles.employerBarBtn,
+              isSaved && styles.employerBarBtnSaved,
+            ]}
+            onPress={handleToggleSave}
+          >
+            <Feather
+              name="bookmark"
+              size={18}
+              color={isSaved ? colors.primary : colors.mutedText}
+            />
+            <Text
+              style={[
+                styles.employerBarBtnText,
+                isSaved && { color: colors.primary },
+              ]}
+            >
+              {t(isSaved ? "savedCandidate" : "saveCandidate")}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.employerBarBtn, styles.employerBarBtnInvite]}
+            onPress={handleInviteToApply}
+            disabled={sendingInvite}
+          >
+            <Feather name="send" size={18} color="#FFFFFF" />
+            <Text style={styles.employerBarBtnTextWhite}>
+              {t("inviteToApply")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

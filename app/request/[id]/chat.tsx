@@ -279,6 +279,40 @@ export default function ChatScreen() {
       sender_id: userId,
       content: trimmed,
     });
+    // Update employer response rate (only for job owner replying to student)
+    if (isOwner) {
+      updateResponseRate();
+    }
+  }
+
+  // Compute & persist avg_response_hours as an EMA after employer replies
+  async function updateResponseRate() {
+    if (!userId) return;
+    const now = Date.now();
+    // Find the last message from the other user before now
+    const lastStudentMsg = messagesRef.current
+      .slice()
+      .reverse()
+      .find((m) => m.sender_id !== userId);
+    if (!lastStudentMsg) return;
+    const responseMs = now - new Date(lastStudentMsg.created_at).getTime();
+    const responseHours = responseMs / 3600000;
+    if (responseHours > 168) return; // ignore if > 7 days (stale)
+    // Fetch current avg
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("avg_response_hours")
+      .eq("id", userId)
+      .single();
+    const current: number | null = prof?.avg_response_hours ?? null;
+    const newAvg =
+      current == null
+        ? responseHours
+        : current * 0.7 + responseHours * 0.3; // EMA α=0.3
+    await supabase
+      .from("profiles")
+      .update({ avg_response_hours: Math.round(newAvg * 10) / 10 })
+      .eq("id", userId);
   }
 
   function parseMediaContent(
