@@ -65,6 +65,9 @@ export default function MessagesScreen() {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
   const hasLoaded = useRef(false);
+  // Track conversations we just opened so a re-fetch can't flash the badge
+  // back before the mark-as-read DB write commits
+  const clearedIds = useRef<Set<string>>(new Set());
 
   // Load archived IDs from storage
   useEffect(() => {
@@ -216,6 +219,18 @@ export default function MessagesScreen() {
       );
     });
 
+    // Apply optimistic zero for any conversation we've recently opened
+    // (guards against the re-fetch running before the mark-as-read write commits)
+    for (const c of convos) {
+      if (clearedIds.current.has(c.requestId)) c.unreadCount = 0;
+    }
+
+    // Apply optimistic zero for any conversation we've recently opened —
+    // prevents a flash-back while the mark-as-read DB write is still in flight
+    for (const c of convos) {
+      if (clearedIds.current.has(c.requestId)) c.unreadCount = 0;
+    }
+
     setConversations(convos);
     setLoading(false);
   }, []);
@@ -319,12 +334,14 @@ export default function MessagesScreen() {
             if (item.unreadCount > 0) {
               setConversations((prev) =>
                 prev.map((c) =>
-                  c.requestId === item.requestId
-                    ? { ...c, unreadCount: 0 }
-                    : c,
+                  c.requestId === item.requestId ? { ...c, unreadCount: 0 } : c,
                 ),
               );
             }
+            // Hold the zero in a ref so re-fetches can't flash the badge back
+            // before the mark-as-read DB write has had time to commit
+            clearedIds.current.add(item.requestId);
+            setTimeout(() => clearedIds.current.delete(item.requestId), 5000);
             router.push(`/request/${item.requestId}/chat` as any);
           }}
         >
