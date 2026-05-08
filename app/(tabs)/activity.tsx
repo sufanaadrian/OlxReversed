@@ -6,11 +6,13 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Image,
     Pressable,
     Text,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { UserAvatar } from "../../src/components/UserAvatar";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { useTheme } from "../../src/context/ThemeContext";
 import { requireAuth } from "../../src/lib/authGuard";
@@ -63,7 +65,7 @@ type Application = {
     user_id: string;
     status: string;
     posting_as: string | null;
-    profiles: { username: string | null } | null;
+    profiles: { username: string | null; avatar_url: string | null } | null;
   } | null;
 };
 
@@ -86,6 +88,7 @@ type ReceivedApplication = {
     skills: string[] | null;
     linkedin_url: string | null;
     verified: boolean | null;
+    avatar_url: string | null;
   } | null;
 };
 
@@ -187,7 +190,7 @@ export default function ActivityScreen() {
       if (req?.user_id) {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("username")
+          .select("username, avatar_url")
           .eq("id", req.user_id)
           .single();
         sentWithProfiles.push({
@@ -210,7 +213,7 @@ export default function ActivityScreen() {
       const { data: received } = await supabase
         .from("offers")
         .select(
-          "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+          "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, workers_needed, accepted_count), profiles!seller_id(id, username, bio, skills, linkedin_url, verified, avatar_url)",
         )
         .in("request_id", postIds)
         .neq("status", "withdrawn")
@@ -492,15 +495,6 @@ export default function ActivityScreen() {
       (item.status === "accepted" || item.status === "hired") && req;
     const isWithdrawn = item.status === "withdrawn";
     const employerName = req?.profiles?.username ?? null;
-    const initials = (n: string | null) => {
-      if (!n) return "?";
-      return n
-        .split(" ")
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-    };
 
     return (
       <View style={[styles.appCard, isWithdrawn && styles.appCardDim]}>
@@ -508,11 +502,12 @@ export default function ActivityScreen() {
         <View style={styles.appCardInner}>
           {/* Top: avatar + title + status */}
           <View style={styles.appCardTop}>
-            <View style={[styles.appAvatar, { backgroundColor: col.bg }]}>
-              <Text style={[styles.appAvatarText, { color: col.text }]}>
-                {initials(employerName)}
-              </Text>
-            </View>
+            <UserAvatar
+              style={[styles.appAvatar, { backgroundColor: col.bg }]}
+              textStyle={[styles.appAvatarText, { color: col.text }]}
+              avatarUrl={req?.profiles?.avatar_url}
+              name={employerName}
+            />
             <View style={{ flex: 1 }}>
               <Text style={styles.appJobTitle} numberOfLines={2}>
                 {req?.title ?? "—"}
@@ -610,7 +605,7 @@ export default function ActivityScreen() {
     const req = item.requests;
     const prof = item.profiles;
     const isVerified = prof?.verified;
-    const initials = (n: string | null) => {
+    function initials(n: string | null) {
       if (!n) return "?";
       return n
         .split(" ")
@@ -618,7 +613,7 @@ export default function ActivityScreen() {
         .join("")
         .toUpperCase()
         .slice(0, 2);
-    };
+    }
 
     return (
       <View style={styles.appCard}>
@@ -629,13 +624,21 @@ export default function ActivityScreen() {
             <Pressable
               style={[
                 styles.appAvatar,
-                { backgroundColor: colors.primaryLight },
+                { backgroundColor: colors.primaryLight, overflow: "hidden" },
               ]}
               onPress={() => prof?.id && router.push(`/cv/${prof.id}` as any)}
             >
-              <Text style={[styles.appAvatarText, { color: colors.primary }]}>
-                {initials(prof?.username ?? null)}
-              </Text>
+              {prof?.avatar_url ? (
+                <Image
+                  source={{ uri: prof.avatar_url }}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={[styles.appAvatarText, { color: colors.primary }]}>
+                  {initials(prof?.username ?? null)}
+                </Text>
+              )}
             </Pressable>
             <View style={{ flex: 1 }}>
               <View

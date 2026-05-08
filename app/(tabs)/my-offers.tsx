@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Image,
     Pressable,
     Text,
     View,
@@ -49,6 +50,7 @@ type ReceivedApplication = {
     skills: string[] | null;
     linkedin_url: string | null;
     verified: boolean | null;
+    avatar_url: string | null;
   } | null;
 };
 
@@ -133,7 +135,7 @@ export default function ApplicationsScreen() {
       ? await supabase
           .from("offers")
           .select(
-            "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, linkedin_url, verified)",
+            "id, status, cover_letter, created_at, viewed_at, requests!inner(id, title, user_id), profiles!seller_id(id, username, bio, skills, linkedin_url, verified, avatar_url)",
           )
           .in("request_id", myRequestIds)
           .order("created_at", { ascending: false })
@@ -472,7 +474,17 @@ export default function ApplicationsScreen() {
           <View style={styles.candidateSection}>
             <View style={styles.candidateRow}>
               <View style={styles.candidateAvatar}>
-                <Text style={styles.candidateAvatarText}>{avatarLetters}</Text>
+                {prof?.avatar_url ? (
+                  <Image
+                    source={{ uri: prof.avatar_url }}
+                    style={{ width: 56, height: 56, borderRadius: 28 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.candidateAvatarText}>
+                    {avatarLetters}
+                  </Text>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <View style={styles.candidateNameRow}>

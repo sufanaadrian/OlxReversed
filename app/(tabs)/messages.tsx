@@ -2,11 +2,18 @@ import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Image,
     Pressable,
     Text,
     View,
@@ -23,6 +30,7 @@ type Conversation = {
   requestTitle: string;
   otherUserId: string;
   otherUsername: string | null;
+  otherAvatarUrl: string | null;
   lastMessage: string | null;
   lastMessageAt: string | null;
   lastMessageIsMe: boolean;
@@ -54,6 +62,7 @@ export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
+  const hasLoaded = useRef(false);
 
   // Load archived IDs from storage
   useEffect(() => {
@@ -95,8 +104,8 @@ export default function MessagesScreen() {
     ]);
   }
 
-  const fetchConversations = useCallback(async () => {
-    setLoading(true);
+  const fetchConversations = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -108,7 +117,7 @@ export default function MessagesScreen() {
     const { data: myAccepted } = await supabase
       .from("offers")
       .select(
-        "id, request_id, requests!inner(id, title, user_id, status, profiles(id, username))",
+        "id, request_id, requests!inner(id, title, user_id, status, profiles(id, username, avatar_url))",
       )
       .eq("seller_id", user.id)
       .in("status", ["accepted", "hired"]);
@@ -135,6 +144,7 @@ export default function MessagesScreen() {
         requestTitle: req.title,
         otherUserId: employer?.id ?? req.user_id,
         otherUsername: employer?.username ?? null,
+        otherAvatarUrl: employer?.avatar_url ?? null,
         lastMessage: last?.content ?? null,
         lastMessageAt: last?.created_at ?? null,
         lastMessageIsMe: last?.sender_id === user.id,
@@ -155,7 +165,7 @@ export default function MessagesScreen() {
       const { data: acceptedOnMyPosts } = await supabase
         .from("offers")
         .select(
-          "id, request_id, seller_id, requests!inner(id, title), profiles!seller_id(id, username)",
+          "id, request_id, seller_id, requests!inner(id, title), profiles!seller_id(id, username, avatar_url)",
         )
         .in("request_id", postIds)
         .in("status", ["accepted", "hired"]);
@@ -182,6 +192,7 @@ export default function MessagesScreen() {
           requestTitle: req.title,
           otherUserId: applicant?.id ?? offer.seller_id,
           otherUsername: applicant?.username ?? null,
+          otherAvatarUrl: applicant?.avatar_url ?? null,
           lastMessage: last?.content ?? null,
           lastMessageAt: last?.created_at ?? null,
           lastMessageIsMe: last?.sender_id === user.id,
@@ -209,7 +220,25 @@ export default function MessagesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchConversations();
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+        fetchConversations(true);
+      }
+      // Subscribe to new messages so the list updates silently without refetching
+      const channel = supabase
+        .channel("messages-list")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages" },
+          () => {
+            // Silent refresh — no loading spinner
+            fetchConversations();
+          },
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }, [fetchConversations]),
   );
 
@@ -266,11 +295,19 @@ export default function MessagesScreen() {
           {/* Avatar with unread dot */}
           <View style={styles.avatarWrap}>
             <View style={[styles.avatar, isBuyer && styles.avatarBuyer]}>
-              <Text
-                style={[styles.avatarText, isBuyer && styles.avatarTextBuyer]}
-              >
-                {initials}
-              </Text>
+              {item.otherAvatarUrl ? (
+                <Image
+                  source={{ uri: item.otherAvatarUrl }}
+                  style={{ width: 52, height: 52, borderRadius: 26 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text
+                  style={[styles.avatarText, isBuyer && styles.avatarTextBuyer]}
+                >
+                  {initials}
+                </Text>
+              )}
             </View>
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
