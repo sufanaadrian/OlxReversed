@@ -3,21 +3,21 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
 } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -219,12 +219,6 @@ export default function MessagesScreen() {
       );
     });
 
-    // Apply optimistic zero for any conversation we've recently opened
-    // (guards against the re-fetch running before the mark-as-read write commits)
-    for (const c of convos) {
-      if (clearedIds.current.has(c.requestId)) c.unreadCount = 0;
-    }
-
     // Apply optimistic zero for any conversation we've recently opened —
     // prevents a flash-back while the mark-as-read DB write is still in flight
     for (const c of convos) {
@@ -256,15 +250,17 @@ export default function MessagesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Show spinner only on the very first load; every re-focus is silent
-      // so that returning from a chat immediately reflects the updated read state
+      let timer: ReturnType<typeof setTimeout>;
       if (!hasLoaded.current) {
+        // Very first mount — show spinner immediately
         hasLoaded.current = true;
         fetchConversations(true);
       } else {
-        fetchConversations();
+        // Returning from chat: wait 1.5 s so the mark-as-read write lands
+        // before we re-query unread counts
+        timer = setTimeout(() => fetchConversations(), 1500);
       }
-      // Subscribe to new messages so the list updates silently without refetching
+      // Subscribe to new messages for real-time updates
       const channel = supabase
         .channel("messages-list")
         .on(
@@ -276,6 +272,7 @@ export default function MessagesScreen() {
         )
         .subscribe();
       return () => {
+        clearTimeout(timer);
         supabase.removeChannel(channel);
       };
     }, [fetchConversations]),
@@ -341,7 +338,7 @@ export default function MessagesScreen() {
             // Hold the zero in a ref so re-fetches can't flash the badge back
             // before the mark-as-read DB write has had time to commit
             clearedIds.current.add(item.requestId);
-            setTimeout(() => clearedIds.current.delete(item.requestId), 5000);
+            setTimeout(() => clearedIds.current.delete(item.requestId), 10000);
             router.push(`/request/${item.requestId}/chat` as any);
           }}
         >
