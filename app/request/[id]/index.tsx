@@ -886,7 +886,9 @@ export default function JobDetailScreen() {
               })
             }
           >
-            <Text style={styles.applyBtnText}>{t("apply")}</Text>
+            <Text style={styles.applyBtnText}>
+              {job.posting_as === "student" ? t("contact") : t("apply")}
+            </Text>
             <Feather name="arrow-right" size={18} color="#FFFFFF" />
           </Pressable>
         </View>

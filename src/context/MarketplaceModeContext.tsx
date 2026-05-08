@@ -30,7 +30,8 @@ export function MarketplaceModeProvider({
         setModeState(saved);
         return;
       }
-      // First launch: default to the user_type they chose at registration
+      // First launch: a student wants to see employer job posts (find work),
+      // an employer wants to see student posts (find candidates).
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -41,10 +42,16 @@ export function MarketplaceModeProvider({
         .eq("id", session.user.id)
         .single();
       const type = profile?.user_type;
-      if (type === "employer" || type === "student") {
-        setModeState(type);
-        await AsyncStorage.setItem(STORAGE_KEY, type);
+      if (type === "employer") {
+        // Employer wants to browse student profiles/availability
+        setModeState("student");
+        await AsyncStorage.setItem(STORAGE_KEY, "student");
+      } else if (type === "student") {
+        // Student wants to browse employer job posts
+        setModeState("employer");
+        await AsyncStorage.setItem(STORAGE_KEY, "employer");
       }
+      // "both" stays as "all" (the initial useState default)
     }
     init();
   }, []);

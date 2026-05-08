@@ -784,7 +784,9 @@ export default function JobsScreen() {
                   </Pressable>
                 )}
                 <View style={styles.applyBtn}>
-                  <Text style={styles.applyBtnText}>{t("apply")}</Text>
+                  <Text style={styles.applyBtnText}>
+                    {isEmployer ? t("apply") : t("contact")}
+                  </Text>
                   <Feather name="arrow-right" size={13} color="#FFFFFF" />
                 </View>
               </View>
