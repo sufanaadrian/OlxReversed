@@ -281,7 +281,10 @@ export default function CVScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, isViewingOtherStudent && { paddingBottom: 96 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          isViewingOtherStudent && { paddingBottom: 96 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header card */}

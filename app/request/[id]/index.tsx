@@ -402,7 +402,13 @@ export default function JobDetailScreen() {
   const canAcceptMore =
     chattingCount + (job.accepted_count ?? 0) < (job.workers_needed ?? 1);
 
-  const FILTER_OPTIONS = ["all", "pending", "accepted", "hired", "rejected"] as const;
+  const FILTER_OPTIONS = [
+    "all",
+    "pending",
+    "accepted",
+    "hired",
+    "rejected",
+  ] as const;
   const filteredApplicants =
     applicantFilter === "all"
       ? applicants
@@ -638,7 +644,10 @@ export default function JobDetailScreen() {
             {applicants.length > 0 && (
               <View style={styles.filterRow}>
                 {FILTER_OPTIONS.map((f) => {
-                  const cnt = f === "all" ? applicants.length : applicants.filter((a) => a.status === f).length;
+                  const cnt =
+                    f === "all"
+                      ? applicants.length
+                      : applicants.filter((a) => a.status === f).length;
                   if (f !== "all" && cnt === 0) return null;
                   return (
                     <Pressable
@@ -655,7 +664,12 @@ export default function JobDetailScreen() {
                           applicantFilter === f && styles.filterChipTextActive,
                         ]}
                       >
-                        {t(f === "all" ? "all" : (`offer${f.charAt(0).toUpperCase() + f.slice(1)}` as any))}{" "}{cnt > 0 ? `(${cnt})` : ""}
+                        {t(
+                          f === "all"
+                            ? "all"
+                            : (`offer${f.charAt(0).toUpperCase() + f.slice(1)}` as any),
+                        )}{" "}
+                        {cnt > 0 ? `(${cnt})` : ""}
                       </Text>
                     </Pressable>
                   );
@@ -882,7 +896,11 @@ export default function JobDetailScreen() {
             onPress={() =>
               router.push({
                 pathname: "/(modals)/create-offer",
-                params: { requestId: id, title: job.title },
+                params: {
+                  requestId: id,
+                  title: job.title,
+                  postingAs: job.posting_as ?? "employer",
+                },
               })
             }
           >

@@ -72,7 +72,11 @@ type JobRequest = {
   is_urgent: boolean;
   is_boosted: boolean;
   boosted_until: string | null;
-  profiles: { username: string | null; avatar_url: string | null; avg_response_hours: number | null } | null;
+  profiles: {
+    username: string | null;
+    avatar_url: string | null;
+    avg_response_hours: number | null;
+  } | null;
 };
 
 function timeAgo(dateStr: string, t: (key: string) => string) {
@@ -741,9 +745,7 @@ export default function JobsScreen() {
                       <Feather name="zap" size={10} color={colors.success} />
                       <Text style={styles.responseRateText}>
                         {t("respondsWithin")}{" "}
-                        {Math.round(
-                          (item.profiles as any).avg_response_hours,
-                        )}
+                        {Math.round((item.profiles as any).avg_response_hours)}
                         {t("h")}
                       </Text>
                     </View>

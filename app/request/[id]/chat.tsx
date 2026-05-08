@@ -306,9 +306,7 @@ export default function ChatScreen() {
       .single();
     const current: number | null = prof?.avg_response_hours ?? null;
     const newAvg =
-      current == null
-        ? responseHours
-        : current * 0.7 + responseHours * 0.3; // EMA α=0.3
+      current == null ? responseHours : current * 0.7 + responseHours * 0.3; // EMA α=0.3
     await supabase
       .from("profiles")
       .update({ avg_response_hours: Math.round(newAvg * 10) / 10 })

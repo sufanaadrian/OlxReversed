@@ -220,9 +220,7 @@ export default function CreateJobScreen() {
                 onPress={() => setShowTemplates((v) => !v)}
               >
                 <Feather name="bookmark" size={15} color={colors.primary} />
-                <Text style={styles.templateBarTitle}>
-                  {t("useTemplate")}
-                </Text>
+                <Text style={styles.templateBarTitle}>{t("useTemplate")}</Text>
                 <Feather
                   name={showTemplates ? "chevron-up" : "chevron-down"}
                   size={15}

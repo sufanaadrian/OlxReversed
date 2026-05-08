@@ -23,10 +23,12 @@ export default function ApplyModal() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useTranslation();
-  const { requestId, title } = useLocalSearchParams<{
+  const { requestId, title, postingAs } = useLocalSearchParams<{
     requestId: string;
     title?: string;
+    postingAs?: string;
   }>();
+  const isStudentPost = postingAs === "student";
   const [coverLetter, setCoverLetter] = useState("");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -128,13 +130,17 @@ export default function ApplyModal() {
           <Pressable onPress={() => router.back()} style={styles.closeBtn}>
             <Feather name="x" size={22} color={colors.primaryText} />
           </Pressable>
-          <Text style={styles.headerTitle}>{t("applyForJob")}</Text>
+          <Text style={styles.headerTitle}>
+            {isStudentPost ? t("contactStudent") : t("applyForJob")}
+          </Text>
           <View style={{ width: 38 }} />
         </View>
 
         {title ? (
           <View style={styles.jobTitleBox}>
-            <Text style={styles.jobTitleLabel}>{t("applyingFor")}</Text>
+            <Text style={styles.jobTitleLabel}>
+              {isStudentPost ? t("contactingAbout") : t("applyingFor")}
+            </Text>
             <Text style={styles.jobTitle} numberOfLines={2}>
               {title}
             </Text>
@@ -150,10 +156,55 @@ export default function ApplyModal() {
             <View style={styles.alreadyApplied}>
               <Feather name="check-circle" size={20} color={colors.primary} />
               <Text style={styles.alreadyAppliedText}>
-                {t("alreadyApplied")}
+                {isStudentPost ? t("alreadyContacted") : t("alreadyApplied")}
               </Text>
             </View>
+          ) : isStudentPost ? (
+            /* ── Employer contacts a student ── */
+            <>
+              <Text style={styles.label}>{t("introMessageLabel")}</Text>
+              <TextInput
+                style={styles.coverInput}
+                value={coverLetter}
+                onChangeText={setCoverLetter}
+                placeholder={t("introMessagePlaceholder")}
+                placeholderTextColor={colors.mutedText}
+                multiline
+                numberOfLines={5}
+                maxLength={400}
+                textAlignVertical="top"
+              />
+              <Text style={styles.charCount}>{coverLetter.length}/400</Text>
+
+              <Text style={[styles.label, { marginTop: 16 }]}>
+                {t("yourBudgetOffer")}
+              </Text>
+              <View style={styles.priceRow}>
+                <TextInput
+                  style={styles.priceInput}
+                  value={price}
+                  onChangeText={(v) => setPrice(v.replace(/[^0-9.]/g, ""))}
+                  placeholder={t("proposedRatePlaceholder")}
+                  placeholderTextColor={colors.mutedText}
+                  keyboardType="decimal-pad"
+                />
+                <View style={styles.priceUnit}>
+                  <Text style={styles.priceUnitText}>{t("rateUnit")}</Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.submitBtn, saving && { opacity: 0.6 }]}
+                onPress={handleApply}
+                disabled={saving}
+              >
+                <Text style={styles.submitBtnText}>
+                  {saving ? t("sending") : t("sendContactRequest")}
+                </Text>
+              </Pressable>
+            </>
           ) : (
+            /* ── Student applies to employer job ── */
             <>
               {/* Quick Apply — no cover letter needed when no screening note */}
               {!screeningNote && (

@@ -521,12 +521,7 @@ export default function ActivityScreen() {
     const posterName = req?.profiles?.username ?? null;
 
     return (
-      <View
-        style={[
-          styles.appCard,
-          isDeclined && styles.appCardDim,
-        ]}
-      >
+      <View style={[styles.appCard, isDeclined && styles.appCardDim]}>
         <View
           style={[
             styles.appStatusBar,
@@ -1027,8 +1022,15 @@ export default function ActivityScreen() {
             </View>
           )}
           {invitations.filter((i) => i.status === "pending").length > 0 && (
-            <View style={[styles.mainTabBadge, { backgroundColor: colors.warningLight }]}>
-              <Text style={[styles.mainTabBadgeText, { color: colors.warning }]}>
+            <View
+              style={[
+                styles.mainTabBadge,
+                { backgroundColor: colors.warningLight },
+              ]}
+            >
+              <Text
+                style={[styles.mainTabBadgeText, { color: colors.warning }]}
+              >
                 {invitations.filter((i) => i.status === "pending").length}
               </Text>
             </View>

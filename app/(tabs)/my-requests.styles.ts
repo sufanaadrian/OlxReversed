@@ -155,7 +155,10 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.surface,
   },
   deleteBtn: { borderColor: theme.errorLight },
-  repostBtn: { borderColor: theme.primaryLight, backgroundColor: theme.primaryLight },
+  repostBtn: {
+    borderColor: theme.primaryLight,
+    backgroundColor: theme.primaryLight,
+  },
   templateBtn: { borderColor: "#EDE9FE", backgroundColor: "#EDE9FE" },
   filledBtn: {
     flexDirection: "row",
