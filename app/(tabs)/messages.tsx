@@ -314,7 +314,19 @@ export default function MessagesScreen() {
             hasUnread && styles.rowUnread,
             pressed && { opacity: 0.75 },
           ]}
-          onPress={() => router.push(`/request/${item.requestId}/chat` as any)}
+          onPress={() => {
+            // Optimistically clear the badge so it disappears instantly
+            if (item.unreadCount > 0) {
+              setConversations((prev) =>
+                prev.map((c) =>
+                  c.requestId === item.requestId
+                    ? { ...c, unreadCount: 0 }
+                    : c,
+                ),
+              );
+            }
+            router.push(`/request/${item.requestId}/chat` as any);
+          }}
         >
           {/* Avatar with unread dot */}
           <View style={styles.avatarWrap}>
