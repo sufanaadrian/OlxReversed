@@ -48,6 +48,7 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.primaryLight,
       alignItems: "center",
       justifyContent: "center",
+      overflow: "hidden",
     },
     avatarBuyer: { backgroundColor: c.employerLight },
     avatarText: {

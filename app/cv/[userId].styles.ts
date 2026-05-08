@@ -55,6 +55,7 @@ export function makeStyles(c: Colors) {
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 12,
+      overflow: "hidden",
     },
     avatarText: { fontSize: 24, fontWeight: "900", color: c.primaryDark },
     name: {

@@ -205,6 +205,7 @@ export function makeStyles(c: Colors) {
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
+      overflow: "hidden",
     },
     appAvatarText: { fontSize: 14, fontWeight: "900" },
     appJobTitle: {

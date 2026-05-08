@@ -1,27 +1,40 @@
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker, {
-    type DateTimePickerEvent,
+  type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect } from "@react-navigation/native";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
+import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import * as Sharing from "expo-sharing";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Linking,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { ImageViewer } from "../../../src/components/ImageViewer";
 import { useTranslation } from "../../../src/context/LanguageContext";
 import { useTheme } from "../../../src/context/ThemeContext";
 import { supabase } from "../../../src/lib/supabase";
@@ -38,6 +51,7 @@ type Message = {
 type Profile = {
   id: string;
   username: string | null;
+  avatar_url?: string | null;
 };
 
 type RequestInfo = {
@@ -71,6 +85,11 @@ export default function ChatScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
   const [pickerStep, setPickerStep] = useState<"date" | "time">("date");
+  const [sendingMedia, setSendingMedia] = useState(false);
+  const [viewingMedia, setViewingMedia] = useState<string | null>(null);
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
 
   const fetchMessages = useCallback(async () => {
     const {
@@ -95,6 +114,42 @@ export default function ChatScreen() {
     }
   }, [id]);
 
+  // Keep ref in sync so catchUpMessages can access latest without stale closure
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Silent catch-up: only fetch messages newer than the last one we have (no loading flash)
+  const catchUpMessages = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const last = messagesRef.current;
+    const lastTs =
+      last.length > 0 ? last[last.length - 1].created_at : "1970-01-01";
+    const { data } = await supabase
+      .from("messages")
+      .select("id, sender_id, content, created_at, read_at")
+      .eq("request_id", id)
+      .gt("created_at", lastTs)
+      .order("created_at", { ascending: true });
+    if (data && data.length > 0) {
+      setMessages((prev) => {
+        const ids = new Set(prev.map((m) => m.id));
+        const newOnes = (data as Message[]).filter((m) => !ids.has(m.id));
+        return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+      });
+      if (user) {
+        await supabase
+          .from("messages")
+          .update({ read_at: new Date().toISOString() })
+          .eq("request_id", id)
+          .neq("sender_id", user.id)
+          .is("read_at", null);
+      }
+    }
+  }, [id]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id ?? null);
@@ -105,10 +160,17 @@ export default function ChatScreen() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      // Also load current user's name for PDF
+      const { data: myProf } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+      setMyUsername((myProf as any)?.username ?? null);
       const { data: req } = await supabase
         .from("requests")
         .select(
-          "user_id, status, title, category, budget_min, budget_max, location, profiles(id, username)",
+          "user_id, status, title, category, budget_min, budget_max, location, profiles(id, username, avatar_url)",
         )
         .eq("id", id)
         .single();
@@ -128,7 +190,7 @@ export default function ChatScreen() {
         const { data: offer } = await supabase
           .from("offers")
           .select(
-            "seller_id, price, profiles!seller_id(id, username, phone_number)",
+            "seller_id, price, profiles!seller_id(id, username, phone_number, avatar_url)",
           )
           .eq("request_id", id)
           .in("status", ["accepted", "hired"])
@@ -148,7 +210,7 @@ export default function ChatScreen() {
         // Fetch employer phone separately (profiles join on request owner)
         const { data: empProf } = await supabase
           .from("profiles")
-          .select("id, username, phone_number")
+          .select("id, username, phone_number, avatar_url")
           .eq("id", req.user_id)
           .single();
         setOtherUser(prof);
@@ -169,7 +231,13 @@ export default function ChatScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchMessages();
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+        fetchMessages();
+      } else {
+        // Silent catch-up: no flash, only new messages
+        catchUpMessages();
+      }
       const channel = supabase
         .channel(`chat-${id}`)
         .on(
@@ -181,14 +249,25 @@ export default function ChatScreen() {
             filter: `request_id=eq.${id}`,
           },
           (payload) => {
-            setMessages((prev) => [...prev, payload.new as Message]);
+            const msg = payload.new as Message;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === msg.id)) return prev;
+              return [...prev, msg];
+            });
+            // Mark as read immediately if from the other user
+            if (userId && msg.sender_id !== userId) {
+              supabase
+                .from("messages")
+                .update({ read_at: new Date().toISOString() })
+                .eq("id", msg.id);
+            }
           },
         )
         .subscribe();
       return () => {
         supabase.removeChannel(channel);
       };
-    }, [fetchMessages, id]),
+    }, [fetchMessages, catchUpMessages, id, userId]),
   );
 
   async function sendMessage() {
@@ -200,6 +279,123 @@ export default function ChatScreen() {
       sender_id: userId,
       content: trimmed,
     });
+  }
+
+  function parseMediaContent(
+    content: string,
+  ):
+    | { type: "text"; text: string }
+    | { type: "img"; url: string }
+    | { type: "doc"; name: string; url: string } {
+    if (content.startsWith('{"_t":')) {
+      try {
+        const obj = JSON.parse(content);
+        if (obj._t === "img" && obj.url) return { type: "img", url: obj.url };
+        if (obj._t === "doc" && obj.url && obj.name)
+          return { type: "doc", name: obj.name, url: obj.url };
+      } catch {}
+    }
+    return { type: "text", text: content };
+  }
+
+  async function pickAndSendMedia() {
+    Alert.alert(t("attachment"), undefined, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("sendPhoto"), onPress: pickAndSendImage },
+      { text: t("sendFile"), onPress: pickAndSendDocument },
+    ]);
+  }
+
+  async function pickAndSendImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("permissionNeeded"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.85,
+    });
+    if (result.canceled || !userId) return;
+    setSendingMedia(true);
+    try {
+      const asset = result.assets[0];
+      const ext = asset.mimeType?.split("/")[1] ?? "jpg";
+      const filePath = `${id}/${Date.now()}.${ext}`;
+      const resp = await fetch(asset.uri);
+      const buf = await resp.arrayBuffer();
+      const { error } = await supabase.storage
+        .from("chat-media")
+        .upload(filePath, buf, {
+          contentType: asset.mimeType ?? "image/jpeg",
+        });
+      if (error) {
+        Alert.alert(t("mediaUploadFailed"));
+        return;
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+      await supabase.from("messages").insert({
+        request_id: id,
+        sender_id: userId,
+        content: JSON.stringify({ _t: "img", url: publicUrl }),
+      });
+    } catch {
+      Alert.alert(t("mediaUploadFailed"));
+    } finally {
+      setSendingMedia(false);
+    }
+  }
+
+  async function pickAndSendDocument() {
+    if (!userId) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      setSendingMedia(true);
+      const asset = result.assets[0];
+      const filePath = `${id}/${Date.now()}_${asset.name}`;
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64" as any,
+      });
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const { error } = await supabase.storage
+        .from("chat-media")
+        .upload(filePath, bytes.buffer, {
+          contentType: asset.mimeType ?? "application/octet-stream",
+        });
+      if (error) {
+        Alert.alert(t("mediaUploadFailed"));
+        return;
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+      await supabase.from("messages").insert({
+        request_id: id,
+        sender_id: userId,
+        content: JSON.stringify({
+          _t: "doc",
+          name: asset.name,
+          url: publicUrl,
+        }),
+      });
+    } catch {
+      Alert.alert(t("mediaUploadFailed"));
+    } finally {
+      setSendingMedia(false);
+    }
   }
 
   function openDateProposal() {
@@ -273,6 +469,63 @@ export default function ChatScreen() {
     );
   }
 
+  async function generateAndSharePDF() {
+    if (!requestInfo) return;
+    const employerName = isOwner
+      ? (myUsername ?? t("employer"))
+      : (otherUser?.username ?? t("employer"));
+    const studentName = isOwner
+      ? (otherUser?.username ?? t("student"))
+      : (myUsername ?? t("student"));
+    const completedOn = new Date().toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  body{font-family:-apple-system,Helvetica,sans-serif;margin:0;padding:40px;color:#1a1a1a;font-size:14px}
+  .hdr{background:#0D9488;color:#fff;padding:24px 40px;margin:-40px -40px 32px}
+  .hdr h1{margin:0;font-size:22px;font-weight:900}
+  .hdr p{margin:4px 0 0;font-size:12px;opacity:.8}
+  .sec-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;font-weight:700;margin:24px 0 10px}
+  .row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #F3F4F6}
+  .lbl{color:#6B7280}.val{font-weight:700}
+  .price-box{background:#F0FDF9;border:2px solid #0D9488;border-radius:12px;padding:20px;text-align:center;margin:24px 0}
+  .price{font-size:32px;font-weight:900;color:#0D9488}
+  .price-lbl{color:#6B7280;font-size:12px;margin-top:4px}
+  .footer{margin-top:40px;text-align:center;font-size:11px;color:#9CA3AF}
+</style></head>
+<body>
+  <div class="hdr"><h1>${t("jobSummaryPDF")}</h1><p>OlxReversed — Student Jobs Marketplace</p></div>
+  <div class="sec-title">${t("jobDetails")}</div>
+  <div class="row"><span class="lbl">${t("jobTitle")}</span><span class="val">${requestInfo.title}</span></div>
+  ${requestInfo.category ? `<div class="row"><span class="lbl">${t("category")}</span><span class="val">${requestInfo.category}</span></div>` : ""}
+  ${requestInfo.location ? `<div class="row"><span class="lbl">${t("location")}</span><span class="val">${requestInfo.location}</span></div>` : ""}
+  <div class="row"><span class="lbl">${t("completedOn")}</span><span class="val">${completedOn}</span></div>
+  <div class="sec-title">${t("parties")}</div>
+  <div class="row"><span class="lbl">${t("employer")}</span><span class="val">${employerName}</span></div>
+  <div class="row"><span class="lbl">${t("student")}</span><span class="val">${studentName}</span></div>
+  ${offerInfo ? `<div class="price-box"><div class="price">${offerInfo.price} RON</div><div class="price-lbl">${t("agreedRate")}</div></div>` : ""}
+  <div class="footer">Generated by OlxReversed · ${completedOn} · Job ID: ${id}</div>
+</body></html>`;
+    try {
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: t("shareSummary"),
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert(t("error"), "Sharing not available on this device.");
+      }
+    } catch {
+      Alert.alert(t("error"), "Failed to generate PDF.");
+    }
+  }
+
   async function handleComplete() {
     Alert.alert(t("markComplete"), t("markCompleteConfirm"), [
       { text: t("cancel"), style: "cancel" },
@@ -284,8 +537,9 @@ export default function ChatScreen() {
             .update({ status: "closed" })
             .eq("id", id);
           setJobClosed(true);
-          Alert.alert(t("jobCompleted"), undefined, [
+          Alert.alert(t("jobCompleted"), t("jobSummaryPDFHint"), [
             { text: t("rateLater"), style: "cancel" },
+            { text: t("shareSummary"), onPress: generateAndSharePDF },
             { text: t("rateNow"), onPress: promptRating },
           ]);
         },
@@ -393,6 +647,21 @@ export default function ChatScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Feather name="arrow-left" size={22} color={colors.primaryText} />
           </Pressable>
+          {otherUser?.id ? (
+            <Pressable
+              style={styles.headerAvatar}
+              onPress={() => router.push(`/cv/${otherUser.id}` as any)}
+            >
+              {otherUser.avatar_url ? (
+                <Image
+                  source={{ uri: otherUser.avatar_url }}
+                  style={styles.headerAvatarImg}
+                />
+              ) : (
+                <Feather name="user" size={18} color={colors.primaryText} />
+              )}
+            </Pressable>
+          ) : null}
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>
               {otherUser?.username ?? t("chat")}
@@ -402,12 +671,24 @@ export default function ChatScreen() {
             )}
           </View>
           <View style={styles.headerActions}>
+            {requestInfo && (
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={generateAndSharePDF}
+              >
+                <Feather name="download" size={18} color={colors.primaryText} />
+              </Pressable>
+            )}
             {otherUser?.id && (
               <Pressable
                 style={styles.headerIconBtn}
                 onPress={() => router.push(`/cv/${otherUser.id}` as any)}
               >
-                <Feather name="user" size={18} color={colors.primaryText} />
+                <Feather
+                  name="file-text"
+                  size={18}
+                  color={colors.primaryText}
+                />
               </Pressable>
             )}
             {otherUser && (
@@ -443,15 +724,18 @@ export default function ChatScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
+        {/* Context card — pinned at top, above messages */}
+        <ContextCard />
+
         <FlatList
           data={[...messages].reverse()}
           keyExtractor={(m) => m.id}
           style={{ flex: 1 }}
           contentContainerStyle={styles.messageList}
           inverted
-          ListFooterComponent={<ContextCard />}
           renderItem={({ item }) => {
             const isMe = item.sender_id === userId;
+            const media = parseMediaContent(item.content);
             return (
               <View
                 style={[
@@ -463,16 +747,57 @@ export default function ChatScreen() {
                   style={[
                     styles.bubble,
                     isMe ? styles.bubbleMe : styles.bubbleOther,
+                    media.type !== "text" && styles.bubbleMedia,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.msgText,
-                      isMe ? styles.msgTextMe : styles.msgTextOther,
-                    ]}
-                  >
-                    {item.content}
-                  </Text>
+                  {media.type === "img" ? (
+                    <Pressable onPress={() => setViewingMedia(media.url)}>
+                      <Image
+                        source={{ uri: media.url }}
+                        style={styles.mediaImg}
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : media.type === "doc" ? (
+                    <Pressable
+                      style={styles.docMsgRow}
+                      onPress={() => Linking.openURL(media.url)}
+                    >
+                      <Feather
+                        name="file-text"
+                        size={22}
+                        color={isMe ? "#fff" : colors.primary}
+                      />
+                      <View style={styles.docMsgInfo}>
+                        <Text
+                          style={[
+                            styles.docMsgName,
+                            isMe && styles.docMsgNameMe,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {media.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.docMsgOpen,
+                            isMe && styles.docMsgOpenMe,
+                          ]}
+                        >
+                          {t("tapToOpen")}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.msgText,
+                        isMe ? styles.msgTextMe : styles.msgTextOther,
+                      ]}
+                    >
+                      {item.content}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.msgMeta}>
                   <Text style={styles.msgTime}>
@@ -506,48 +831,54 @@ export default function ChatScreen() {
           }
         />
 
-        {/* Quick-reply templates */}
-        {!jobClosed && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.templateRow}
-            contentContainerStyle={styles.templateRowContent}
-            keyboardShouldPersistTaps="handled"
-          >
+        {/* Quick-reply templates — always visible */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.templateRow}
+          contentContainerStyle={styles.templateRowContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable style={styles.dateProposalChip} onPress={openDateProposal}>
+            <Text style={styles.dateProposalChipText}>
+              {t("tplProposeDate")}
+            </Text>
+          </Pressable>
+          {[
+            t("tplAvailable"),
+            t("tplWhenStart"),
+            t("tplSoundsGood"),
+            t("tplConfirm"),
+            t("tplLate"),
+          ].map((tpl) => (
             <Pressable
-              style={styles.dateProposalChip}
-              onPress={openDateProposal}
+              key={tpl}
+              style={styles.templateChip}
+              onPress={() => setText(tpl)}
             >
-              <Text style={styles.dateProposalChipText}>
-                {t("tplProposeDate")}
-              </Text>
+              <Text style={styles.templateChipText}>{tpl}</Text>
             </Pressable>
-            {[
-              t("tplAvailable"),
-              t("tplWhenStart"),
-              t("tplSoundsGood"),
-              t("tplConfirm"),
-              t("tplLate"),
-            ].map((tpl) => (
-              <Pressable
-                key={tpl}
-                style={styles.templateChip}
-                onPress={() => setText(tpl)}
-              >
-                <Text style={styles.templateChipText}>{tpl}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
+          ))}
+        </ScrollView>
 
-        {/* Input */}
+        {/* Input — always available, even on closed jobs */}
         <View
           style={[
             styles.inputRow,
             { paddingBottom: Math.max(10, insets.bottom) },
           ]}
         >
+          <Pressable
+            style={styles.attachBtn}
+            onPress={pickAndSendMedia}
+            disabled={sendingMedia}
+          >
+            <Feather
+              name={sendingMedia ? "loader" : "paperclip"}
+              size={20}
+              color={sendingMedia ? colors.mutedText : colors.primaryText}
+            />
+          </Pressable>
           <TextInput
             style={styles.input}
             value={text}
@@ -568,6 +899,13 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Full-screen image viewer */}
+      <ImageViewer
+        images={viewingMedia ? [viewingMedia] : []}
+        visible={!!viewingMedia}
+        onClose={() => setViewingMedia(null)}
+      />
 
       {/* Date proposal picker — Android native dialog */}
       {Platform.OS === "android" && showDatePicker && (

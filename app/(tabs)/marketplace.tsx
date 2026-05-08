@@ -3,23 +3,24 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { UserAvatar } from "../../src/components/UserAvatar";
 import { useTranslation } from "../../src/context/LanguageContext";
 import { useMarketplaceMode } from "../../src/context/MarketplaceModeContext";
 import { useTheme } from "../../src/context/ThemeContext";
@@ -71,7 +72,7 @@ type JobRequest = {
   is_urgent: boolean;
   is_boosted: boolean;
   boosted_until: string | null;
-  profiles: { username: string | null } | null;
+  profiles: { username: string | null; avatar_url: string | null } | null;
 };
 
 function timeAgo(dateStr: string, t: (key: string) => string) {
@@ -171,16 +172,6 @@ function forYouScore(job: JobRequest, userSkills: string[]): number {
   return matches ? 200 : 0;
 }
 
-function initials(name: string | null | undefined) {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
 const RATE_LABELS: Record<string, string> = {
   hourly: "RON/h",
   "per-session": "RON/ședință",
@@ -264,7 +255,7 @@ export default function JobsScreen() {
     let query = supabase
       .from("requests")
       .select(
-        "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
+        "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url)",
       )
       .eq("status", "active")
       .gte("created_at", thirtyDaysAgo);
@@ -362,7 +353,7 @@ export default function JobsScreen() {
       const { data: trendData } = await supabase
         .from("requests")
         .select(
-          "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username)",
+          "id,title,description,category,job_type,schedule_type,rate_type,availability_tags,budget_min,budget_max,location,status,posting_as,created_at,is_urgent,is_boosted,boosted_until,profiles(username,avatar_url)",
         )
         .in("id", topIds)
         .eq("status", "active");
@@ -624,9 +615,7 @@ export default function JobsScreen() {
             )}
             {isForYou && (
               <View style={styles.forYouBadge}>
-                <Text style={styles.forYouBadgeText}>
-                  {t("forYouSection")}
-                </Text>
+                <Text style={styles.forYouBadgeText}>{t("forYouSection")}</Text>
               </View>
             )}
           </View>
@@ -732,9 +721,12 @@ export default function JobsScreen() {
           {/* Footer */}
           <View style={styles.cardFooter}>
             <View style={styles.posterRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initials(posterName)}</Text>
-              </View>
+              <UserAvatar
+                style={styles.avatar}
+                textStyle={styles.avatarText}
+                avatarUrl={item.profiles?.avatar_url}
+                name={posterName}
+              />
               <View>
                 <Text style={styles.posterName} numberOfLines={1}>
                   {posterName ?? t("anonymous")}

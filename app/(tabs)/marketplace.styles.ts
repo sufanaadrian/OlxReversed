@@ -236,6 +236,7 @@ export function makeStyles(c: Colors) {
       backgroundColor: c.primaryLight,
       alignItems: "center",
       justifyContent: "center",
+      overflow: "hidden",
     },
     avatarText: { fontSize: 11, fontWeight: "800", color: c.primaryDark },
     posterName: {

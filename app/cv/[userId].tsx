@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Linking,
     Pressable,
     ScrollView,
@@ -30,6 +31,7 @@ type CVProfile = {
   phone_number: string | null;
   company_name: string | null;
   company_description: string | null;
+  avatar_url: string | null;
 };
 
 type Endorsement = {
@@ -64,7 +66,7 @@ export default function CVScreen() {
       const { data } = await supabase
         .from("profiles")
         .select(
-          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at, phone_number, company_name, company_description",
+          "id, username, bio, university, study_year, skills, user_type, verified, linkedin_url, created_at, phone_number, company_name, company_description, avatar_url",
         )
         .eq("id", userId)
         .single();
@@ -212,7 +214,17 @@ export default function CVScreen() {
         {/* Header card */}
         <View style={styles.headerCard}>
           <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{initials(profile.username)}</Text>
+            {profile.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={{ width: 72, height: 72, borderRadius: 36 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {initials(profile.username)}
+              </Text>
+            )}
           </View>
           <Text style={styles.name}>{profile.username ?? t("anonymous")}</Text>
           <View style={styles.badgeRow}>
