@@ -256,9 +256,9 @@ export default function MessagesScreen() {
         hasLoaded.current = true;
         fetchConversations(true);
       } else {
-        // Returning from chat: wait 1.5 s so the mark-as-read write lands
-        // before we re-query unread counts
-        timer = setTimeout(() => fetchConversations(), 1500);
+        // Returning from chat: small delay so the awaited mark-as-read
+        // write in chat.tsx has time to commit before we query unread counts
+        timer = setTimeout(() => fetchConversations(), 300);
       }
       // Subscribe to new messages for real-time updates
       const channel = supabase

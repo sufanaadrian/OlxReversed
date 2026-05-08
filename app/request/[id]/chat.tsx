@@ -103,16 +103,15 @@ export default function ChatScreen() {
     setMessages((data as Message[]) ?? []);
     setLoading(false);
 
-    // Mark incoming messages as read — fire-and-forget so it writes to the
-    // DB as fast as possible (no await, user may navigate back immediately)
+    // Mark incoming messages as read — awaited so the DB write completes
+    // reliably even if the user navigates away (JS promises run to completion)
     if (user) {
-      supabase
+      await supabase
         .from("messages")
         .update({ read_at: new Date().toISOString() })
         .eq("request_id", id)
         .neq("sender_id", user.id)
-        .is("read_at", null)
-        .then(() => {}); // intentional fire-and-forget
+        .is("read_at", null);
     }
   }, [id]);
 
