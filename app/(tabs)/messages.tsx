@@ -241,9 +241,13 @@ export default function MessagesScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Show spinner only on the very first load; every re-focus is silent
+      // so that returning from a chat immediately reflects the updated read state
       if (!hasLoaded.current) {
         hasLoaded.current = true;
         fetchConversations(true);
+      } else {
+        fetchConversations();
       }
       // Subscribe to new messages so the list updates silently without refetching
       const channel = supabase
@@ -252,7 +256,6 @@ export default function MessagesScreen() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages" },
           () => {
-            // Silent refresh — no loading spinner
             fetchConversations();
           },
         )
